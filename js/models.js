@@ -6,53 +6,34 @@ const R2 = Math.SQRT2;
 
 export const MODELS = [
   {
-    id: 'fortune-teller',
-    name: 'Fortune teller',
+    id: 'cup',
+    name: 'Paper cup',
     level: 'Easy',
-    blurb: 'The cootie catcher from the schoolyard. Two rounds of corners to the middle.',
-    paper: { colorUp: false },
+    blurb: 'A cup that holds water for a minute or two. Five folds.',
+    paper: { colorUp: false, turn: 45 },
     steps: [
       {
-        say: 'White side up. Fold in half corner to corner and unfold.',
-        do: (h) => h.crease(h.onto([0, 0], [1, 1]), { move: [0, 0] }),
+        say: 'Start with the white side up, turned like a diamond. Fold the bottom corner up to the top corner.',
+        do: (h) => h.valley(h.onto([1, 0], [0, 1]), { move: [1, 0] }),
       },
       {
-        say: 'Fold in half the other way, corner to corner, and unfold. The creases cross in the middle.',
-        do: (h) => h.crease(h.onto([1, 0], [0, 1]), { move: [1, 0] }),
+        say: 'Fold the left corner over to the right edge, so the top edge of the flap lies level.',
+        do: (h) => h.valley(h.lineAt(h.lerp(h.at([1, 1]), h.at([0, 0]), R2 - 1), 112.5), { move: [1, 1] }),
       },
       {
-        say: 'Fold all four corners in to the middle.',
-        do: (h) => h.together(
-          (k) => k.valley(k.onto([0, 0], [0.5, 0.5]), { move: [0, 0] }),
-          (k) => k.valley(k.onto([1, 0], [0.5, 0.5]), { move: [1, 0] }),
-          (k) => k.valley(k.onto([1, 1], [0.5, 0.5]), { move: [1, 1] }),
-          (k) => k.valley(k.onto([0, 1], [0.5, 0.5]), { move: [0, 1] }),
-        ),
+        say: 'Fold the right corner over to the left edge the same way. It lands on top of the first flap.',
+        do: (h) => {
+          const right = h.at([0, 0]), left = [-right[0], right[1]]; // the left corner has moved; its old place mirrors the right one
+          return h.valley(h.lineAt(h.lerp(right, left, R2 - 1), 67.5), { move: [0, 0] });
+        },
       },
       {
-        say: 'Turn it over.',
-        do: (h) => h.turnOver(),
+        say: 'Fold the front layer of the top point down over the flaps.',
+        do: (h) => h.valley(h.lineAt([0, h.at([0, 0])[1]], 0), { flap: [1, 0] }),
       },
       {
-        say: 'Fold the four new corners in to the middle again.',
-        do: (h) => h.together(
-          (k) => k.valley(k.onto([0.5, 0], [0.5, 0.5]), { move: [0.5, 0] }),
-          (k) => k.valley(k.onto([1, 0.5], [0.5, 0.5]), { move: [1, 0.5] }),
-          (k) => k.valley(k.onto([0.5, 1], [0.5, 0.5]), { move: [0.5, 1] }),
-          (k) => k.valley(k.onto([0, 0.5], [0.5, 0.5]), { move: [0, 0.5] }),
-        ),
-      },
-      {
-        say: 'Fold in half, bottom edge to top edge, and unfold.',
-        do: (h) => h.crease(h.level(h.sheet().bounds().cy), { move: [0.25, 0.25] }),
-      },
-      {
-        say: 'Fold in half side to side and unfold. Now write colors on the outer flaps and numbers and fortunes inside.',
-        do: (h) => h.crease(h.upright(h.sheet().bounds().cx), { move: [0.25, 0.25] }),
-      },
-      {
-        say: 'Turn it over, slide a thumb and finger under each of the four square flaps, and push the points up and together.',
-        do: (h) => h.turnOver(),
+        say: 'Fold the back layer of the top point down behind. Squeeze the sides and the cup opens.',
+        do: (h) => h.mountain(h.lineAt([0, h.at([0, 0])[1]], 0), { flap: [0, 1] }),
       },
     ],
   },
@@ -159,9 +140,60 @@ export const MODELS = [
     ],
   },
   {
+    id: 'fortune-teller',
+    name: 'Fortune teller',
+    level: 'Easy',
+    blurb: 'The cootie catcher from the schoolyard. Two rounds of corners to the middle.',
+    paper: { colorUp: false },
+    steps: [
+      {
+        say: 'White side up. Fold in half corner to corner and unfold.',
+        do: (h) => h.crease(h.onto([0, 0], [1, 1]), { move: [0, 0] }),
+      },
+      {
+        say: 'Fold in half the other way, corner to corner, and unfold. The creases cross in the middle.',
+        do: (h) => h.crease(h.onto([1, 0], [0, 1]), { move: [1, 0] }),
+      },
+      {
+        say: 'Fold all four corners in to the middle.',
+        do: (h) => h.together(
+          (k) => k.valley(k.onto([0, 0], [0.5, 0.5]), { move: [0, 0] }),
+          (k) => k.valley(k.onto([1, 0], [0.5, 0.5]), { move: [1, 0] }),
+          (k) => k.valley(k.onto([1, 1], [0.5, 0.5]), { move: [1, 1] }),
+          (k) => k.valley(k.onto([0, 1], [0.5, 0.5]), { move: [0, 1] }),
+        ),
+      },
+      {
+        say: 'Turn it over.',
+        do: (h) => h.turnOver(),
+      },
+      {
+        say: 'Fold the four new corners in to the middle again.',
+        do: (h) => h.together(
+          (k) => k.valley(k.onto([0.5, 0], [0.5, 0.5]), { move: [0.5, 0] }),
+          (k) => k.valley(k.onto([1, 0.5], [0.5, 0.5]), { move: [1, 0.5] }),
+          (k) => k.valley(k.onto([0.5, 1], [0.5, 0.5]), { move: [0.5, 1] }),
+          (k) => k.valley(k.onto([0, 0.5], [0.5, 0.5]), { move: [0, 0.5] }),
+        ),
+      },
+      {
+        say: 'Fold in half, bottom edge to top edge, and unfold.',
+        do: (h) => h.crease(h.level(h.sheet().bounds().cy), { move: [0.25, 0.25] }),
+      },
+      {
+        say: 'Fold in half side to side and unfold. Now write colors on the outer flaps and numbers and fortunes inside.',
+        do: (h) => h.crease(h.upright(h.sheet().bounds().cx), { move: [0.25, 0.25] }),
+      },
+      {
+        say: 'Turn it over, slide a thumb and finger under each of the four square flaps, and push the points up and together.',
+        do: (h) => h.turnOver(),
+      },
+    ],
+  },
+  {
     id: 'helmet',
     name: 'Samurai helmet',
-    level: 'Easy',
+    level: 'Medium',
     blurb: 'The kabuto, with two horns and a brim. Big enough to wear if you start with newspaper.',
     paper: { colorUp: false, turn: 45 },
     steps: [
@@ -204,38 +236,6 @@ export const MODELS = [
       {
         say: 'Fold the back layer of the bottom point up behind. The helmet is done.',
         do: (h) => h.mountain(h.level(h.at([1, 0.5])[1]), { flap: [1, 0] }),
-      },
-    ],
-  },
-  {
-    id: 'cup',
-    name: 'Paper cup',
-    level: 'Easy',
-    blurb: 'A cup that holds water for a minute or two. Five folds.',
-    paper: { colorUp: false, turn: 45 },
-    steps: [
-      {
-        say: 'Start with the white side up, turned like a diamond. Fold the bottom corner up to the top corner.',
-        do: (h) => h.valley(h.onto([1, 0], [0, 1]), { move: [1, 0] }),
-      },
-      {
-        say: 'Fold the left corner over to the right edge, so the top edge of the flap lies level.',
-        do: (h) => h.valley(h.lineAt(h.lerp(h.at([1, 1]), h.at([0, 0]), R2 - 1), 112.5), { move: [1, 1] }),
-      },
-      {
-        say: 'Fold the right corner over to the left edge the same way. It lands on top of the first flap.',
-        do: (h) => {
-          const right = h.at([0, 0]), left = [-right[0], right[1]]; // the left corner has moved; its old place mirrors the right one
-          return h.valley(h.lineAt(h.lerp(right, left, R2 - 1), 67.5), { move: [0, 0] });
-        },
-      },
-      {
-        say: 'Fold the front layer of the top point down over the flaps.',
-        do: (h) => h.valley(h.lineAt([0, h.at([0, 0])[1]], 0), { flap: [1, 0] }),
-      },
-      {
-        say: 'Fold the back layer of the top point down behind. Squeeze the sides and the cup opens.',
-        do: (h) => h.mountain(h.lineAt([0, h.at([0, 0])[1]], 0), { flap: [0, 1] }),
       },
     ],
   },

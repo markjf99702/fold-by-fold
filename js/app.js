@@ -135,12 +135,22 @@ function go(i, { play = false, snap = false } = {}) {
   prefs.progress[P.id] = P.i;
   save();
   if (play) start();
+  else if (!P.b.steps[P.i].view) aimFor(P.b.steps[P.i]);
   paint();
   frameCamera(snap);
 }
 
+// Some steps look best from a particular angle (a finished plane from the side, say).
+let aimedFor = null;
+function aimFor(step) {
+  if (!view) return;
+  if (step.view) { view.aim(step.view.yaw, step.view.pitch); aimedFor = step; }
+  else if (aimedFor) { view.aim(-90, 58); aimedFor = null; }
+}
+
 function start() {
   if (P.t >= 1) P.t = 0;
+  aimFor(P.b.steps[P.i]);
   P.playing = true;
   P.holding = P.t === 0;
   P.clock = performance.now();
@@ -194,8 +204,9 @@ const CHIP = {
 };
 function chipFor(step) {
   const m = step.motion;
+  const type = m.type || (m.parts && m.parts[0].type);
   let icon = CHIP.valley;
-  if (m.type === 'mountain') icon = CHIP.mountain;
+  if (type === 'mountain') icon = CHIP.mountain;
   if (m.kind === 'turnOver' || m.kind === 'turn') icon = CHIP.turn;
   return `${icon}<span>${step.name}</span>`;
 }
