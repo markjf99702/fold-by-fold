@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Fold by Fold</title>
+  <meta name="description" content="Origami you can watch fold, one step at a time. Each step is a real sheet of paper folding in 3D: replay it, slow it down, scrub it back and forth, and turn the paper to see it from any side.">
+  <meta property="og:title" content="Fold by Fold">
+  <meta property="og:description" content="Origami steps you can watch fold in 3D, rewind and turn around.">
+  <meta property="og:image" content="https://junkdrawer.works/fold-by-fold/og.png">
+  <meta property="og:url" content="https://junkdrawer.works/fold-by-fold/">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="theme-color" content="#efe8db" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#151816" media="(prefers-color-scheme: dark)">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icon-180.png">
+  <link rel="preload" href="fonts/shippori-mincho-800.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="fonts/zen-kaku-400.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="css/app.css">
+  <script type="module" src="js/app.js"></script>
+</head>
+<body>
+  <noscript><p class="noscript">Fold by Fold needs JavaScript to fold the paper.</p></noscript>
+
+  <main id="app">
+    <section class="screen home" id="home" hidden>
+      <header class="mast">
+        <p class="eyebrow">Origami, step by step</p>
+        <h1>Fold by Fold</h1>
+        <p class="lede">Watch each fold happen on a real sheet of paper. Replay it, slow it down, scrub it back and forth, and drag to see it from any side.</p>
+      </header>
+
+      <div class="paper-pick">
+        <span class="pick-label" id="pickLabel">Paper</span>
+        <div class="swatches" id="swatches" role="radiogroup" aria-labelledby="pickLabel"></div>
+      </div>
+
+      <ul class="models" id="models"></ul>
+
+      <section class="symbols" aria-labelledby="symbolsTitle">
+        <h2 id="symbolsTitle">Reading a diagram</h2>
+        <p>Printed origami instructions use a handful of marks. Every step here shows the same marks on the paper just before it folds.</p>
+        <dl class="symbol-list">
+          <div>
+            <dt><svg viewBox="0 0 60 30" aria-hidden="true"><path class="ln valley" d="M4 22H56"/><path class="arc" d="M18 21C18 4 42 4 42 18"/><path class="head" d="M38 14l4 6 3-7"/></svg>Valley fold</dt>
+            <dd>A dashed line. Fold the paper toward you, so the crease sinks like a valley.</dd>
+          </div>
+          <div>
+            <dt><svg viewBox="0 0 60 30" aria-hidden="true"><path class="ln mountain" d="M4 22H56"/><path class="arc" d="M18 21C18 4 42 4 42 18"/><path class="head hollow" d="M38 14l4 6 3-7z"/></svg>Mountain fold</dt>
+            <dd>A line of dashes and dots. Fold the paper away from you, behind, so the crease stands up like a ridge.</dd>
+          </div>
+          <div>
+            <dt><svg viewBox="0 0 60 30" aria-hidden="true"><path class="ln valley" d="M4 22H56"/><path class="arc" d="M16 21C16 4 30 4 30 18M30 18C30 4 44 4 44 21"/><path class="head" d="M40 17l4 5 3-6"/></svg>Fold and unfold</dt>
+            <dd>Make the fold, press it flat, and open it again. The crease guides a later step.</dd>
+          </div>
+          <div>
+            <dt><svg viewBox="0 0 60 30" aria-hidden="true"><path class="arc" d="M14 18C14 6 46 6 46 18C46 24 34 26 30 22"/><path class="head" d="M33 19l-4 4 5 2"/></svg>Turn over</dt>
+            <dd>Flip the whole model over, left to right.</dd>
+          </div>
+        </dl>
+      </section>
+
+      <footer class="jd-foot">
+        <a href="https://junkdrawer.works/">Part of junkdrawer.works</a>
+        <span aria-hidden="true">·</span>
+        <a href="https://junkdrawer.works/privacy.html">Privacy</a>
+      </footer>
+    </section>
+
+    <section class="screen player" id="player" hidden>
+      <header class="bar">
+        <button type="button" class="icon-btn" id="back" aria-label="All models">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>
+        </button>
+        <div class="bar-title">
+          <h2 id="modelName"></h2>
+          <p id="stepCount"></p>
+        </div>
+        <div class="bar-end">
+          <button type="button" class="icon-btn" id="topView" aria-label="Look straight down" title="Look straight down">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="5" width="14" height="14" rx="1.5"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></svg>
+          </button>
+          <button type="button" class="icon-btn" id="resetView" aria-label="Reset the view" title="Reset the view">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.4-5.7"/><path d="M4 4v4.5h4.5"/></svg>
+          </button>
+        </div>
+      </header>
+
+      <div class="stage" id="stage">
+        <canvas id="gl" aria-label="The paper, in 3D. Drag to turn it, pinch or scroll to zoom." role="img"></canvas>
+        <p class="hint" id="hint">Drag to turn the paper · pinch to zoom</p>
+        <p class="gl-error" id="glError" hidden>This browser can’t draw 3D here, so the folds can’t be shown.</p>
+      </div>
+
+      <div class="panel">
+        <ol class="ticks" id="ticks" aria-label="Steps"></ol>
+        <div class="step-now">
+          <p class="chip" id="chip"></p>
+          <p class="say" id="say" aria-live="polite"></p>
+        </div>
+        <label class="scrub">
+          <span class="sr">Where in this fold</span>
+          <input type="range" id="scrub" min="0" max="1000" value="0">
+        </label>
+        <div class="controls">
+          <button type="button" class="ctl" id="prev" aria-label="Previous step">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5v14M18 5l-9 7 9 7z"/></svg>
+          </button>
+          <button type="button" class="ctl main" id="play">
+            <svg viewBox="0 0 24 24" aria-hidden="true" id="playIcon"><path d="M7 4.5v15l12.5-7.5z"/></svg>
+            <span id="playLabel">Play</span>
+          </button>
+          <button type="button" class="ctl" id="next" aria-label="Next step">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 5v14M6 5l9 7-9 7z"/></svg>
+          </button>
+          <button type="button" class="speed" id="speed" aria-pressed="false">Slow</button>
+        </div>
+        <ol class="step-list" id="stepList"></ol>
+      </div>
+    </section>
+  </main>
+</body>
+</html>
