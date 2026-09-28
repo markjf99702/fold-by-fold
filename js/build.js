@@ -48,7 +48,8 @@ function helpers(current) {
   // Points the moving side toward the left of the line.
   const orient = (L, move) => {
     if (!move) return L;
-    return side(L, at(move)) > 0 ? L : flip(L);
+    const q = Array.isArray(move[0]) ? move[0] : move; // a flap can be given by several points
+    return side(L, at(q)) > 0 ? L : flip(L);
   };
   const opts = (o = {}) => {
     const out = { ...o };

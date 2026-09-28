@@ -81,6 +81,51 @@ function footLine(h, face, at, deg) {
   return { p: [tip[0] + at * along[0], tip[1] + at * along[1]], d: [Math.cos(r) * along[0] - Math.sin(r) * along[1], Math.sin(r) * along[0] + Math.cos(r) * along[1]] };
 }
 
+// The jumping frog's index card: 3 by 5, so 1 wide and 5/3 tall. The top square collapses into a
+// waterbomb base around X, the middle of the square; the body below it is BODY tall.
+const CARD = 5 / 3, BODY = CARD - 1;
+const X = [0.5, CARD - 0.5];
+
+// One side of the waterbomb, from its waterbomb base: the front flaps up to the top, their side corners
+// in to the middle, and their tips tucked into the pockets that makes. at maps a paper point on the front
+// to the matching one on the back.
+function waterbombSide(at, first, last = 'Tuck each one into the pocket under the side triangle just below it.') {
+  // A point just inside a side corner of the flap, and the corner itself: a point on the base's edge, which
+  // stays put on both sides.
+  const side = (u) => [at([u, 0.78]), [u, 0.25]];
+  return [
+    {
+      say: first,
+      name: 'Valley folds',
+      do: (h) => h.together(
+        (k) => k.valley(k.onto(at(K3), C), { flap: at([0.95, 0.98]) }),
+        (k) => k.valley(k.onto(at(K4), C), { flap: at([0.05, 0.98]) }),
+      ),
+    },
+    {
+      say: 'Fold the side corners of the top layer in to the middle line.',
+      name: 'Valley folds',
+      do: (h) => h.together(...[0.75, 0.25].map((u) => (k) => {
+        const [seed, corner] = side(u);
+        return k.valley(k.upright((k.at(C)[0] + k.at(corner)[0]) / 2), { flap: seed });
+      })),
+    },
+    {
+      say: 'Fold the loose points at the top down, so their edges lie along the tops of the side triangles.',
+      name: 'Valley folds',
+      do: (h) => h.together(...[[0.98, 0.875], [0.02, 0.125]].map(([u, w]) => (k) =>
+        k.valley(k.level(k.at(at([w, 0.875]))[1]), { flap: at([u, 0.95]) }))),
+    },
+    {
+      say: last,
+      name: 'Tuck',
+      // Both layers of the point go in (they're joined only along the fold), under the whole side triangle.
+      do: (h) => h.together(...[[0.98, 0.95, 0.875, 0.75, 0.833], [0.02, 0.05, 0.125, 0.25, 0.167]].map(([u, v, w, e, q]) => (k) =>
+        k.valley(k.through(at([w, 0.875]), at([e, 0.75])), { flap: [at([u, 0.95]), at([v, 0.98])], into: { below: at([q, 0.75]) } }))),
+    },
+  ];
+}
+
 // The wings of the flapping bird: up to halfway while it stands up, then three flaps, ending halfway.
 const ease = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
 function flapping(t) {
@@ -540,6 +585,109 @@ export const MODELS = [
           (k) => k.bend(k.level(k.at(C)[1]), 80, { flap: [0.98, 0.9], type: 'mountain', schedule: flapping }),
         ], { line: { p: [0, h.at(C)[1]], d: [1, 0] }, angle: 90, schedule: (t) => ease(Math.min(1, t / 0.3)) }),
       },
+    ],
+  },
+  {
+    id: 'jumping-frog',
+    name: 'Jumping frog',
+    level: 'Easy',
+    blurb: 'From an index card. Press on its back, slide your finger off, and it hops.',
+    paper: { colorUp: false, size: [1, CARD] },
+    steps: [
+      {
+        say: 'Start with an index card standing up tall. Fold the top right corner down to the left edge, and unfold.',
+        do: (h) => h.crease(h.through([0, CARD], [1, BODY]), { move: [1, CARD] }),
+      },
+      {
+        say: 'Fold the top left corner down to the right edge, and unfold. The creases make an X.',
+        do: (h) => h.crease(h.through([1, CARD], [0, BODY]), { move: [0, CARD] }),
+      },
+      {
+        say: 'Fold the top down behind, so the fold runs across the middle of the X, and unfold.',
+        do: (h) => h.crease(h.level(h.at(X)[1]), { move: [0.5, CARD], type: 'mountain' }),
+      },
+      {
+        say: 'Push the sides in at the ends of that crease. They fold in along the X, the top comes down, and it all flattens into a triangle on top of the card.',
+        name: 'Collapse',
+        do: (h) => h.mech({
+          root: [0.5, 0.3], arrow: [0.5, CARD],
+          // Mountain and valley as seen from the colored side, which is underneath here.
+          creases: [
+            { a: X, b: [0, BODY], fold: 'mountain' }, { a: X, b: [1, BODY], fold: 'mountain' },
+            { a: X, b: [0, CARD], fold: 'mountain' }, { a: X, b: [1, CARD], fold: 'mountain' },
+            { a: X, b: [0, CARD - 0.5], fold: 'valley' }, { a: X, b: [1, CARD - 0.5], fold: 'valley' },
+          ],
+        }),
+      },
+      {
+        say: 'Fold the two bottom corners of the top layer of the triangle up to its top point. These are the front legs.',
+        name: 'Valley folds',
+        do: (h) => h.together(
+          (k) => k.valley(k.onto([1, CARD], X), { flap: [0.95, CARD - 0.02] }),
+          (k) => k.valley(k.onto([0, CARD], X), { flap: [0.05, CARD - 0.02] }),
+        ),
+      },
+      {
+        say: 'Fold the sides of the card in to meet in the middle.',
+        name: 'Valley folds',
+        do: (h) => h.together(
+          (k) => k.valley(k.through([0.75, 0], [0.75, BODY]), { flap: [0.9, 0.3] }),
+          (k) => k.valley(k.through([0.25, 0], [0.25, BODY]), { flap: [0.1, 0.3] }),
+        ),
+      },
+      {
+        say: 'Fold the bottom up to meet the bottom of the triangle.',
+        do: (h) => h.valley(h.level(h.at([0.5, BODY / 2])[1]), { move: [0.5, 0.02] }),
+      },
+      {
+        say: 'Fold it back down in half, so its edge meets the fold at the bottom. This zigzag is the spring.',
+        do: (h) => h.valley(h.level(h.at([0.5, BODY * 3 / 4])[1]), { flap: [0.5, 0.02] }),
+      },
+      {
+        say: 'Turn it over. That’s the frog. Press down on its back end, slide your finger off, and it hops.',
+        do: (h) => h.turnOver(),
+      },
+    ],
+  },
+  {
+    id: 'waterbomb',
+    name: 'Waterbomb',
+    level: 'Medium',
+    blurb: 'The paper balloon. It folds flat, and then you blow it up.',
+    paper: { colorUp: false },
+    steps: [
+      {
+        say: 'White side up. Fold the bottom left corner up to the top right corner, and unfold.',
+        do: (h) => h.crease(h.onto(K1, K3), { move: K1 }),
+      },
+      {
+        say: 'Fold the bottom right corner up to the top left corner, and unfold.',
+        do: (h) => h.crease(h.onto(K2, K4), { move: K2 }),
+      },
+      {
+        say: 'Fold the top edge down behind to the bottom edge, and unfold.',
+        do: (h) => h.crease(h.onto(M34, M12), { move: M34, type: 'mountain' }),
+      },
+      {
+        say: 'Push the middles of the left and right edges in. The sides fold in along the diagonals, the top comes down, and it all flattens into a triangle. This is the waterbomb base.',
+        name: 'Collapse',
+        do: (h) => h.mech({
+          root: [0.5, 0.15], arrow: M34,
+          // Mountain and valley as seen from the colored side, which is underneath here.
+          creases: [
+            { a: C, b: K1, fold: 'mountain' }, { a: C, b: K2, fold: 'mountain' },
+            { a: C, b: K3, fold: 'mountain' }, { a: C, b: K4, fold: 'mountain' },
+            { a: C, b: M41, fold: 'valley' }, { a: C, b: M23, fold: 'valley' },
+          ],
+        }),
+      },
+      ...waterbombSide((p) => p, 'Fold the two bottom corners of the top layer up to the top point.'),
+      {
+        say: 'Turn it over.',
+        do: (h) => h.turnOver(),
+      },
+      ...waterbombSide(([u, v]) => [u, 1 - v], 'Do the same on this side: fold the bottom corners of the top layer up to the top point.',
+        'Tuck these two into their pockets too. That’s the waterbomb. Blow gently into the small hole at the bottom and it puffs up into a balloon.'),
     ],
   },
   {

@@ -182,10 +182,15 @@ function movingPieces(sheet, L, { layers = 'all', seed = null, only = null }) {
     }
     return moving;
   }
-  const start = sheet.facetAt(seed);
-  if (side(L, apply(start.m, seed)) <= 0) throw new Error('The flap to fold is not on the moving side of the line');
+  // One seed, or several when the flap's layers are joined only along the fold itself.
+  const seeds = Array.isArray(seed[0]) ? seed : [seed];
+  const starts = seeds.map((q) => {
+    const start = sheet.facetAt(q);
+    if (side(L, apply(start.m, q)) <= 0) throw new Error('The flap to fold is not on the moving side of the line');
+    return start.id;
+  });
   const moving = new Set();
-  const queue = [start.id];
+  const queue = starts.slice();
   const seen = new Set();
   const grow = () => { while (queue.length) step(); };
   // Anything caught between two layers of the flap has to fold with it.
@@ -240,7 +245,7 @@ function result(from, to, motion) {
 
 // Folds along line L, moving the paper on L's left over to its right.
 //   type: 'valley' (toward you) or 'mountain' (away, behind).
-//   layers: 'all' or 'flap' (with seed: a paper point on the flap).
+//   layers: 'all' or 'flap' (with seed: a paper point on the flap, or a list of them).
 //   into: where the moved layers go in the stack: 'top' for valley folds, 'bottom' for mountain folds,
 //   or { above: paper point } / { below: paper point } to tuck them into a pocket.
 export function fold(sheet, L, opts = {}) {
