@@ -378,12 +378,18 @@ export const MODELS = [
         ),
       },
       {
-        say: 'Inside reverse fold the right point up to make the neck: open its layers a little, push the point up between them along the crease, and flatten.',
-        do: (h) => h.reverse(h.lineAt(h.sub(h.at(H4), [0, NECK]), -12.5), { flap: [0.15, 0.9], split: h.paperLine(K2, K4) }),
+        say: 'Inside reverse fold the right point up to make the neck. Swing the top layer on the right over to the left like a page, so the point lies open. Fold it up along its crease as you swing the page back, and it goes up inside, between the layers.',
+        name: 'Inside reverse fold',
+        do: (h) => h.reverseOpen([
+          (k) => k.reverse(k.lineAt(k.sub(k.at(H4), [0, NECK]), -12.5), { flap: [0.15, 0.9], split: k.paperLine(K2, K4) }),
+        ], { axis: h.through(C, H4), page: [0.75, 0.95] }),
       },
       {
-        say: 'Reverse fold the left point up the same way, for the tail.',
-        do: (h) => h.reverse(h.lineAt(h.sub(h.at(H2), [0, NECK]), 12.5), { flap: [0.9, 0.15], split: h.paperLine(K2, K4) }),
+        say: 'Do the same with the left point for the tail: swing the top layer on the left over to the right, fold the point up, and swing it back.',
+        name: 'Inside reverse fold',
+        do: (h) => h.reverseOpen([
+          (k) => k.reverse(k.lineAt(k.sub(k.at(H2), [0, NECK]), 12.5), { flap: [0.9, 0.15], split: k.paperLine(K2, K4) }),
+        ], { axis: h.through(C, H2), page: [0.95, 0.75] }),
       },
       {
         say: 'Reverse fold the tip of the neck down to make the head.',

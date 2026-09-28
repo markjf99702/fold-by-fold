@@ -182,7 +182,7 @@ function reversePoses(step, e, zFrom, zTo) {
   for (const id of motion.back) axisZ.set(id, bottom);
   const c = Math.cos(phi * e), s = Math.sin(phi * e);
   const swing = [c, -s, 0, s, c, 0, 0, 0, 1];
-  return from.order.map((id) => {
+  const items = from.order.map((id) => {
     const f = from.facets.get(id);
     if (!axisZ.has(id)) return { facet: f, pose: flatPose(f.m, zFrom(id) + (zTo(id) - zFrom(id)) * e) };
     const a = axisZ.get(id), z = zFrom(id);
@@ -191,14 +191,33 @@ function reversePoses(step, e, zFrom, zTo) {
     pose.t[2] += (zTo(id) - (2 * a - z)) * e;
     return { facet: f, pose };
   });
+  // Where the tip pulls away from the rest of its layer along the crease, a strip of paper bends across
+  // the gap, the way real paper gives there.
+  const poseOf = new Map(items.map((it) => [it.facet.id, it.pose]));
+  for (const { tip, base, edge: [p0, p1] } of motion.hinges) {
+    const T = poseOf.get(tip), B = poseOf.get(base);
+    const pts = [transformPoint(T, ...p1), transformPoint(T, ...p0), transformPoint(B, ...p0), transformPoint(B, ...p1)];
+    const n = norm3(cross3(sub3(pts[1], pts[0]), sub3(pts[3], pts[0])));
+    items.push({ facet: { poly: [p1, p0, p0, p1] }, pts, pose: { r: [1, 0, n[0], 0, 1, n[1], 0, 0, n[2]], t: [0, 0, 0] }, bridge: true });
+  }
+  return items;
 }
+
+const sub3 = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+const cross3 = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+const norm3 = (a) => { const l = Math.hypot(...a) || 1; return [a[0] / l, a[1] / l, a[2] / l]; };
 
 // Nothing goes through the table: if part of the paper would dip below it, lift the whole sheet, the way
 // you pick the paper up to fold something behind.
 function lifted(items) {
   let low = 0;
   for (const it of items) for (const q of corners(it)) low = Math.min(low, q[2]);
-  if (low < 0) for (const it of items) it.pose.t[2] -= low;
+  if (low < 0) {
+    for (const it of items) {
+      if (it.pts) for (const q of it.pts) q[2] -= low;
+      else it.pose.t[2] -= low;
+    }
+  }
   return items;
 }
 
@@ -206,6 +225,9 @@ function lifted(items) {
 // moving part to where it lands. All in 3D table coordinates.
 export function marks(step) {
   const { from, motion } = step;
+  if (motion.kind === 'mech' && motion.parts) {
+    return motion.parts.map((p) => markFor(from, { ...p, sign: -1, type: 'mountain', kind: 'fold' })).filter(Boolean);
+  }
   if (motion.kind === 'mech') return mechMarks(step);
   if (motion.kind === 'reverse') {
     const m = markFor(from, { ...motion, sign: -1, type: 'mountain', kind: 'fold' });
@@ -277,6 +299,7 @@ function mechMarks(step) {
 
 // The facet's corners on the paper and in 3D.
 export function corners(item) {
+  if (item.pts) return item.pts;
   return item.facet.poly.map(([u, v]) => transformPoint(item.pose, u, v));
 }
 

@@ -344,6 +344,7 @@ export class View {
     const data = [];
     const w = 0.0016;
     for (const it of this.items) {
+      if (it.bridge) continue;
       const c = corners(it);
       const r = it.pose.r;
       const n = [r[2], r[5], r[8]];

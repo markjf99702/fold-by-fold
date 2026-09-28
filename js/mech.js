@@ -146,13 +146,85 @@ function specFor(specs, j) {
 
 // ---------- The step ----------
 
-// sheet: the state before. specs: [{ a, b, fold, schedule? }] crease segments on the paper.
-// root: a paper point on the part that stays put. schedule(t) -> [0, 1] shapes how each crease closes
-// (default: eased evenly).
+// sheet: the state before. specs: [{ a, b, fold, drive?, via?, when?, schedule? }] crease segments on the
+// paper. root: a paper point on the part that stays put. See solve() for the rest.
 export function mechanism(sheet, { creases: specs, root, arrow = null, samples = 60 }) {
   const from = sheet.clone();
   from._world = new Map();
   cutAlong(from, specs);
+  const driven = specs.some((sp) => sp.drive);
+  const plan = (j) => {
+    const s = specFor(specs, j);
+    if (!s) return null;
+    const target = s.fold === 'free' ? null : (typeof s.fold === 'number' ? s.fold * Math.PI / 180 : FOLDS[s.fold]);
+    if (target !== null && Math.abs(target - j.theta0) < 1e-9 && s.via === undefined) return null;
+    return { target, via: viaOf(s.via), when: s.when, schedule: s.schedule, weight: !driven || s.drive ? 1 : 0.02 };
+  };
+  const r = run(from, null, plan, { root, samples });
+  r.motion.specs = specs;
+  r.motion.arrow = arrow;
+  return r;
+}
+
+// Moves between two flat states that are already known, as one linked motion, by turning a page: the
+// layers joined to paper point `page` without crossing the line `axis` (on the table) swing over about that
+// line and back, like a page of a book. Turned over, they open up whatever they were folded against, and
+// the creases that change do so while the page comes back. This is how an inside reverse fold can be made
+// with stiff paper: open the flap out flat, fold the point up, and close it again.
+export function between(from, to, { axis, page, samples = 80 }) {
+  const onAxis = (j) => {
+    const f = from.facets.get(j.f);
+    return Math.abs(side(axis, apply(f.m, j.p0))) < 1e-7 && Math.abs(side(axis, apply(f.m, j.p1))) < 1e-7;
+  };
+  const all = joins(from);
+  const changed = (j) => Math.abs(angleIn(to, j) - j.theta0) > 1e-9;
+  // The page: everything reachable from the seed without crossing the axis or a crease that changes.
+  const inPage = new Set([from.facetAt(page).id]);
+  for (let grew = true; grew;) {
+    grew = false;
+    for (const j of all) {
+      if (onAxis(j) || changed(j) || inPage.has(j.f) === inPage.has(j.g)) continue;
+      inPage.add(j.f); inPage.add(j.g); grew = true;
+    }
+  }
+  const plan = (j) => {
+    const theta1 = angleIn(to, j);
+    if (onAxis(j) && inPage.has(j.f) !== inPage.has(j.g) && !changed(j)) {
+      // The page's own hinge: where it lies open beside a layer it folds over onto that layer's upper
+      // face; where it lies folded on a layer it opens out flat. Either way it comes back.
+      if (Math.abs(j.theta0) < 1e-9) {
+        const other = from.facets.get(inPage.has(j.f) ? j.g : j.f);
+        return { target: theta1, via: det(other.m) > 0 ? Math.PI : -Math.PI, weight: 1 };
+      }
+      return { target: theta1, via: 0, weight: 1 };
+    }
+    if (!changed(j)) return null;
+    if (Math.abs(Math.abs(theta1 - j.theta0) - 2 * Math.PI) < 1e-9) return { target: theta1, via: 0, weight: 0.02 };
+    return { target: theta1, when: [0.5, 1], weight: 0.02 };
+  };
+  // Hang it all from a layer that stays put.
+  const still = from.order.find((id) => !inPage.has(id));
+  const root = centroid(from.facets.get(still).poly);
+  return run(from, to, plan, { root, samples });
+}
+
+const viaOf = (v) => (v === undefined ? undefined : v === 'flat' ? 0 : (v * Math.PI) / 180);
+
+// The fold angle between two joined facets as they lie in sheet: 0 open, +pi colored sides together,
+// -pi white sides together.
+function angleIn(sheet, j) {
+  const f = sheet.facets.get(j.f), g = sheet.facets.get(j.g);
+  const fUp = det(f.m) > 0, gUp = det(g.m) > 0;
+  if (fUp === gUp) return 0;
+  const gAbove = sheet.order.indexOf(j.g) > sheet.order.indexOf(j.f);
+  return gAbove === fUp ? Math.PI : -Math.PI;
+}
+
+// The solver. plan(join) says what each crease does: null to stay as it is, or { target (radians, or null
+// to go wherever the others make it), via (an angle to pass through on the way), when ([start, end] as
+// fractions of the step), schedule (t -> 0..1), weight (how closely to keep to all that) }. `to`, if known,
+// is the finished state; otherwise it is worked out from where the hinges end up.
+function run(from, known, plan, { root, samples }) {
   const levels = from.levels();
   // The hinges turn as if the paper had no thickness, so creases that meet at a point really do meet
   // there. Each layer's thickness is added back afterward, along its own face.
@@ -164,18 +236,15 @@ export function mechanism(sheet, { creases: specs, root, arrow = null, samples =
   const parent = new Map(from.order.map((id) => [id, id]));
   const findB = (x) => { while (parent.get(x) !== x) { parent.set(x, parent.get(parent.get(x))); x = parent.get(x); } return x; };
   for (const j of all) {
-    const s = specFor(specs, j);
-    if (s) {
-      const target = s.fold === 'free' ? null : (typeof s.fold === 'number' ? s.fold * Math.PI / 180 : FOLDS[s.fold]);
-      if (target === null || Math.abs(target - j.theta0) > 1e-9) { hinges.push({ ...j, target, spec: s }); continue; }
-    }
-    parent.set(findB(j.f), findB(j.g));
+    const p = plan(j);
+    if (p) hinges.push({ ...j, plan: p });
+    else parent.set(findB(j.f), findB(j.g));
   }
   const bodyOf = new Map(from.order.map((id) => [id, findB(id)]));
   const rootBody = bodyOf.get(from.facetAt(root).id);
 
   // A tree of bodies hung from the root; hinges not in the tree close loops.
-  const tree = []; // { body, parentBody, hinge }
+  const tree = [];
   const placed = new Set([rootBody]);
   const loops = [];
   let frontier = [rootBody];
@@ -214,11 +283,13 @@ export function mechanism(sheet, { creases: specs, root, arrow = null, samples =
     const d = [mu[1] * n[2] - mu[2] * n[1], mu[2] * n[0] - mu[0] * n[2], mu[0] * n[1] - mu[1] * n[0]];
     e.axisP = [P0[0], P0[1], 0];
     e.axisD = d;
-    e.delta = e.hinge.target === null ? null : e.hinge.target - e.hinge.theta0;
-    e.schedule = e.hinge.spec.schedule || null;
-    // With a crease marked `drive`, only it keeps to a schedule; the rest go wherever the paper takes them,
-    // pulled only faintly toward where they end up, which is enough to pick the right way at the start.
-    e.weight = !specs.some((sp) => sp.drive) || e.hinge.spec.drive ? 1 : 0.02;
+    // Angles are measured from where the crease starts.
+    const p = e.hinge.plan;
+    e.delta = p.target === null ? null : p.target - e.hinge.theta0;
+    e.viaDelta = p.via === undefined ? undefined : p.via - e.hinge.theta0;
+    e.when = p.when || [0, 1];
+    e.schedule = p.schedule || null;
+    e.weight = p.weight ?? 1;
   }
   const order = [...tree]; // parents always come before children
   const loopPts = loops.map((h) => {
@@ -232,7 +303,15 @@ export function mechanism(sheet, { creases: specs, root, arrow = null, samples =
     order.forEach((e, i) => W.set(e.body, composeT(W.get(e.parentBody), axisRot(e.axisP, e.axisD, x[i]))));
     return W;
   };
-  const targetAt = (t) => order.map((e) => (e.delta === null ? null : e.delta * (e.schedule ? e.schedule(t) : ease(t))));
+  // Where each crease is meant to be at time t.
+  const along = (e, t) => {
+    const [a, b] = e.when;
+    const u = t <= a ? 0 : t >= b ? 1 : (t - a) / (b - a);
+    if (e.schedule) return e.delta * e.schedule(t);
+    if (e.viaDelta === undefined) return e.delta * ease(u);
+    return u < 0.5 ? e.viaDelta * ease(2 * u) : e.viaDelta + (e.delta - e.viaDelta) * ease(2 * u - 1);
+  };
+  const targetAt = (t) => order.map((e) => (e.delta === null ? null : along(e, t)));
   const residual = (x, tgt, prev) => {
     const W = kin(x);
     const r = [];
@@ -269,16 +348,19 @@ export function mechanism(sheet, { creases: specs, root, arrow = null, samples =
     return x;
   };
 
-  // Sample the motion.
+  // Sample the motion. Each solve starts from a guess that leans the right way: creases that keep to
+  // their schedule start there, and the rest move on by as much as their schedule did, which is what
+  // picks the right way to go where two ways of folding meet.
   const xs = [];
   let x = new Array(n).fill(0);
+  let prevTgt = targetAt(0);
   for (let k = 0; k <= samples; k++) {
     const t = k / samples;
     const tgt = targetAt(t);
-    // Start each solve from a guess that already leans the right way.
-    const guess = x.map((v, i) => (tgt[i] === null || order[i].weight < 1 ? v : tgt[i]));
+    const guess = x.map((v, i) => (tgt[i] === null ? v : order[i].weight >= 1 ? tgt[i] : v + (tgt[i] - prevTgt[i])));
     x = solve(guess, tgt);
     xs.push(x.slice());
+    prevTgt = tgt;
   }
   // How far apart the paper comes at the hinges that close loops, anywhere along the way.
   let pathGap = 0;
@@ -295,6 +377,9 @@ export function mechanism(sheet, { creases: specs, root, arrow = null, samples =
     const q = Math.round(v / Math.PI) * Math.PI;
     return Math.abs(v - q) < 0.08 ? q : v;
   });
+  // And the motion has to get there by itself; a paper that jams would otherwise jump at the last moment.
+  const jump = Math.max(0, ...xs[samples].map((v, i) => Math.abs(v - xEnd[i])));
+  if (jump > 0.05) throw new Error(`The paper jams on the way (it would jump ${(jump * 180 / Math.PI).toFixed(0)} degrees at the end)`);
   xs[samples] = xEnd;
   const WEnd = kin(xEnd);
   let gap = 0;
@@ -315,18 +400,26 @@ export function mechanism(sheet, { creases: specs, root, arrow = null, samples =
     endPose.set(id, P);
     to.facets.set(id, { ...f, m: { a: P.r[0], b: P.r[1], c: P.r[3], d: P.r[4], e: P.t[0], f: P.t[1] } });
   }
-
-  // Stacking: how the layers lie just short of closing.
-  const nearTgt = order.map((e) => (e.delta === null ? null : e.delta * 0.94));
-  const xNear = solve(xs[Math.floor(samples * 0.94)].map((v, i) => (nearTgt[i] === null ? v : nearTgt[i])), nearTgt);
-  const WNear = kin(xNear);
-  to.order = stackOrder(
-    from, to,
-    (id) => composeT(WNear.get(bodyOf.get(id)), flatT(from.facets.get(id).m, 0)),
-    (id) => bodyOf.get(id) === rootBody,
-    (id) => bodyOf.get(id),
-    (id) => det(to.facets.get(id).m) * det(from.facets.get(id).m) < 0,
-  );
+  if (known) {
+    // It has to land where the flat state says.
+    for (const id of from.order) {
+      const a = to.facets.get(id).m, b = known.facets.get(id).m;
+      if (['a', 'b', 'c', 'd', 'e', 'f'].some((k) => Math.abs(a[k] - b[k]) > 1e-6)) throw new Error('The motion does not end where the fold does');
+    }
+    to.order = known.order.slice();
+  } else {
+    // Stacking: how the layers lie just short of closing.
+    const nearTgt = order.map((e) => (e.delta === null ? null : along(e, 0.94)));
+    const xNear = solve(xs[Math.floor(samples * 0.94)].map((v, i) => (nearTgt[i] === null ? v : nearTgt[i])), nearTgt);
+    const WNear = kin(xNear);
+    to.order = stackOrder(
+      from, to,
+      (id) => composeT(WNear.get(bodyOf.get(id)), flatT(from.facets.get(id).m, 0)),
+      (id) => bodyOf.get(id) === rootBody,
+      (id) => bodyOf.get(id),
+      (id) => det(to.facets.get(id).m) * det(from.facets.get(id).m) < 0,
+    );
+  }
   to._levels = null;
 
   // Each layer's height above the table, measured along its own face: where it starts, and where it
@@ -335,19 +428,18 @@ export function mechanism(sheet, { creases: specs, root, arrow = null, samples =
   const lift1 = (id) => lv.get(id) * LAYER * Math.sign(endPose.get(id).r[8]);
 
   const motion = {
-    kind: 'mech', specs, arrow, pathGap,
+    kind: 'mech', pathGap,
     moving: from.order.filter((id) => bodyOf.get(id) !== rootBody),
   };
-  // Poses at time t: between samples the hinge angles are blended, and each layer drifts the last bit to
-  // its exact height in the finished stack.
+  // Poses at time t: between samples the hinge angles are blended, and each layer's thickness moves over
+  // to where it sits in the finished stack.
   motion.at = (t) => {
     const N = xs.length - 1;
-    const u = Math.min(1, Math.max(0, t)) * N;
-    const k = Math.min(N - 1, Math.floor(u)), w = u - k;
+    const u = Math.min(1, Math.max(0, t));
+    const k = Math.min(N - 1, Math.floor(u * N)), w = u * N - k;
     const W = kin(xs[k].map((v, i) => v + (xs[k + 1][i] - v) * w));
     return from.order.map((id) => {
       const f = from.facets.get(id);
-      const u = Math.min(1, Math.max(0, t));
       const P = thick(composeT(W.get(bodyOf.get(id)), flatT(f.m, 0)), lift0(id) + (lift1(id) - lift0(id)) * u);
       return { facet: f, pose: P };
     });

@@ -82,6 +82,7 @@ for (const model of MODELS) {
       };
       const check = (t, sheet) => {
         for (const it of poses(step, t)) {
+          if (it.bridge) continue;
           const want = flatAt(sheet, it.facet.id);
           const got = corners(it);
           got.forEach((p, k) => assert.ok(closePt(p, want[k], 1e-6), `${where} at t=${t}: facet ${it.facet.id} is at ${p}, not ${want[k]}`));
@@ -118,16 +119,19 @@ test('crane: a petal fold lays the petal over the top of the base, with its side
   assert.ok(pos.get(sideId) > pos.get(petalId), 'the side is not folded onto the petal');
 });
 
-test('crane: a reverse-folded tip ends up between the front and back of the model', () => {
+test('crane: each reverse-folded point ends up between the front and back of the model', () => {
   const b = build(MODELS.find((m) => m.id === 'crane'));
   const split = line([1, 0], [0, 1]);
   const front = (f) => side(split, centroid(f.poly)) < 0; // the half with the corner that faces you
-  for (const step of b.steps.filter((st) => st.motion.kind === 'reverse')) {
+  const reversed = b.steps.filter((st) => st.motion.kind === 'reverse' || st.motion.parts?.length && st.motion.kind === 'mech');
+  assert.equal(reversed.length, 3, 'the crane should have three reverse folds: neck, tail and head');
+  for (const step of reversed) {
     const { to, motion } = step;
-    const moved = new Set(motion.moving);
+    const tips = motion.parts ? motion.parts.flatMap((p) => p.moving) : motion.moving;
+    const moved = new Set(tips);
     const pos = new Map(to.order.map((id, k) => [id, k]));
     const frontIsLow = front(to.facets.get(to.order[0]));
-    for (const m of motion.moving) {
+    for (const m of tips) {
       for (const id of to.order) {
         if (moved.has(id) || overlapArea(to.world(m), to.world(id)) < 1e-7) continue;
         const inFront = front(to.facets.get(id)) !== frontIsLow;

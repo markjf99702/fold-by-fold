@@ -5,7 +5,7 @@
 // square, [0, 0] at one corner); `at` says where such a point is now.
 
 import { Sheet, fold, foldUnfold, bend, turnOver, turn, together, reverse } from './paper.js';
-import { mechanism } from './mech.js';
+import { mechanism, between } from './mech.js';
 import { bisector, line, lineAt, side, flip, intersect, mid, lerp, reflectPoint, angleBisector, sub } from './geom.js';
 
 export function build(model) {
@@ -34,7 +34,7 @@ function nameOf(m) {
   if (m.kind === 'turn') return 'Rotate';
   if (m.kind === 'bend') return 'Shape';
   if (m.kind === 'reverse') return 'Inside reverse fold';
-  if (m.kind === 'mech') return m.name || 'Collapse';
+  if (m.kind === 'mech') return m.name || (m.parts ? 'Inside reverse folds' : 'Collapse');
   if (m.kind === 'multi') {
     if (m.parts.every((p) => p.bend)) return 'Shape';
     return m.parts.every((p) => p.type === 'mountain') ? 'Mountain folds' : 'Valley folds';
@@ -98,6 +98,15 @@ function helpers(current) {
     // An inside reverse fold of the flap holding paper point `flap`, along L. `split` is the line on the
     // paper between the model's front and back halves.
     reverse: (L, o) => reverse(current(), orient(L, o.flap), { seed: o.flap, split: o.split }),
+    // Inside reverse folds made the way stiff paper allows: the layers holding paper point `page` turn
+    // over about the line `axis` on the table like a page, the flap under them lies open, the point folds
+    // up, and the page turns back. Each maker returns one h.reverse(...).
+    reverseOpen: (makers, o) => {
+      const t = together(current(), makers.map((mk) => (s) => mk(helpers(() => s))));
+      const r = between(t.from, t.to, { axis: o.axis, page: o.page });
+      r.motion.parts = t.motion.parts;
+      return r;
+    },
     // A line on the flat, unfolded paper, through two of its points.
     paperLine: (a, b) => line(a, b),
     turnOver: (how) => turnOver(current(), how),

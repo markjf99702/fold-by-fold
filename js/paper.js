@@ -372,7 +372,14 @@ export function reverse(sheet, L, { seed, split }) {
   // The spine: where the tip's front and back halves meet, on the table.
   const spine = spineOf(from, tipF, tipB);
   if (!spine) throw new Error('Could not find the fold joining the two halves of the tip');
-  return result(from, to, { kind: 'reverse', line: L, moving, front: tipF, back: tipB, spine });
+  // Where each moving piece is joined to one that stays, along the crease, on the paper.
+  const hinges = [];
+  for (const id of moving) {
+    for (const { g, edge } of from.neighbors(from.facets.get(id))) {
+      if (!movingSet.has(g.id)) hinges.push({ tip: id, base: g.id, edge });
+    }
+  }
+  return result(from, to, { kind: 'reverse', line: L, moving, front: tipF, back: tipB, spine, hinges });
 }
 
 // The folded edge joining the two halves of a flap, on the table, as { p: where it meets nothing yet, d }.
