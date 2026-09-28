@@ -231,11 +231,14 @@ h1 {
     grid-template-rows: auto minmax(0, 1fr);
     grid-template-areas: "bar bar" "stage panel";
   }
-  .panel { border-top: 0; border-left: 1px solid var(--line); overflow: auto; padding-top: 16px; }
+  /* The words and controls keep their size at the top; the list of steps scrolls under them. */
+  .panel { border-top: 0; border-left: 1px solid var(--line); min-height: 0; padding-top: 16px; }
+  .panel > * { flex-shrink: 0; }
   .ticks { display: none; }
   .step-list {
     display: block; list-style: none; margin: 6px 0 0; padding: 0; counter-reset: s;
     border-top: 1px solid var(--line);
+    flex: 1 1 auto; min-height: 0; overflow: auto; overscroll-behavior: contain;
   }
   .step-list li button {
     appearance: none; border: 0; background: none; width: 100%; text-align: left; cursor: pointer;

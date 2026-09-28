@@ -116,6 +116,20 @@ await page.click('.model:has(h3:text("Samurai helmet"))');
 await page.waitForFunction(() => fold.state.id === 'helmet');
 assert.equal((await state()).i, 2, 'did not pick up where you left off');
 
+// On a short desktop window the words, slider and buttons keep their own space, and the list of steps
+// scrolls under them.
+await page.setViewportSize({ width: 1000, height: 560 });
+await page.waitForTimeout(100);
+const boxes = await page.evaluate(() => ['#chip', '#say', '.scrub', '.controls', '#stepList'].map((q) => {
+  const r = document.querySelector(q).getBoundingClientRect();
+  return { q, top: r.top, bottom: r.bottom };
+}));
+for (let k = 1; k < boxes.length; k++) {
+  assert.ok(boxes[k].top >= boxes[k - 1].bottom - 0.5, `${boxes[k].q} overlaps ${boxes[k - 1].q} on a desktop`);
+}
+assert.equal(await sideways(), false, 'the player scrolls sideways on a desktop');
+await page.setViewportSize({ width: 390, height: 844 });
+
 // The offline copy lists every file the page needs.
 const sw = await readFile(join(root, 'sw.js'), 'utf8');
 for (const dir of ['js', 'css', 'fonts']) {
