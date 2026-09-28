@@ -81,7 +81,7 @@ const HOLD = 850;
 
 function duration(step) {
   const k = step.motion.kind;
-  const base = k === 'foldUnfold' ? 2600 : k === 'turnOver' ? 1900 : k === 'turn' ? 1300 : 2100;
+  const base = k === 'mech' ? 3400 : k === 'reverse' ? 2800 : k === 'foldUnfold' ? 2600 : k === 'turnOver' ? 1900 : k === 'turn' ? 1300 : 2100;
   return base * (prefs.slow ? 2.2 : 1);
 }
 
@@ -144,8 +144,8 @@ function go(i, { play = false, snap = false } = {}) {
 let aimedFor = null;
 function aimFor(step) {
   if (!view) return;
-  if (step.view) { view.aim(step.view.yaw, step.view.pitch); aimedFor = step; }
-  else if (aimedFor) { view.aim(-90, 58); aimedFor = null; }
+  if (step.view) { view.aim(step.view.yaw, step.view.pitch); aimedFor = step; frameCamera(false); }
+  else if (aimedFor) { view.aim(-90, 58); aimedFor = null; frameCamera(false); }
 }
 
 function start() {
@@ -201,6 +201,7 @@ const CHIP = {
   valley: '<svg viewBox="0 0 34 12"><path d="M1 6H33" stroke-dasharray="5 3.5"/></svg>',
   mountain: '<svg viewBox="0 0 34 12"><path d="M1 6H33" stroke-dasharray="5 2.5 .5 2.5"/></svg>',
   turn: '<svg viewBox="0 0 34 12"><path d="M5 9C5 2 29 2 29 9"/><path d="M25 6l4 3 3-4"/></svg>',
+  both: '<svg viewBox="0 0 34 12"><path d="M1 3H33" stroke-dasharray="5 3.5"/><path d="M1 9H33" stroke-dasharray="5 2.5 .5 2.5"/></svg>',
 };
 function chipFor(step) {
   const m = step.motion;
@@ -208,6 +209,8 @@ function chipFor(step) {
   let icon = CHIP.valley;
   if (type === 'mountain') icon = CHIP.mountain;
   if (m.kind === 'turnOver' || m.kind === 'turn') icon = CHIP.turn;
+  if (m.kind === 'reverse') icon = CHIP.mountain;
+  if (m.kind === 'mech') icon = CHIP.both;
   return `${icon}<span>${step.name}</span>`;
 }
 
@@ -221,7 +224,9 @@ function frameCamera(snap) {
   const s = P.b.steps[P.i];
   const a = s.from.bounds(), b = s.to.bounds();
   const x0 = Math.min(a.x0, b.x0), x1 = Math.max(a.x1, b.x1), y0 = Math.min(a.y0, b.y0), y1 = Math.max(a.y1, b.y1);
-  view.frame((x0 + x1) / 2, (y0 + y1) / 2, Math.max(x1 - x0, y1 - y0, 0.55));
+  // A step that stands the model up says how big it gets and how high to look.
+  const v = aimedFor === s ? s.view : null;
+  view.frame((x0 + x1) / 2, (y0 + y1) / 2, Math.max(x1 - x0, y1 - y0, v?.size || 0, 0.55), v?.lift || 0);
   if (snap) view.settle(1);
   dirty = true;
 }

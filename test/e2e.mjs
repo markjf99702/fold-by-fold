@@ -106,6 +106,12 @@ assert.equal(await page.getAttribute('#speed', 'aria-pressed'), 'true');
 // Every step can be shown at any moment without an error.
 for (let i = 0; i < steps; i++) for (const t of [0, 0.5, 1]) await page.evaluate(([i, t]) => fold.set(i, t), [i, t]);
 
+// The crane's collapse, petal folds and reverse folds draw at every moment too.
+await page.evaluate(() => { location.hash = 'crane'; });
+await page.waitForFunction(() => fold.state.id === 'crane');
+const craneSteps = (await state()).steps;
+for (let i = 0; i < craneSteps; i++) for (const t of [0, 0.3, 0.7, 1]) await page.evaluate(([i, t]) => fold.set(i, t), [i, t]);
+
 // A link can go straight to a step, and the gallery remembers where you got to.
 await page.evaluate(() => { location.hash = 'helmet-3'; });
 await page.waitForFunction(() => fold.state.id === 'helmet');

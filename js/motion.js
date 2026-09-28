@@ -4,7 +4,7 @@
 // the moving facets turn about the fold line (lifted halfway between where they start and where they
 // land, so they arrive exactly on their new layer); everything else stays put.
 
-import { apply, det, dot, sub, side, reflectPoint, centroid, area, add, mul } from './geom.js';
+import { apply, det, dot, sub, side, reflectPoint, centroid, area, add, mul, line, intersect, norm, cross } from './geom.js';
 
 export const LAYER = 0.0035; // thickness of one layer of paper, in sheet widths
 
@@ -99,6 +99,9 @@ export function poses(step, t) {
     return lifted(out);
   }
 
+  if (motion.kind === 'mech') return lifted(motion.at(t));
+  if (motion.kind === 'reverse') return lifted(reversePoses(step, e, zFrom, zTo));
+
   if (motion.kind === 'multi') {
     const partOf = new Map();
     for (const part of motion.parts) {
@@ -154,6 +157,42 @@ export function poses(step, t) {
   return lifted(out);
 }
 
+// An inside reverse fold can't be made with stiff paper: real paper gives a little near the crease so the
+// tip can slip between the layers. Here the tip swings round the point where the crease meets its folded
+// edge, and turns over along that edge like a page as it goes, so it arrives inside out. The tip's front
+// half turns about a line at the top of its layers and the back half about one at the bottom, which keeps
+// the front half in front; each layer then drifts the last bit to its height in the finished stack.
+function reversePoses(step, e, zFrom, zTo) {
+  const { from, motion } = step;
+  const L = motion.line;
+  const [s0, s1] = motion.spine;
+  const V = intersect(line(s0, s1), L);
+  const far = Math.hypot(s0[0] - V[0], s0[1] - V[1]) > Math.hypot(s1[0] - V[0], s1[1] - V[1]) ? s0 : s1;
+  const d = norm(sub(far, V));
+  let phi = 2 * (Math.atan2(L.d[1], L.d[0]) - Math.atan2(d[1], d[0]));
+  phi = Math.atan2(Math.sin(phi), Math.cos(phi)); // the short way round
+  if (Math.abs(Math.abs(phi) - Math.PI) < 1e-9) phi = Math.PI;
+  // Turn the tip so its far side lifts off the table first.
+  let cx = 0, cy = 0, n = 0;
+  for (const id of motion.moving) { const c = centroid(from.world(id)); cx += c[0]; cy += c[1]; n++; }
+  const roll = cross(d, [cx / n - V[0], cy / n - V[1]]) > 0 ? 1 : -1;
+  const axisZ = new Map();
+  const top = Math.max(...motion.front.map(zFrom)), bottom = Math.min(...motion.back.map(zFrom));
+  for (const id of motion.front) axisZ.set(id, top);
+  for (const id of motion.back) axisZ.set(id, bottom);
+  const c = Math.cos(phi * e), s = Math.sin(phi * e);
+  const swing = [c, -s, 0, s, c, 0, 0, 0, 1];
+  return from.order.map((id) => {
+    const f = from.facets.get(id);
+    if (!axisZ.has(id)) return { facet: f, pose: flatPose(f.m, zFrom(id) + (zTo(id) - zFrom(id)) * e) };
+    const a = axisZ.get(id), z = zFrom(id);
+    let pose = rotateAbout(flatPose(f.m, z), V[0], V[1], a, d[0], d[1], roll * Math.PI * e);
+    pose = compose3(swing, [V[0], V[1], 0], pose);
+    pose.t[2] += (zTo(id) - (2 * a - z)) * e;
+    return { facet: f, pose };
+  });
+}
+
 // Nothing goes through the table: if part of the paper would dip below it, lift the whole sheet, the way
 // you pick the paper up to fold something behind.
 function lifted(items) {
@@ -167,6 +206,11 @@ function lifted(items) {
 // moving part to where it lands. All in 3D table coordinates.
 export function marks(step) {
   const { from, motion } = step;
+  if (motion.kind === 'mech') return mechMarks(step);
+  if (motion.kind === 'reverse') {
+    const m = markFor(from, { ...motion, sign: -1, type: 'mountain', kind: 'fold' });
+    return m ? [m] : null;
+  }
   if (motion.kind === 'multi') {
     return motion.parts.map((p) => markFor(from, { ...p, kind: p.bend ? 'bend' : 'fold' })).filter(Boolean);
   }
@@ -208,6 +252,27 @@ function markFor(from, motion) {
     line: [[a[0], a[1], z], [b[0], b[1], z]],
     arrow: { from: [start[0], start[1], z], to: [end[0], end[1], z], over: motion.sign > 0, angle: motion.kind === 'bend' ? motion.angle : 180 },
   };
+}
+
+// A collapse or petal fold: the creases that close, drawn where they lie now, and an arrow following one
+// point of the paper from where it starts to where it ends up.
+function mechMarks(step) {
+  const { from, to, motion } = step;
+  const levels = from.levels();
+  let top = 0;
+  for (const id of from.order) top = Math.max(top, levels.get(id));
+  const z = (top + 1) * LAYER + 0.002;
+  const out = [];
+  for (const s of motion.specs) {
+    if (s.mark === false || (s.fold !== 'valley' && s.fold !== 'mountain')) continue;
+    const a = from.at(s.a), b = from.at(s.b);
+    out.push({ type: s.fold, line: [[a[0], a[1], z], [b[0], b[1], z]] });
+  }
+  if (motion.arrow && out.length) {
+    const p = from.at(motion.arrow), q = to.at(motion.arrow);
+    out[0].arrow = { from: [p[0], p[1], z], to: [q[0], q[1], z], over: true, angle: 180 };
+  }
+  return out.length ? out : null;
 }
 
 // The facet's corners on the paper and in 3D.

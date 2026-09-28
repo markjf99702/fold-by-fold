@@ -4,7 +4,8 @@
 // that one, fold along the line through these two points. Points are given on the paper (the unit
 // square, [0, 0] at one corner); `at` says where such a point is now.
 
-import { Sheet, fold, foldUnfold, bend, turnOver, turn, together } from './paper.js';
+import { Sheet, fold, foldUnfold, bend, turnOver, turn, together, reverse } from './paper.js';
+import { mechanism } from './mech.js';
 import { bisector, line, lineAt, side, flip, intersect, mid, lerp, reflectPoint, angleBisector, sub } from './geom.js';
 
 export function build(model) {
@@ -32,6 +33,8 @@ function nameOf(m) {
   if (m.kind === 'turnOver') return 'Turn over';
   if (m.kind === 'turn') return 'Rotate';
   if (m.kind === 'bend') return 'Shape';
+  if (m.kind === 'reverse') return 'Inside reverse fold';
+  if (m.kind === 'mech') return m.name || 'Collapse';
   if (m.kind === 'multi') {
     if (m.parts.every((p) => p.bend)) return 'Shape';
     return m.parts.every((p) => p.type === 'mountain') ? 'Mountain folds' : 'Valley folds';
@@ -84,6 +87,19 @@ function helpers(current) {
       if (roll) r.motion.roll = roll;
       return r;
     },
+    // Several creases closing at once, as one linked motion (a collapse, a petal fold). Each crease is a
+    // segment on the paper, { a, b, fold: 'valley' | 'mountain' | 'flat' | 'free' }; root is a paper
+    // point on the part that stays put; arrow is a paper point to follow with an arrow.
+    mech: (o) => {
+      const r = mechanism(current(), o);
+      r.motion.name = o.name;
+      return r;
+    },
+    // An inside reverse fold of the flap holding paper point `flap`, along L. `split` is the line on the
+    // paper between the model's front and back halves.
+    reverse: (L, o) => reverse(current(), orient(L, o.flap), { seed: o.flap, split: o.split }),
+    // A line on the flat, unfolded paper, through two of its points.
+    paperLine: (a, b) => line(a, b),
     turnOver: (how) => turnOver(current(), how),
     turn: (deg) => turn(current(), deg),
     sheet: current,

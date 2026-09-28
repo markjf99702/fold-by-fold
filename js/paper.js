@@ -148,6 +148,23 @@ function splitFacet(sheet, id, L) {
   return { left: lf.id, right: rf.id };
 }
 
+// Cuts facet id along a line drawn on the paper (in the paper's own coordinates, before any folding).
+export function splitPaper(sheet, id, Lp) {
+  const f = sheet.facets.get(id);
+  if (!cuts(f.poly, Lp)) return null;
+  const lf = { id: newId(), poly: ccw(clip(f.poly, Lp, true)), m: f.m };
+  const rf = { id: newId(), poly: ccw(clip(f.poly, Lp, false)), m: f.m };
+  cutInto.set(id, [rf.id, lf.id]);
+  sheet.facets.delete(id);
+  sheet.facets.set(lf.id, lf);
+  sheet.facets.set(rf.id, rf);
+  sheet._world.delete(id);
+  const k = sheet.order.indexOf(id);
+  sheet.order.splice(k, 1, rf.id, lf.id);
+  sheet._levels = null;
+  return { left: lf.id, right: rf.id };
+}
+
 // Does the segment [a, b] of the table lie on line L?
 const onLine = (L, a, b) => Math.abs(side(L, a)) < 1e-7 && Math.abs(side(L, b)) < 1e-7;
 
@@ -317,6 +334,58 @@ export function together(sheet, makers) {
     angle: r.motion.kind === 'bend' ? r.motion.angle : 180, bend: r.motion.kind === 'bend',
   }));
   return result(from, to, { kind: 'multi', parts, moving: parts.flatMap((p) => p.moving) });
+}
+
+// An inside reverse fold: the tip of a flap past line L turns inside out and goes up between the flap's own
+// layers. The flap is the layer holding paper point `seed` and whatever is joined to it past L.
+// `split` is a line on the paper that divides the model into its front and back halves (for a crane, the
+// diagonal its wings fold away from); the tip's front layers stay in front of its back ones, and the whole
+// tip goes between everything in front and everything behind.
+export function reverse(sheet, L, { seed, split }) {
+  const from = sheet.clone();
+  const moving = movingPieces(from, L, { layers: 'flap', seed });
+  const movingSet = new Set(moving);
+  const sideOf = (id) => side(split, centroid(from.facets.get(id).poly)) > 0;
+  // Which half is in front: the one whose tip layers sit higher.
+  const pos = new Map(from.order.map((id, k) => [id, k]));
+  const tipL = moving.filter(sideOf), tipR = moving.filter((id) => !sideOf(id));
+  if (!tipL.length || !tipR.length) throw new Error('The flap to reverse has no front and back halves');
+  const avg = (ids) => ids.reduce((s, id) => s + pos.get(id), 0) / ids.length;
+  const frontIsLeft = avg(tipL) > avg(tipR);
+  const isFront = (id) => sideOf(id) === frontIsLeft;
+  const byOrder = (ids) => ids.slice().sort((a, b) => pos.get(a) - pos.get(b));
+  const tipF = byOrder(moving.filter(isFront)), tipB = byOrder(moving.filter((id) => !isFront(id)));
+  const still = from.order.filter((id) => !movingSet.has(id));
+  const stillF = still.filter(isFront), stillB = still.filter((id) => !isFront(id));
+  // Everything in front has to lie above everything behind wherever they overlap, or there is no pocket.
+  for (const a of stillF) for (const b of stillB) {
+    if (pos.get(a) < pos.get(b) && overlapArea(from.world(a), from.world(b)) > 1e-7) {
+      throw new Error('The front and back halves are interleaved; there is no pocket to reverse into');
+    }
+  }
+  const to = from.clone();
+  to._world = new Map();
+  const R = reflection(L);
+  for (const id of moving) to.facets.set(id, { ...from.facets.get(id), m: compose(R, from.facets.get(id).m) });
+  to.order = stillB.concat(tipB.slice().reverse(), tipF.slice().reverse(), stillF);
+  to._levels = null;
+  // The spine: where the tip's front and back halves meet, on the table.
+  const spine = spineOf(from, tipF, tipB);
+  if (!spine) throw new Error('Could not find the fold joining the two halves of the tip');
+  return result(from, to, { kind: 'reverse', line: L, moving, front: tipF, back: tipB, spine });
+}
+
+// The folded edge joining the two halves of a flap, on the table, as { p: where it meets nothing yet, d }.
+function spineOf(sheet, a, b) {
+  const bs = new Set(b);
+  for (const id of a) {
+    const f = sheet.facets.get(id);
+    for (const { g, edge } of sheet.neighbors(f)) {
+      if (!bs.has(g.id)) continue;
+      return [apply(f.m, edge[0]), apply(f.m, edge[1])];
+    }
+  }
+  return null;
 }
 
 // Turns the whole model over, left to right ('side') or top to bottom ('end').

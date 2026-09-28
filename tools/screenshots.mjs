@@ -23,6 +23,8 @@ const server = createServer(async (req, res) => {
 }).listen(0);
 const base = `http://localhost:${server.address().port}/`;
 
+const PETAL = 10; // the crane's first petal fold
+
 // Software WebGL, the same on every machine.
 const browser = await pw.chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
 await mkdir(join(out, 'docs'), { recursive: true });
@@ -49,19 +51,19 @@ async function at(page, i, t, aim) {
 {
   const page = await open({ width: 390, height: 844 }, 2);
   await page.screenshot({ path: join(out, 'docs/phone-home.png') });
-  await page.evaluate(() => { location.hash = 'helmet'; });
+  await page.evaluate(() => { location.hash = 'crane'; });
   await page.waitForSelector('#player:not([hidden])');
-  // The same step twice: the diagram's marks on the paper, then the fold happening.
-  await at(page, 3, 0);
+  // The crane's first petal fold twice: the diagram's marks on the paper, then the fold happening.
+  await at(page, PETAL, 0);
   await page.screenshot({ path: join(out, 'docs/phone-marks.png') });
-  await at(page, 3, 0.45, [-70, 40]);
+  await at(page, PETAL, 0.42, [-65, 38]);
   await page.screenshot({ path: join(out, 'docs/phone-fold.png') });
   await page.context().close();
 }
 
 // Link preview, 1200 x 630: a real fold, part way, on the cutting mat beside the name.
 {
-  const page = await open({ width: 1200, height: 630 }, 1, '#helmet');
+  const page = await open({ width: 1200, height: 630 }, 1, '#crane');
   await page.waitForSelector('#player:not([hidden])');
   await page.addStyleTag({ content: `
     .player { display: block !important; position: relative; }
@@ -79,8 +81,8 @@ async function at(page, i, t, aim) {
     document.getElementById('player').append(d);
     dispatchEvent(new Event('resize'));
   });
-  // The helmet's second flap, halfway over.
-  await at(page, 3, 0.45, [-70, 40]);
+  // The crane's petal fold, part way.
+  await at(page, PETAL, 0.42, [-65, 38]);
   const png = await page.screenshot();
   await writeFile(join(out, 'og.png'), await small(png));
   await page.context().close();

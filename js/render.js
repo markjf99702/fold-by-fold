@@ -176,8 +176,9 @@ export class View {
   }
 
   // Frames a region of the table: centre and size, eased toward over a few frames by the caller.
-  frame(cx, cy, size) {
-    this.goal.target = [cx, cy, 0];
+  // Frames a square of the table centered on (cx, cy), raised to height cz for a model standing up.
+  frame(cx, cy, size, cz = 0) {
+    this.goal.target = [cx, cy, cz];
     this.goal.size = size;
   }
 
@@ -383,6 +384,7 @@ export class View {
     this.drawFlat(this.buf.marks, lineData(0.0075, halo), vp, dash, this.markAlpha);
     this.drawFlat(this.buf.marks, lineData(0.0042, ink), vp, dash, this.markAlpha);
     // The arrow: an arc from the moving part over the fold, facing the camera.
+    if (!m.arrow) return;
     const arc = arrowPath(m.arrow);
     this.drawFlat(this.buf.marks, ribbon(arc, eye, 0.011, halo, true), vp, 0, this.markAlpha);
     this.drawFlat(this.buf.marks, ribbon(arc, eye, 0.0055, ink, true), vp, 0, this.markAlpha);

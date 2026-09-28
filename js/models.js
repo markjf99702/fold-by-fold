@@ -4,6 +4,19 @@
 
 const R2 = Math.SQRT2;
 
+// The crane's paper points: corners, edge midpoints, the center, and where its kite creases meet the
+// center lines (a 22.5 degree fold from each corner reaches them this far from the edge).
+const K1 = [0, 0], K2 = [1, 0], K3 = [1, 1], K4 = [0, 1];
+const M12 = [0.5, 0], M23 = [1, 0.5], M34 = [0.5, 1], M41 = [0, 0.5], C = [0.5, 0.5];
+const KITE = (R2 - 1) / 2;
+const P12 = [0.5, KITE], P23 = [1 - KITE, 0.5], P34 = [0.5, 1 - KITE], P41 = [KITE, 0.5];
+// Where the folds that narrow the legs cross the center lines: an 11.25 degree fold from the leg's corner.
+const NARROW = Math.tan(Math.PI / 16) / 2;
+const N12 = [0.5, NARROW], N23 = [1 - NARROW, 0.5], N34 = [0.5, 1 - NARROW], N41 = [NARROW, 0.5];
+// Where the legs meet the body, on the center line, and how far below it the neck and tail turn up.
+const H2 = [1 - R2 / 4, R2 / 4], H4 = [R2 / 4, 1 - R2 / 4];
+const NECK = 0.035;
+
 export const MODELS = [
   {
     id: 'cup',
@@ -236,6 +249,161 @@ export const MODELS = [
       {
         say: 'Fold the back layer of the bottom point up behind. The helmet is done.',
         do: (h) => h.mountain(h.level(h.at([1, 0.5])[1]), { flap: [1, 0] }),
+      },
+    ],
+  },
+  {
+    id: 'crane',
+    name: 'Crane',
+    level: 'Tricky',
+    blurb: 'The traditional orizuru. The collapse, petal folds and reverse folds are the steps drawings make hardest.',
+    paper: { colorUp: true, turn: 45 },
+    steps: [
+      {
+        say: 'Colored side up. Fold the bottom corner up to the top corner, and unfold.',
+        do: (h) => h.crease(h.onto(K1, K3), { move: K1 }),
+      },
+      {
+        say: 'Fold the right corner over to the left corner, and unfold.',
+        do: (h) => h.crease(h.onto(K2, K4), { move: K2 }),
+      },
+      {
+        say: 'Turn it over, white side up.',
+        do: (h) => h.turnOver(),
+      },
+      {
+        say: 'Fold in half, lower right edge onto upper left edge, and unfold.',
+        do: (h) => h.crease(h.onto(K1, K2), { move: K1 }),
+      },
+      {
+        say: 'Fold in half the other way, lower left edge onto upper right edge, and unfold.',
+        do: (h) => h.crease(h.onto(K1, K4), { move: K1 }),
+      },
+      {
+        say: 'Bring the other three corners down to the bottom one. The left and right corners fold in between the layers along the creases, and it all flattens into a small square, colored on the outside. This is the square base.',
+        name: 'Collapse',
+        do: (h) => h.mech({
+          root: [0.2, 0.2], arrow: K3,
+          creases: [
+            { a: C, b: M12, fold: 'mountain' }, { a: C, b: M23, fold: 'mountain' },
+            { a: C, b: M34, fold: 'mountain' }, { a: C, b: M41, fold: 'mountain' },
+            { a: C, b: K2, fold: 'valley' }, { a: C, b: K4, fold: 'valley' },
+          ],
+        }),
+      },
+      {
+        say: 'The open end points down. Fold the lower edges of the top layer in to the middle crease.',
+        do: (h) => h.together(
+          (k) => k.valley(k.through(K3, P23), { flap: [0.93, 0.66] }),
+          (k) => k.valley(k.through(K3, P34), { flap: [0.66, 0.93] }),
+        ),
+      },
+      {
+        say: 'Fold the top triangle down over them, crease it well, and unfold.',
+        do: (h) => h.crease(h.through(P23, P34), { move: C }),
+      },
+      {
+        say: 'Unfold the two side flaps. Their creases stay to guide the next step.',
+        name: 'Unfold',
+        do: (h) => h.together(
+          (k) => k.valley(k.through(K3, P23), { flap: [0.93, 0.66] }),
+          (k) => k.valley(k.through(K3, P34), { flap: [0.66, 0.93] }),
+        ),
+      },
+      {
+        say: 'Lift the bottom corner of the top layer up along the crease across the middle. As it rises, the sides fold in along their creases and meet in the middle. Press it flat into a long diamond. This is a petal fold.',
+        name: 'Petal fold',
+        do: (h) => h.mech({
+          root: [0.2, 0.2], arrow: K3,
+          creases: [
+            { a: P23, b: P34, fold: 'valley', drive: true },
+            { a: K3, b: P23, fold: 'mountain' }, { a: K3, b: P34, fold: 'mountain' },
+            { a: M23, b: P23, fold: 'flat' }, { a: M34, b: P34, fold: 'flat' },
+            { a: K2, b: P23, fold: 'mountain', mark: false }, { a: K4, b: P34, fold: 'mountain', mark: false },
+          ],
+        }),
+      },
+      {
+        say: 'Turn it over.',
+        do: (h) => h.turnOver(),
+      },
+      {
+        say: 'Fold the lower edges of the top layer in to the middle, as on the other side.',
+        do: (h) => h.together(
+          (k) => k.valley(k.through(K1, P12), { flap: [0.34, 0.07] }),
+          (k) => k.valley(k.through(K1, P41), { flap: [0.07, 0.34] }),
+        ),
+      },
+      {
+        say: 'Fold the top triangle down over them and unfold.',
+        do: (h) => h.crease(h.through(P12, P41), { flap: [0.4, 0.4] }),
+      },
+      {
+        say: 'Unfold the side flaps again.',
+        name: 'Unfold',
+        do: (h) => h.together(
+          (k) => k.valley(k.through(K1, P12), { flap: [0.34, 0.07] }),
+          (k) => k.valley(k.through(K1, P41), { flap: [0.07, 0.34] }),
+        ),
+      },
+      {
+        say: 'Petal fold this side too: lift the bottom corner of the top layer up, let the sides fold in to the middle, and press it flat. This is the bird base.',
+        name: 'Petal fold',
+        do: (h) => h.mech({
+          root: [0.55, 0.55], arrow: K1,
+          creases: [
+            { a: P12, b: P41, fold: 'valley', drive: true },
+            { a: K1, b: P12, fold: 'mountain' }, { a: K1, b: P41, fold: 'mountain' },
+            { a: M12, b: P12, fold: 'flat' }, { a: M41, b: P41, fold: 'flat' },
+            { a: K2, b: P12, fold: 'mountain', mark: false }, { a: K4, b: P41, fold: 'mountain', mark: false },
+          ],
+        }),
+      },
+      {
+        say: 'Fold the lower edges of the top layer in to the middle line, making the two bottom points thin.',
+        do: (h) => h.together(
+          (k) => k.valley(k.through(K2, N12), { flap: [0.667, 0.102] }),
+          (k) => k.valley(k.through(K4, N41), { flap: [0.102, 0.667] }),
+        ),
+      },
+      {
+        say: 'Turn it over.',
+        do: (h) => h.turnOver(),
+      },
+      {
+        say: 'Fold the lower edges in to the middle on this side too.',
+        do: (h) => h.together(
+          (k) => k.valley(k.through(K2, N23), { flap: [0.898, 0.333] }),
+          (k) => k.valley(k.through(K4, N34), { flap: [0.333, 0.898] }),
+        ),
+      },
+      {
+        say: 'Inside reverse fold the right point up to make the neck: open its layers a little, push the point up between them along the crease, and flatten.',
+        do: (h) => h.reverse(h.lineAt(h.sub(h.at(H4), [0, NECK]), -12.5), { flap: [0.15, 0.9], split: h.paperLine(K2, K4) }),
+      },
+      {
+        say: 'Reverse fold the left point up the same way, for the tail.',
+        do: (h) => h.reverse(h.lineAt(h.sub(h.at(H2), [0, NECK]), 12.5), { flap: [0.9, 0.15], split: h.paperLine(K2, K4) }),
+      },
+      {
+        say: 'Reverse fold the tip of the neck down to make the head.',
+        do: (h) => h.reverse(h.lineAt(h.lerp(h.sub(h.at(H4), [0, NECK]), h.at(K4), 0.8), 20), { flap: [0.03, 0.98], split: h.paperLine(K2, K4) }),
+      },
+      {
+        say: 'Fold the wings down: the front one toward you and the back one behind.',
+        name: 'Valley and mountain',
+        do: (h) => h.together(
+          (k) => k.valley(k.level(k.at(C)[1]), { flap: [0.98, 0.9] }),
+          (k) => k.mountain(k.level(k.at(C)[1]), { flap: [0.1, 0.02] }),
+        ),
+      },
+      {
+        say: 'Lift the wings halfway back up, so they stand out from the body. Stand it up, and gently pull the wings apart to puff out the body. Your crane is done.',
+        view: { yaw: -120, pitch: 16, size: 0.62, lift: 0.22 },
+        do: (h) => h.shape([
+          (k) => k.bend(k.level(k.at(C)[1]), 90, { flap: [0.98, 0.9] }),
+          (k) => k.bend(k.level(k.at(C)[1]), 90, { flap: [0.1, 0.02], type: 'mountain' }),
+        ], { line: { p: [0, h.at(C)[1]], d: [1, 0] }, angle: 90 }),
       },
     ],
   },
