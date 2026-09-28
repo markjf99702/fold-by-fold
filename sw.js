@@ -2,10 +2,10 @@
 // Your paper colour and where you got to live in localStorage, not here.
 // Network first, so a new version shows up as soon as you're online.
 
-const CACHE = 'fold-by-fold-v2'; // bump the number when the file list changes
+const CACHE = 'fold-by-fold-v3'; // bump the number when the file list changes
 const SHELL = [
   './', 'index.html', 'icon.svg', 'manifest.webmanifest',
-  'css/app.css', 'js/app.js', 'js/build.js', 'js/geom.js', 'js/mech.js', 'js/models.js', 'js/motion.js', 'js/paper.js',
+  'css/app.css', 'js/app.js', 'js/build.js', 'js/check.js', 'js/geom.js', 'js/mech.js', 'js/models.js', 'js/motion.js', 'js/paper.js',
   'js/render.js', 'js/thumbs.js', 'fonts/shippori-mincho-800.woff2', 'fonts/zen-kaku-400.woff2', 'fonts/zen-kaku-700.woff2',
   'icon-192.png',
 ];
