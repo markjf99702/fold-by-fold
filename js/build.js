@@ -5,7 +5,7 @@
 // square, [0, 0] at one corner); `at` says where such a point is now.
 
 import { Sheet, fold, foldUnfold, bend, turnOver, turn, together, reverse } from './paper.js';
-import { mechanism, between } from './mech.js';
+import { mechanism, between, squash } from './mech.js';
 import { bisector, line, lineAt, side, flip, intersect, mid, lerp, reflectPoint, angleBisector, sub } from './geom.js';
 
 export function build(model) {
@@ -105,6 +105,13 @@ function helpers(current) {
       const t = together(current(), makers.map((mk) => (s) => mk(helpers(() => s))));
       const r = between(t.from, t.to, { axis: o.axis, page: o.page });
       r.motion.parts = t.motion.parts;
+      return r;
+    },
+    // A squash fold of the flap between the table line top–bottom and its folded edge top–corner; seed is
+    // a paper point on its front layer.
+    squash: (o) => {
+      const r = squash(current(), o);
+      r.motion.name = 'Squash fold';
       return r;
     },
     // A line on the flat, unfolded paper, through two of its points.

@@ -298,7 +298,7 @@ export function foldUnfold(sheet, L, opts = {}) {
 // Folds only part way, to shape the finished model. angle in degrees.
 export function bend(sheet, L, angle, opts = {}) {
   const r = fold(sheet, L, { ...opts, into: opts.into || (opts.type === 'mountain' ? 'bottom' : 'top') });
-  return result(r.from, r.from.clone(), { ...r.motion, kind: 'bend', angle });
+  return result(r.from, r.from.clone(), { ...r.motion, kind: 'bend', angle, schedule: opts.schedule || null });
 }
 
 // Several folds made at the same time, like folding all four corners in at once, or shaping a finished
@@ -329,10 +329,13 @@ export function together(sheet, makers) {
   if (from.order.length !== from.facets.size) throw new Error('Lost track of a facet while folding together');
   const bends = results.every((r) => r.motion.kind === 'bend');
   const to = bends ? from.clone() : s.clone();
-  const parts = results.map((r) => ({
-    line: r.motion.line, moving: r.motion.moving, sign: r.motion.sign, type: r.motion.type,
-    angle: r.motion.kind === 'bend' ? r.motion.angle : 180, bend: r.motion.kind === 'bend',
-  }));
+  const parts = results.map((r) => (r.motion.kind === 'reverse'
+    // An inside reverse fold keeps its own motion, and is marked the way a diagram marks one.
+    ? { line: r.motion.line, moving: r.motion.moving, sign: -1, type: 'mountain', angle: 180, reverse: r.motion }
+    : {
+      line: r.motion.line, moving: r.motion.moving, sign: r.motion.sign, type: r.motion.type,
+      angle: r.motion.kind === 'bend' ? r.motion.angle : 180, bend: r.motion.kind === 'bend', schedule: r.motion.schedule || null,
+    }));
   return result(from, to, { kind: 'multi', parts, moving: parts.flatMap((p) => p.moving) });
 }
 

@@ -104,7 +104,16 @@ export function poses(step, t) {
 
   if (motion.kind === 'multi') {
     const partOf = new Map();
+    // Inside reverse folds among the parts move the way they do on their own, bridges and all.
+    const reversed = new Map(), bridges = [];
     for (const part of motion.parts) {
+      if (part.reverse) {
+        for (const it of reversePoses({ from, motion: part.reverse }, e, zFrom, zTo)) {
+          if (it.bridge) bridges.push(it);
+          else if (part.reverse.moving.includes(it.facet.id)) reversed.set(it.facet.id, it.pose);
+        }
+        continue;
+      }
       part.h = axisHeight(part.moving, zFrom, zTo, part.bend, part.sign);
       for (const id of part.moving) partOf.set(id, part);
     }
@@ -112,20 +121,24 @@ export function poses(step, t) {
       const f = from.facets.get(id);
       const part = partOf.get(id);
       let pose;
-      if (!part) pose = flatPose(f.m, zFrom(id) + (zTo(id) - zFrom(id)) * e);
+      if (reversed.has(id)) pose = reversed.get(id);
+      else if (!part) pose = flatPose(f.m, zFrom(id) + (zTo(id) - zFrom(id)) * e);
       else {
         const zs = zFrom(id), H = part.h;
         const L = part.line;
-        pose = rotateAbout(flatPose(f.m, zs), L.p[0], L.p[1], H, L.d[0], L.d[1], part.sign * (part.angle * Math.PI / 180) * e);
+        // A bend can keep its own time (a wing that flaps), as a fraction of its angle at each moment.
+        const k = part.schedule ? part.schedule(Math.min(1, Math.max(0, t))) : e;
+        pose = rotateAbout(flatPose(f.m, zs), L.p[0], L.p[1], H, L.d[0], L.d[1], part.sign * (part.angle * Math.PI / 180) * k);
         if (!part.bend) pose.t[2] += (zTo(id) - (2 * H - zs)) * e;
       }
       if (motion.roll) {
         const R = motion.roll;
-        pose = rotateAbout(pose, R.line.p[0], R.line.p[1], 0, R.line.d[0], R.line.d[1], (R.angle * Math.PI / 180) * e);
+        const k = R.schedule ? R.schedule(Math.min(1, Math.max(0, t))) : e;
+        pose = rotateAbout(pose, R.line.p[0], R.line.p[1], 0, R.line.d[0], R.line.d[1], (R.angle * Math.PI / 180) * k);
       }
       out.push({ facet: f, pose });
     }
-    return lifted(out);
+    return lifted(out.concat(bridges));
   }
 
   let angle, zMid = null;
@@ -225,6 +238,10 @@ function lifted(items) {
 // moving part to where it lands. All in 3D table coordinates.
 export function marks(step) {
   const { from, motion } = step;
+  if (motion.kind === 'mech' && motion.squash) {
+    const q = motion.squash, z = (Math.max(...from.levels().values()) + 1) * LAYER + 0.002;
+    return [{ type: 'valley', line: q.line.map((p) => [p[0], p[1], z]), arrow: { from: [...q.from, z], to: [...q.to, z], over: true, angle: 180 } }];
+  }
   if (motion.kind === 'mech' && motion.parts) {
     return motion.parts.map((p) => markFor(from, { ...p, sign: -1, type: 'mountain', kind: 'fold' })).filter(Boolean);
   }

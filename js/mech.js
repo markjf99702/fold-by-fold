@@ -10,9 +10,10 @@
 // just before they close. (Inside reverse folds are in paper.js: stiff paper can't make them.)
 
 import {
-  apply, det, line, side, cross, sub, dot, centroid, cuts, ccw, area, intersectPolys, invert,
+  apply, det, line, side, cross, sub, dot, centroid, cuts, ccw, area, intersectPolys, invert, norm, reflection, compose,
 } from './geom.js';
 import { splitPaper } from './paper.js';
+import { crossings } from './check.js';
 import { LAYER, ease } from './motion.js';
 
 const FOLDS = { valley: Math.PI, mountain: -Math.PI, flat: 0 };
@@ -199,6 +200,8 @@ export function between(from, to, { axis, page, samples = 80 }) {
       return { target: theta1, via: 0, weight: 1 };
     }
     if (!changed(j)) return null;
+    // The flap can only fold once the page lies open, and it folds as the page comes back: while the page is
+    // flat open, the creases around the point where the fold meets the page's hinge are locked.
     if (Math.abs(Math.abs(theta1 - j.theta0) - 2 * Math.PI) < 1e-9) return { target: theta1, via: 0, weight: 0.02 };
     return { target: theta1, when: [0.5, 1], weight: 0.02 };
   };
@@ -206,6 +209,89 @@ export function between(from, to, { axis, page, samples = 80 }) {
   const still = from.order.find((id) => !inPage.has(id));
   const root = centroid(from.facets.get(still).poly);
   return run(from, to, plan, { root, samples });
+}
+
+// A squash fold. The flap between the line from `top` to `bottom` (on the table) and its folded outer edge
+// from `top` to `corner` is lifted upright, opened, and pressed flat. Its front layer (the one holding paper
+// point `seed`) goes over to the far side of the line, its back layer comes back down where it was, and each
+// folds in half along the line that splits its angle at the top, so the outer edge lands on the line.
+export function squash(sheet, { top, bottom, corner, seed }) {
+  const from = sheet.clone();
+  from._world = new Map();
+  const spine = line(top, bottom), outer = line(top, corner);
+  const u = norm(sub(bottom, top)), v = norm(sub(corner, top));
+  const bis = { p: top, d: norm([u[0] + v[0], u[1] + v[1]]) };
+  const worldOn = (L, j) => {
+    const f = from.facets.get(j.f);
+    return Math.abs(side(L, apply(f.m, j.p0))) < 1e-7 && Math.abs(side(L, apply(f.m, j.p1))) < 1e-7;
+  };
+  const reach = (start, stop) => {
+    const all = joins(from);
+    const got = new Set([start]);
+    for (let grew = true; grew;) {
+      grew = false;
+      for (const j of all) {
+        if (stop(j) || got.has(j.f) === got.has(j.g)) continue;
+        got.add(j.f); got.add(j.g); grew = true;
+      }
+    }
+    return got;
+  };
+  // The flap, cut along its fold lines.
+  const page = reach(from.facetAt(seed).id, (j) => worldOn(spine, j));
+  const front = reach(from.facetAt(seed).id, (j) => worldOn(spine, j) || worldOn(outer, j));
+  for (const id of [...page]) {
+    const f = from.facets.get(id);
+    if (!cuts(from.world(id), bis)) continue;
+    const inv = invert(f.m);
+    const r = splitPaper(from, id, line(apply(inv, bis.p), apply(inv, [bis.p[0] + bis.d[0], bis.p[1] + bis.d[1]])));
+    if (!r) continue;
+    page.delete(id); page.add(r.left); page.add(r.right);
+    if (front.delete(id)) { front.add(r.left); front.add(r.right); }
+  }
+  from._world = new Map();
+  const inner = (id) => side(bis, centroid(from.world(id))) * side(bis, bottom) > 0;
+  const Rs = reflection(spine), Rb = reflection(bis);
+  const to = from.clone();
+  to._world = new Map();
+  const moved = [];
+  for (const id of page) {
+    const f = from.facets.get(id);
+    let m = f.m;
+    if (!inner(id)) m = compose(Rb, m);
+    if (front.has(id)) m = compose(Rs, m);
+    if (m !== f.m) { to.facets.set(id, { ...f, m }); moved.push(id); }
+  }
+  // The front layer lands on top of the far side, folded in two; the back layer's outer part lands on its
+  // inner part.
+  const pick = (test) => from.order.filter((id) => page.has(id) && test(id));
+  const f1 = pick((id) => front.has(id) && inner(id)), f2 = pick((id) => front.has(id) && !inner(id));
+  const b2 = pick((id) => !front.has(id) && !inner(id));
+  const lifted = new Set([...f1, ...f2, ...b2]);
+  to.order = from.order.filter((id) => !lifted.has(id)).concat(f1.slice().reverse(), f2, b2.slice().reverse());
+  to._levels = null;
+  const problems = crossings(to);
+  if (problems.length) throw new Error(`The squash fold would pass paper through paper (${problems[0]})`);
+
+  const plan = (j) => {
+    const theta1 = angleIn(to, j);
+    const inF = (id) => front.has(id), inP = (id) => page.has(id);
+    if (worldOn(spine, j) && inP(j.f) !== inP(j.g)) {
+      const mine = inP(j.f) ? j.f : j.g;
+      if (inF(mine)) return { target: theta1, weight: 1 };
+      return { target: j.theta0, via: j.theta0 / 2, weight: 1 };
+    }
+    if (Math.abs(theta1 - j.theta0) < 1e-9) return null;
+    return { target: theta1, when: [0.5, 1], weight: 0.02 };
+  };
+  const still = from.order.find((id) => !page.has(id));
+  const r = run(from, to, plan, { root: centroid(from.facets.get(still).poly), samples: 80 });
+  const reach1 = Math.hypot(corner[0] - top[0], corner[1] - top[1]);
+  r.motion.squash = {
+    line: [top, [top[0] + bis.d[0] * reach1 * 1.08, top[1] + bis.d[1] * reach1 * 1.08]],
+    from: corner, to: [top[0] + u[0] * reach1, top[1] + u[1] * reach1],
+  };
+  return r;
 }
 
 const viaOf = (v) => (v === undefined ? undefined : v === 'flat' ? 0 : (v * Math.PI) / 180);
@@ -243,22 +329,30 @@ function run(from, known, plan, { root, samples }) {
   const bodyOf = new Map(from.order.map((id) => [id, findB(id)]));
   const rootBody = bodyOf.get(from.facetAt(root).id);
 
-  // A tree of bodies hung from the root; hinges not in the tree close loops.
+  // A tree of bodies hung from the root; hinges not in the tree close loops. The creases that keep to a
+  // schedule go in the tree first: a loop only keeps the paper joined, it can't drive anything.
+  const rank = (h) => (h.plan.target === null ? 2 : (h.plan.weight ?? 1) >= 1 ? 0 : 1);
+  const group = new Map([...new Set(bodyOf.values())].map((b) => [b, b]));
+  const findG = (x) => { while (group.get(x) !== x) x = group.get(x); return x; };
+  const inTree = new Set();
+  for (const h of [...hinges].sort((a, b) => rank(a) - rank(b))) {
+    const a = findG(bodyOf.get(h.f)), b = findG(bodyOf.get(h.g));
+    if (a === b) continue;
+    group.set(a, b);
+    inTree.add(h);
+  }
   const tree = [];
   const placed = new Set([rootBody]);
-  const loops = [];
+  const loops = hinges.filter((h) => !inTree.has(h));
   let frontier = [rootBody];
-  const used = new Set();
   while (frontier.length) {
     const next = [];
     for (const b of frontier) {
-      for (const h of hinges) {
-        if (used.has(h)) continue;
+      for (const h of inTree) {
         const bf = bodyOf.get(h.f), bg = bodyOf.get(h.g);
         if (bf !== b && bg !== b) continue;
         const other = bf === b ? bg : bf;
         if (placed.has(other)) continue;
-        used.add(h);
         placed.add(other);
         tree.push({ body: other, parentBody: b, hinge: h, parentFacet: bf === b ? h.f : h.g, childFacet: bf === b ? h.g : h.f });
         next.push(other);
@@ -266,7 +360,6 @@ function run(from, known, plan, { root, samples }) {
     }
     frontier = next;
   }
-  for (const h of hinges) if (!used.has(h)) loops.push(h);
   for (const id of from.order) if (!placed.has(bodyOf.get(id))) throw new Error('Part of the paper is not joined to the rest');
 
   // Each tree hinge's axis, from the parent facet's side: turning by +x folds the child toward the
@@ -348,17 +441,21 @@ function run(from, known, plan, { root, samples }) {
     return x;
   };
 
-  // Sample the motion. Each solve starts from a guess that leans the right way: creases that keep to
-  // their schedule start there, and the rest move on by as much as their schedule did, which is what
-  // picks the right way to go where two ways of folding meet.
+  // Sample the motion. Creases that keep to a schedule start each solve there. The rest are tried two
+  // ways, carrying on from where they were and starting from where they are meant to be, and whichever
+  // keeps the paper joined and heads the right way wins: where two ways of folding meet, that is what picks
+  // the right one.
+  const cost = (x, tgt, prev) => residual(x, tgt, prev).reduce((s, r) => s + r * r, 0);
   const xs = [];
   let x = new Array(n).fill(0);
   let prevTgt = targetAt(0);
   for (let k = 0; k <= samples; k++) {
     const t = k / samples;
     const tgt = targetAt(t);
-    const guess = x.map((v, i) => (tgt[i] === null ? v : order[i].weight >= 1 ? tgt[i] : v + (tgt[i] - prevTgt[i])));
-    x = solve(guess, tgt);
+    const carry = x.map((v, i) => (tgt[i] === null ? v : order[i].weight >= 1 ? tgt[i] : v + (tgt[i] - prevTgt[i])));
+    const aim = x.map((v, i) => (tgt[i] === null ? v : tgt[i]));
+    const a = solve(carry, tgt), b = solve(aim, tgt);
+    x = cost(b, tgt, x) < cost(a, tgt, x) - 1e-12 ? b : a;
     xs.push(x.slice());
     prevTgt = tgt;
   }
@@ -377,9 +474,10 @@ function run(from, known, plan, { root, samples }) {
     const q = Math.round(v / Math.PI) * Math.PI;
     return Math.abs(v - q) < 0.08 ? q : v;
   });
+  if (xEnd.every((v) => Math.abs(v) < 1e-9)) throw new Error('None of the creases move');
   // And the motion has to get there by itself; a paper that jams would otherwise jump at the last moment.
   const jump = Math.max(0, ...xs[samples].map((v, i) => Math.abs(v - xEnd[i])));
-  if (jump > 0.05) throw new Error(`The paper jams on the way (it would jump ${(jump * 180 / Math.PI).toFixed(0)} degrees at the end)`);
+  if (jump > 0.05) throw new Error(`The paper jams on the way (it would jump ${(jump * 180 / Math.PI).toFixed(0)} degrees at the end) ${xs[samples].map((v, i) => `${(v * 180 / Math.PI).toFixed(0)}/${(xEnd[i] * 180 / Math.PI).toFixed(0)}/${order[i].delta === null ? "free" : "t"}`).join(" ")}`);
   xs[samples] = xEnd;
   const WEnd = kin(xEnd);
   let gap = 0;
@@ -429,6 +527,8 @@ function run(from, known, plan, { root, samples }) {
 
   const motion = {
     kind: 'mech', pathGap,
+    hingeInfo: order.map((e) => ({ p0: e.hinge.p0, p1: e.hinge.p1, theta0: e.hinge.theta0, delta: e.delta, end: xEnd[order.indexOf(e)] })),
+    loopInfo: loops.map((h) => ({ p0: h.p0, p1: h.p1, theta0: h.theta0 })),
     moving: from.order.filter((id) => bodyOf.get(id) !== rootBody),
   };
   // Poses at time t: between samples the hinge angles are blended, and each layer's thickness moves over
