@@ -7,6 +7,7 @@ import { build } from '../js/build.js';
 import { poses, marks, corners, LAYER } from '../js/motion.js';
 import { MODELS } from '../js/models.js';
 import { stateSVG } from '../js/thumbs.js';
+import { crossings } from '../js/check.js';
 
 const close = (a, b, tol = 1e-9) => Math.abs(a - b) < tol;
 const closePt = (p, q, tol = 1e-9) => p.every((x, i) => close(x, q[i], tol));
@@ -105,7 +106,33 @@ for (const model of MODELS) {
     const svg = stateSVG(b.end);
     assert.equal(svg.match(/<polygon/g).length, b.end.facets.size);
   });
+
+  test(`${model.name}: every folded state could be real paper, with nothing passing through anything`, () => {
+    for (const [i, step] of build(model).steps.entries()) {
+      assert.deepEqual(crossings(step.to), [], `${model.id} step ${i + 1}`);
+    }
+  });
 }
+
+test('the checker catches paper passing through paper', () => {
+  // Fold in half and in half again: two folds lie along the second crease, one nested inside the other.
+  const half = fold(Sheet.square(), { p: [0, 0], d: [0, 1] }, { type: 'valley' }).to;
+  const quarter = fold(half, { p: [0, 0], d: [1, 0] }, { type: 'valley' }).to;
+  assert.deepEqual(crossings(quarter), []);
+  // Restack the four layers so those two folds interleave, as if one had pushed through the other.
+  const pairs = [];
+  for (const f of quarter.facets.values()) {
+    for (const { g, edge } of quarter.neighbors(f)) {
+      const a = apply(f.m, edge[0]), b = apply(f.m, edge[1]);
+      if (g.id > f.id && Math.abs(a[1]) < 1e-9 && Math.abs(b[1]) < 1e-9) pairs.push([f.id, g.id]);
+    }
+  }
+  assert.equal(pairs.length, 2);
+  const s = quarter.clone();
+  s.order = [pairs[0][0], pairs[1][0], pairs[0][1], pairs[1][1]];
+  s._levels = null;
+  assert.ok(crossings(s).length > 0, 'interleaved folds went unnoticed');
+});
 
 test('crane: a petal fold lays the petal over the top of the base, with its sides folded onto it', () => {
   const b = build(MODELS.find((m) => m.id === 'crane'));

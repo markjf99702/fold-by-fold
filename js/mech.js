@@ -477,7 +477,7 @@ function run(from, known, plan, { root, samples }) {
   if (xEnd.every((v) => Math.abs(v) < 1e-9)) throw new Error('None of the creases move');
   // And the motion has to get there by itself; a paper that jams would otherwise jump at the last moment.
   const jump = Math.max(0, ...xs[samples].map((v, i) => Math.abs(v - xEnd[i])));
-  if (jump > 0.05) throw new Error(`The paper jams on the way (it would jump ${(jump * 180 / Math.PI).toFixed(0)} degrees at the end) ${xs[samples].map((v, i) => `${(v * 180 / Math.PI).toFixed(0)}/${(xEnd[i] * 180 / Math.PI).toFixed(0)}/${order[i].delta === null ? "free" : "t"}`).join(" ")}`);
+  if (jump > 0.05) throw new Error(`The paper jams on the way (it would jump ${(jump * 180 / Math.PI).toFixed(0)} degrees at the end)`);
   xs[samples] = xEnd;
   const WEnd = kin(xEnd);
   let gap = 0;
@@ -527,8 +527,6 @@ function run(from, known, plan, { root, samples }) {
 
   const motion = {
     kind: 'mech', pathGap,
-    hingeInfo: order.map((e) => ({ p0: e.hinge.p0, p1: e.hinge.p1, theta0: e.hinge.theta0, delta: e.delta, end: xEnd[order.indexOf(e)] })),
-    loopInfo: loops.map((h) => ({ p0: h.p0, p1: h.p1, theta0: h.theta0 })),
     moving: from.order.filter((id) => bodyOf.get(id) !== rootBody),
   };
   // Poses at time t: between samples the hinge angles are blended, and each layer's thickness moves over

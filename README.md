@@ -14,8 +14,8 @@
 
 ## How it works
 
-- **Pick a model.** A paper cup, a paper airplane, a heart, a fortune teller, a samurai helmet and the traditional crane, from five steps to twenty-three. Pick a paper colour too; the back of the paper is always white, as it is with origami paper.
-- **The crane has the folds drawings make hardest.** Collapsing the square base, where six creases close at once. Petal folds, where a corner lifts and its sides fold in to meet under it. Inside reverse folds for the neck, tail and head, where a thin flap turns inside out and tucks up between its own layers. Each one plays as a single motion, and you can stop it anywhere.
+- **Pick a model.** Ten of them: a paper cup, a paper airplane, a heart, a fortune teller, a jumping frog from an index card, a samurai helmet, the waterbomb, the traditional crane, the flapping bird and the traditional frog, from five steps to thirty-four. Pick a paper colour too; the back of the paper is always white, as it is with origami paper.
+- **The crane and the frog have the folds drawings make hardest.** Collapsing a base, where six or eight creases close at once. Squash folds, where a flap stands up, opens and presses flat. Petal folds, where a corner lifts and its sides fold in to meet under it. Inside reverse folds for the crane's neck and tail and the frog's legs, where a thin flap turns inside out and tucks up between its own layers. Tucks, where a point slides into a pocket. Each one plays as a single motion, and you can stop it anywhere.
 - **Each step starts as a diagram.** Before a fold, the paper shows the marks a printed diagram would: a dashed line for a valley fold (toward you), dashes and dots for a mountain fold (behind), and an arrow for which way it goes. The name of the fold and what to do are written underneath.
 - **Press Play and it folds.** The flap turns over about the crease and lands on its new layer, and the next step waits for you. Slow makes every fold take a little over twice as long.
 - **Scrub it.** The slider under the words is the fold itself: drag it to stop the paper anywhere between flat and folded, and back.
@@ -53,15 +53,18 @@ A model is a list of steps in `js/models.js`, each with the words to show and th
 }
 ```
 
-`h.valley` and `h.mountain` fold, `h.crease` folds and unfolds, `h.together` makes several folds at once, and `h.turnOver` and `h.turn` move the whole model. `h.mech` closes several creases as one linked motion, for collapses and petal folds, and `h.reverse` makes an inside reverse fold. `move` names a point on the part that moves; `flap` instead folds just the layer holding that point, and whatever is joined to it. `npm test` folds every step of every model and checks that nothing passes through the table and every animation lands exactly where the fold says.
+`h.valley` and `h.mountain` fold, `h.crease` folds and unfolds, `h.together` makes several folds at once, and `h.turnOver` and `h.turn` move the whole model. `h.mech` closes several creases as one linked motion, for collapses and petal folds; `h.squash` makes a squash fold; `h.reverse` makes an inside reverse fold, and `h.reverseOpen` makes it the way stiff paper allows, by turning the layers over it back like a page. `move` names a point on the part that moves; `flap` instead folds just the layer holding that point, and whatever is joined to it (or a list of points, for layers joined only along the fold itself); `into: { below: point }` tucks the flap into a pocket. `npm test` folds every step of every model and checks that nothing passes through the table, that every animation lands exactly where the fold says, and that every folded state could be real paper: no layer passes through another at a crease.
 
-A collapse or petal fold is worked out as a mechanism: the paper between the moving creases is rigid, the creases are hinges, and a small solver keeps every loop of hinges closed while the main crease follows its schedule and the rest go wherever the paper takes them. An inside reverse fold can't be made that way, because real paper bends a little to let the tip slip between the layers. There the tip swings round the point where the crease meets its folded edge and turns over along that edge as it goes, then settles exactly into its place between the layers.
+A collapse, squash or petal fold is worked out as a mechanism: the paper between the moving creases is rigid, the creases are hinges, and a small solver keeps every loop of hinges closed while the main crease follows its schedule and the rest go wherever the paper takes them. An inside reverse fold can't be made that way with the flap closed, because the tip would have to pass through its own layers. So the neck, tail and legs are shown the way you'd do it with stiff paper: the layers over the flap turn back like the page of a book, the flap lies open, and the point folds up as the page comes back, all as one rigid motion. Small ones near a tip (the crane's head, the frog's feet) swing round in place instead, with a strip of paper bending across the crease the way real paper gives there.
+
+The traditional frog is folded the way stiff paper allows, which differs a little from most diagrams. Each petal fold is made on a plain face, found by turning a page, rather than on a squashed one: there the layer underneath is joined along the middle, so it would have to come too. And the legs are reverse folded at their full width without narrowing them first: narrowing wraps a thin strip of the body around each leg, so a leg could only come out if real paper gave a little.
 
 ### Files
 
 - `js/geom.js`: points, lines, polygons and the flat moves between them.
 - `js/paper.js`: the folded sheet, and folding it: cutting pieces along the crease, working out which layers move, and restacking them. Inside reverse folds are here too.
-- `js/mech.js`: folds where several creases move at once, solved as rigid pieces joined by hinges.
+- `js/mech.js`: folds where several creases move at once, solved as rigid pieces joined by hinges, and the page-turning reverse folds and squash folds built on them.
+- `js/check.js`: checks a folded state could be real paper, with no layer passing through another where they're joined.
 - `js/build.js`: turns a model's steps into the folded states between them. `js/models.js`: the models.
 - `js/motion.js`: where every piece of paper is, in 3D, at any moment of a fold, and the diagram marks for it.
 - `js/render.js`: the WebGL drawing: two-sided paper, the cutting mat, shadows, the marks and the camera.
