@@ -160,6 +160,7 @@ h1 {
 .player {
   height: 100dvh;
   display: grid;
+  grid-template-columns: minmax(0, 1fr); /* a long model name shortens with an ellipsis instead of widening the page */
   grid-template-rows: auto minmax(0, 1fr) auto;
   grid-template-areas: "bar" "stage" "panel";
 }
@@ -222,6 +223,13 @@ h1 {
   font-size: .85rem; font-weight: 700; cursor: pointer; color: var(--muted);
 }
 .speed[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
+/* Narrow phones: the buttons draw in a little so the row fits, and Play keeps one width for every label. */
+@media (max-width: 379px) {
+  .controls { gap: 6px; }
+  .ctl { min-width: 46px; padding: 0 10px; }
+  .ctl.main { min-width: 128px; padding: 0 8px; }
+  .speed { padding: 0 10px; }
+}
 
 .step-list { display: none; }
 

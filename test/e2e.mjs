@@ -136,6 +136,23 @@ for (let k = 1; k < boxes.length; k++) {
   assert.ok(boxes[k].top >= boxes[k - 1].bottom - 0.5, `${boxes[k].q} overlaps ${boxes[k - 1].q} on a desktop`);
 }
 assert.equal(await sideways(), false, 'the player scrolls sideways on a desktop');
+
+// On narrow phones every button fits, even with the longest label on the main one.
+await page.evaluate((n) => fold.set(n - 1, 1), (await state()).steps);
+assert.equal(await page.textContent('#playLabel'), 'Start again');
+for (const [width, height] of [[360, 780], [320, 568]]) {
+  await page.setViewportSize({ width, height });
+  await page.waitForTimeout(100);
+  assert.equal(await sideways(), false, `the player scrolls sideways at ${width} px`);
+  const cut = await page.evaluate(() => ['#back', '#topView', '#resetView', '#prev', '#play', '#next', '#speed'].filter((q) => {
+    const r = document.querySelector(q).getBoundingClientRect();
+    return r.left < 0 || r.right > innerWidth;
+  }));
+  assert.deepEqual(cut, [], `buttons cut off at ${width} px`);
+  const [label, button] = await page.evaluate(() => ['#playLabel', '#play'].map((q) => document.querySelector(q).getBoundingClientRect().toJSON()));
+  assert.ok(label.left >= button.left + 4 && label.right <= button.right - 4, `the label spills out of its button at ${width} px`);
+}
+await page.evaluate(() => fold.set(2, 0));
 await page.setViewportSize({ width: 390, height: 844 });
 
 // The offline copy lists every file the page needs.
