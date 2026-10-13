@@ -365,6 +365,28 @@ for (const hash of ['#%', '#crane-3%', '#%F0%9F']) {
   await p.context().close();
 }
 
+// On a phone turned sideways, nothing sits under the notch or the rounded corners at the sides.
+{
+  const p = await fresh();
+  await (await p.context().newCDPSession(p)).send('Emulation.setSafeAreaInsetsOverride', { insets: { top: 0, left: 47, bottom: 21, right: 47 } });
+  await p.setViewportSize({ width: 844, height: 390 });
+  await p.reload();
+  await p.waitForSelector('#home:not([hidden])');
+  const under = (qs) => p.evaluate((qs) => qs.filter((q) => {
+    const r = document.querySelector(q).getBoundingClientRect();
+    return r.left < 47 || r.right > innerWidth - 47;
+  }), qs);
+  assert.deepEqual(await under(['.mast', '.paper-pick', '.models', '.symbols', '.jd-foot']), [], 'the gallery runs under the sides of the screen');
+  await p.click('.model:has(h3:text("Paper cup"))');
+  await p.waitForSelector('#player:not([hidden])');
+  assert.deepEqual(await under(['#back', '#resetView', '#ticks', '.step-now', '.scrub', '#prev', '#speed']), [], 'the player runs under the sides of the screen');
+  // Wide enough for the words beside the paper (a big phone), the panel makes room for the notch too.
+  await p.setViewportSize({ width: 932, height: 430 });
+  await p.waitForTimeout(100);
+  assert.deepEqual(await under(['#back', '#resetView', '.step-now', '#speed']), [], 'the player runs under the sides of a big phone');
+  await p.context().close();
+}
+
 assert.deepEqual(problems.filter(p => !p.startsWith('failed:')), [], 'problems while using it');
 await browser.close();
 server.close();

@@ -91,7 +91,7 @@ h1, h2, h3 { text-wrap: balance; }
 .home {
   max-width: 1040px;
   margin: 0 auto;
-  padding: max(28px, env(safe-area-inset-top)) var(--gutter) max(16px, env(safe-area-inset-bottom));
+  padding: max(28px, env(safe-area-inset-top)) max(var(--gutter), env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(var(--gutter), env(safe-area-inset-left));
   display: flex;
   flex-direction: column;
   gap: 22px;
@@ -167,7 +167,7 @@ h1 {
 .bar {
   grid-area: bar;
   display: flex; align-items: center; gap: 10px;
-  padding: max(8px, env(safe-area-inset-top)) var(--gutter) 8px;
+  padding: max(8px, env(safe-area-inset-top)) max(var(--gutter), env(safe-area-inset-right)) 8px max(var(--gutter), env(safe-area-inset-left));
 }
 .bar-title { flex: 1; min-width: 0; }
 .bar-title h2 { font-family: var(--display); font-weight: 800; font-size: 1.2rem; margin: 0; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -187,7 +187,7 @@ h1 {
 
 .panel {
   grid-area: panel;
-  padding: 10px var(--gutter) max(12px, env(safe-area-inset-bottom));
+  padding: 10px max(var(--gutter), env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(var(--gutter), env(safe-area-inset-left));
   display: flex; flex-direction: column; gap: 10px;
   background: var(--bg);
   border-top: 1px solid var(--line);
@@ -235,12 +235,13 @@ h1 {
 
 @media (min-width: 900px) {
   .player {
-    grid-template-columns: minmax(0, 1fr) 380px;
+    grid-template-columns: minmax(0, 1fr) calc(380px + env(safe-area-inset-right));
     grid-template-rows: auto minmax(0, 1fr);
     grid-template-areas: "bar bar" "stage panel";
   }
-  /* The words and controls keep their size at the top; the list of steps scrolls under them. */
-  .panel { border-top: 0; border-left: 1px solid var(--line); min-height: 0; padding-top: 16px; }
+  /* The words and controls keep their size at the top; the list of steps scrolls under them. The panel's
+     left side is mid-screen, so only its right side keeps clear of a notch, and the panel is that much wider. */
+  .panel { border-top: 0; border-left: 1px solid var(--line); min-height: 0; padding-top: 16px; padding-left: var(--gutter); }
   .panel > * { flex-shrink: 0; }
   .ticks { display: none; }
   .step-list {
