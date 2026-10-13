@@ -14,5 +14,7 @@ export function stateSVG(sheet, { front = '#d9412b', back = '#f3eee3', edge = 'r
     const fill = det(f.m) > 0 ? front : back;
     return `<polygon points="${sheet.world(id).map(pt).join(' ')}" fill="${fill}" stroke="${edge}" stroke-width=".45" stroke-linejoin="round"/>`;
   });
-  return `<svg viewBox="0 0 100 100" role="img" aria-label="${label}">${polys.join('')}</svg>`;
+  // Without a label the picture is decoration, and screen readers skip it.
+  const a11y = label ? `role="img" aria-label="${label}"` : 'aria-hidden="true"';
+  return `<svg viewBox="0 0 100 100" ${a11y}>${polys.join('')}</svg>`;
 }

@@ -43,6 +43,8 @@ const cards = await page.locator('.model').count();
 assert.ok(cards >= 5, `only ${cards} models`);
 assert.equal(await page.locator('.model .thumb svg polygon').count() > cards, true, 'the model pictures are empty');
 assert.equal(await sideways(), false, 'the gallery scrolls sideways on a phone');
+// A screen reader names each card by its model; the picture on it is left out.
+assert.equal(await page.getByRole('button', { name: /^Paper cup\b/ }).count(), 1, 'the paper cup card is not named for its model');
 
 // Picking a paper colour sticks.
 await page.click('.swatch[aria-label="Indigo"]');

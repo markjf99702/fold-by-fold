@@ -119,9 +119,9 @@ function paintHome() {
   }
   if (thumbsIn === paperColor()) return;
   thumbsIn = paperColor();
+  // The card's own words say what the model is, so the picture goes unlabelled and screen readers skip it.
   for (const card of document.querySelectorAll('#models .model')) {
-    const m = MODELS.find((x) => x.id === card.dataset.model);
-    card.querySelector('.thumb').innerHTML = stateSVG(built(m.id).end, { front: thumbsIn, back: BACK, label: `The finished ${m.name.toLowerCase()}` });
+    card.querySelector('.thumb').innerHTML = stateSVG(built(card.dataset.model).end, { front: thumbsIn, back: BACK });
   }
 }
 
