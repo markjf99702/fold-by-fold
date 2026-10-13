@@ -169,6 +169,31 @@ await page.waitForSelector('#player:not([hidden])');
 assert.equal((await state()).id, 'helmet', 'the page did not load offline');
 await ctx.setOffline(false);
 
+// A page of its own, for the checks below that need a fresh start: nothing saved and no history.
+async function fresh(hash = '', { init, ...opts } = {}) {
+  const c = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, hasTouch: true, serviceWorkers: 'block', ...opts });
+  if (init) await c.addInitScript(init);
+  const p = await c.newPage();
+  p.on('pageerror', e => problems.push(e.message));
+  p.on('console', m => { if (m.type() === 'error') problems.push(m.text()); });
+  await p.goto(base + hash);
+  return p;
+}
+
+// A link to a step opens that step once. After that a reload picks up where you got to, not the link's step.
+{
+  const p = await fresh('#crane-3');
+  await p.waitForFunction(() => fold.state.id === 'crane');
+  assert.equal(await p.evaluate(() => fold.state.i), 2);
+  for (let k = 0; k < 4; k++) await p.click('#next');
+  assert.equal(await p.evaluate(() => fold.state.i), 6);
+  await p.reload();
+  await p.waitForFunction(() => fold.state.id === 'crane');
+  assert.equal(await p.evaluate(() => fold.state.i), 6, 'a reload went back to the step in the link');
+  assert.equal(await p.evaluate(() => JSON.parse(localStorage.getItem('fold-by-fold.v1')).progress.crane), 6);
+  await p.context().close();
+}
+
 assert.deepEqual(problems.filter(p => !p.startsWith('failed:')), [], 'problems while using it');
 await browser.close();
 server.close();

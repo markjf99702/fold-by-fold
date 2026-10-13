@@ -311,8 +311,12 @@ function show(id) {
 function route() {
   const h = decodeURIComponent(location.hash.slice(1));
   const m = /^([a-z-]+?)(?:-(\d+))?$/.exec(h);
-  if (m && MODELS.some((x) => x.id === m[1])) openModel(m[1], m[2] ? +m[2] - 1 : null);
-  else {
+  if (m && MODELS.some((x) => x.id === m[1])) {
+    openModel(m[1], m[2] ? +m[2] - 1 : null);
+    // A link to a step opens it once; after that the address is the model's, so a reload picks up where
+    // you got to instead of going back to the link's step.
+    if (m[2]) history.replaceState(history.state, '', '#' + m[1]);
+  } else {
     show('home');
     renderHome();
     document.title = 'Fold by Fold';
