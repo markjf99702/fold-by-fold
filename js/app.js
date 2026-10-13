@@ -94,7 +94,9 @@ function openModel(id, i = null) {
       view = new View($('gl'));
       wireCamera();
     } catch {
+      // No 3D here: say so and put away what only works in 3D. The words, slider and buttons still work.
       $('glError').hidden = false;
+      for (const id of ['hint', 'topView', 'resetView']) $(id).hidden = true;
     }
   }
   if (view) view.setPaper(paperColor(), BACK);
@@ -233,7 +235,7 @@ function frameCamera(snap) {
 
 function loop(now) {
   requestAnimationFrame(loop);
-  if (!view || !P.b || $('player').hidden) return;
+  if (!P.b || $('player').hidden) return;
   const dt = Math.min(0.1, (now - (lastFrame || now)) / 1000);
   lastFrame = now;
   const step = P.b.steps[P.i];
@@ -247,6 +249,7 @@ function loop(now) {
     }
     dirty = true;
   }
+  if (!view) return; // no 3D: the fold's time still runs for the words and slider, with nothing to draw
   const settled = view.settle(1 - Math.pow(0.001, dt));
   if (!settled) dirty = true;
   if (!dirty) return;

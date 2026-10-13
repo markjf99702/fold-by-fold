@@ -217,6 +217,22 @@ async function fresh(hash = '', { init, ...opts } = {}) {
   await p.context().close();
 }
 
+// Where the browser can't draw 3D, it says so, puts away what only works in 3D, and the words, slider and
+// buttons still walk through the steps: Play runs the fold's time through to the end.
+{
+  const p = await fresh('#crane-10', { init: () => {
+    const get = HTMLCanvasElement.prototype.getContext;
+    HTMLCanvasElement.prototype.getContext = function (type, ...rest) { return /webgl/.test(type) ? null : get.call(this, type, ...rest); };
+  } });
+  await p.waitForFunction(() => fold.state.id === 'crane');
+  assert.equal(await p.isVisible('#glError'), true, 'no word that 3D is missing');
+  for (const q of ['#hint', '#topView', '#resetView']) assert.equal(await p.isVisible(q), false, `${q} is still up without 3D`);
+  await p.click('#play');
+  await p.waitForFunction(() => fold.state.t >= 1, null, { timeout: 10000 });
+  assert.equal(await p.textContent('#playLabel'), 'Next fold');
+  await p.context().close();
+}
+
 assert.deepEqual(problems.filter(p => !p.startsWith('failed:')), [], 'problems while using it');
 await browser.close();
 server.close();
