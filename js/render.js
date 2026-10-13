@@ -138,13 +138,11 @@ export class View {
     const gl = canvas.getContext('webgl', { antialias: true, stencil: true, alpha: true, premultipliedAlpha: false, preserveDrawingBuffer: true });
     if (!gl) throw new Error('WebGL is not available');
     this.gl = gl;
-    this.paper = compile(gl, PAPER_VS, PAPER_FS);
-    this.flat = compile(gl, FLAT_VS, FLAT_FS);
-    this.mat = compile(gl, MAT_VS, MAT_FS);
-    this.buf = {
-      paper: gl.createBuffer(), edges: gl.createBuffer(), shadow: gl.createBuffer(),
-      marks: gl.createBuffer(), mat: gl.createBuffer(),
-    };
+    this.init();
+    // A graphics card reset, or a phone reclaiming the 3D from a tab in the background, loses everything on
+    // the card. Asking to have it back, and making it again when it comes, brings the paper back.
+    canvas.addEventListener('webglcontextlost', (e) => e.preventDefault());
+    canvas.addEventListener('webglcontextrestored', () => this.init());
     this.front = hexToRgb('#d9412b');
     this.back = hexToRgb('#f3eee3');
     this.matColor = hexToRgb('#2f5a4e');
@@ -156,6 +154,18 @@ export class View {
     this.items = [];
     this.marks = null;
     this.markAlpha = 0;
+  }
+
+  // The shader programs and buffers, which live on the graphics card.
+  init() {
+    const gl = this.gl;
+    this.paper = compile(gl, PAPER_VS, PAPER_FS);
+    this.flat = compile(gl, FLAT_VS, FLAT_FS);
+    this.mat = compile(gl, MAT_VS, MAT_FS);
+    this.buf = {
+      paper: gl.createBuffer(), edges: gl.createBuffer(), shadow: gl.createBuffer(),
+      marks: gl.createBuffer(), mat: gl.createBuffer(),
+    };
   }
 
   setPaper(front, back) {
@@ -233,6 +243,7 @@ export class View {
 
   draw() {
     const gl = this.gl;
+    if (gl.isContextLost()) return; // until it comes back
     this.resize();
     const W = this.canvas.width, H = this.canvas.height;
     gl.viewport(0, 0, W, H);

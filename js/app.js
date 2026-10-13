@@ -93,6 +93,7 @@ function openModel(id, i = null) {
     try {
       view = new View($('gl'));
       wireCamera();
+      $('gl').addEventListener('webglcontextrestored', () => { dirty = true; }); // after the view has rebuilt
     } catch {
       // No 3D here: say so and put away what only works in 3D. The words, slider and buttons still work.
       $('glError').hidden = false;

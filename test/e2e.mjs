@@ -233,6 +233,35 @@ async function fresh(hash = '', { init, ...opts } = {}) {
   await p.context().close();
 }
 
+// When the graphics card resets, or a phone takes the 3D back from a tab in the background, the paper comes
+// back as soon as the browser gives the 3D back.
+{
+  const p = await fresh('#heart-4');
+  await p.waitForFunction(() => fold.state.id === 'heart');
+  const paper = async () => {
+    await p.waitForTimeout(300);
+    const img = UPNG.decode(await p.locator('#gl').screenshot());
+    const px = new Uint8Array(UPNG.toRGBA8(img)[0]);
+    let n = 0;
+    for (let k = 0; k < px.length; k += 4) if ((px[k] > 190 && px[k + 1] > 185 && px[k + 2] > 170) || (px[k] > 150 && px[k + 1] < 110 && px[k + 2] < 100)) n++;
+    return n;
+  };
+  const before = await paper();
+  assert.ok(before > 1000, 'no paper on screen');
+  const restored = await p.evaluate(() => new Promise((done) => {
+    const canvas = document.getElementById('gl');
+    const lose = canvas.getContext('webgl').getExtension('WEBGL_lose_context');
+    canvas.addEventListener('webglcontextlost', () => setTimeout(() => lose.restoreContext(), 50), { once: true });
+    canvas.addEventListener('webglcontextrestored', () => done(true), { once: true });
+    setTimeout(() => done(false), 4000);
+    lose.loseContext();
+  }));
+  assert.equal(restored, true, 'the 3D never came back');
+  const after = await paper();
+  assert.ok(Math.abs(after - before) < before * 0.05, `the paper didn't come back (${after} paper pixels, ${before} before)`);
+  await p.context().close();
+}
+
 assert.deepEqual(problems.filter(p => !p.startsWith('failed:')), [], 'problems while using it');
 await browser.close();
 server.close();
