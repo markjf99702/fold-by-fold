@@ -248,6 +248,31 @@ async function fresh(hash = '', { init, arg, ...opts } = {}) {
   await p.context().close();
 }
 
+// In a frame on another page, the way a viewer can show the single-file copy, the address isn't the page's own to
+// rewrite. The cards and the back arrow still work there, from the gallery and from a link.
+{
+  const p = await fresh();
+  const html = (await readFile(join(root, 'index.html'), 'utf8')).replace('<html lang="en">', '<html lang="en" data-single>');
+  await p.evaluate((html) => new Promise((done) => {
+    const f = document.createElement('iframe');
+    f.style.cssText = 'position: fixed; inset: 0; width: 100%; height: 100%; border: 0';
+    f.onload = done;
+    f.srcdoc = html;
+    document.body.append(f);
+  }), html);
+  const frame = p.frames()[1];
+  await frame.waitForSelector('#home:not([hidden])');
+  await frame.click('.model:has(h3:text("Paper cup"))');
+  await frame.waitForSelector('#player:not([hidden])', { timeout: 5000 }).catch(() => assert.fail('a card did nothing in a frame'));
+  await frame.click('#back');
+  await frame.waitForSelector('#home:not([hidden])', { timeout: 5000 }).catch(() => assert.fail('the back arrow did nothing in a frame'));
+  await frame.evaluate(() => { location.hash = 'heart-2'; });
+  await frame.waitForSelector('#player:not([hidden])');
+  await frame.click('#back');
+  await frame.waitForSelector('#home:not([hidden])', { timeout: 5000 }).catch(() => assert.fail('the back arrow did nothing in a frame, from a link'));
+  await p.context().close();
+}
+
 // Where the browser can't draw 3D, it says so, puts away what only works in 3D, and the words, slider and
 // buttons still walk through the steps: Play runs the fold's time through to the end.
 {

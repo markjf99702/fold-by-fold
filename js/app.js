@@ -95,7 +95,7 @@ function renderHome() {
         <h3>${m.name}</h3>
         <p class="meta"><span class="level">${m.level}</span><span>${b.steps.length} steps</span></p>
         <p class="blurb">${m.blurb}</p>`;
-      btn.addEventListener('click', () => { history.pushState({ from: 'home' }, '', '#' + m.id); route(); });
+      btn.addEventListener('click', () => openFromHome(m.id));
       li.append(btn);
       list.append(li);
     }
@@ -372,6 +372,11 @@ function show(id) {
   window.scrollTo(0, id === 'home' ? homeY : 0);
 }
 
+// In a frame on another page (a viewer showing the single-file copy, say) the address may not be the page's own
+// to rewrite, and going back can take the frame somewhere else entirely, so there a card and the back arrow just
+// set the #part, as they always did.
+const framed = window.self !== window.top;
+
 function route() {
   let h = '';
   try { h = decodeURIComponent(location.hash.slice(1)); } catch { /* a link mangled on the way: the gallery */ }
@@ -380,7 +385,7 @@ function route() {
     openModel(m[1], m[2] ? +m[2] - 1 : null);
     // A link to a step opens it once; after that the address is the model's, so a reload picks up where
     // you got to instead of going back to the link's step.
-    if (m[2]) history.replaceState(history.state, '', '#' + m[1]);
+    if (m[2] && !framed) history.replaceState(history.state, '', '#' + m[1]);
   } else {
     renderHome(); // first, so the cards are there to scroll back to
     show('home');
@@ -388,10 +393,17 @@ function route() {
   }
 }
 
+function openFromHome(id) {
+  if (framed) { location.hash = id; return; }
+  history.pushState({ from: 'home' }, '', '#' + id);
+  route();
+}
+
 // Opened from the gallery, the back arrow goes back to it the way the browser's Back does, so Back from
 // the gallery then leaves instead of reopening the model. Opened from a link, it shows the gallery in place.
 $('back').addEventListener('click', () => {
-  if (history.state?.from === 'home') history.back();
+  if (framed) location.hash = '';
+  else if (history.state?.from === 'home') history.back();
   else { history.replaceState(null, '', location.pathname + location.search); route(); }
 });
 $('play').addEventListener('click', primary);
