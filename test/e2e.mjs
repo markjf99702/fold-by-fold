@@ -161,6 +161,20 @@ for (const dir of ['js', 'css', 'fonts']) {
   for (const f of await readdir(join(root, dir))) assert.ok(sw.includes(`'${dir}/${f}'`), `sw.js doesn't list ${dir}/${f}`);
 }
 
+// Other tools on junkdrawer.works share this address and its caches, so the offline copy clears out only
+// its own old caches, never theirs.
+{
+  const c = await browser.newContext();
+  const p = await c.newPage();
+  await p.goto(base + 'css/app.css'); // the same address, before the page sets up its offline copy
+  await p.evaluate(() => Promise.all([caches.open('another-tool-v1'), caches.open('fold-by-fold-v0')]));
+  await p.goto(base);
+  await p.waitForFunction(() => navigator.serviceWorker?.controller, null, { timeout: 20000 });
+  const kept = await p.evaluate(async () => [await caches.has('another-tool-v1'), await caches.has('fold-by-fold-v0')]);
+  assert.deepEqual(kept, [true, false], 'the offline copy cleared out the wrong caches');
+  await c.close();
+}
+
 // Works offline once it has been opened.
 await page.waitForFunction(() => navigator.serviceWorker?.controller, null, { timeout: 10000 }).catch(() => {});
 await ctx.setOffline(true);
