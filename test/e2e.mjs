@@ -184,9 +184,9 @@ assert.equal((await state()).id, 'helmet', 'the page did not load offline');
 await ctx.setOffline(false);
 
 // A page of its own, for the checks below that need a fresh start: nothing saved and no history.
-async function fresh(hash = '', { init, ...opts } = {}) {
+async function fresh(hash = '', { init, arg, ...opts } = {}) {
   const c = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, hasTouch: true, serviceWorkers: 'block', ...opts });
-  if (init) await c.addInitScript(init);
+  if (init) await c.addInitScript(init, arg);
   const p = await c.newPage();
   p.on('pageerror', e => problems.push(e.message));
   p.on('console', m => { if (m.type() === 'error') problems.push(m.text()); });
@@ -273,6 +273,17 @@ async function fresh(hash = '', { init, ...opts } = {}) {
   assert.equal(restored, true, 'the 3D never came back');
   const after = await paper();
   assert.ok(Math.abs(after - before) < before * 0.05, `the paper didn't come back (${after} paper pixels, ${before} before)`);
+  await p.context().close();
+}
+
+// A damaged or hand-edited save can't break the player: whatever makes no sense is left out.
+for (const junk of ['{"progress":null}', '{"progress":"x"}', '{"progress":{"crane":4.5},"paper":"plaid","slow":"yes"}']) {
+  const p = await fresh('#crane', { init: (v) => localStorage.setItem('fold-by-fold.v1', v), arg: junk });
+  await p.waitForFunction(() => fold.state.id === 'crane');
+  assert.match(await p.textContent('#stepCount'), /^Step 1 of \d+$/, `the crane didn't open with ${junk} saved`);
+  assert.ok((await p.textContent('#say')).length > 10, `no words for the step with ${junk} saved`);
+  const kept = await p.evaluate(() => JSON.parse(localStorage.getItem('fold-by-fold.v1')));
+  assert.deepEqual([kept.paper, kept.slow, kept.progress.crane], ['vermilion', false, 0], `${junk} was kept as it was`);
   await p.context().close();
 }
 

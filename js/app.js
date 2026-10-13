@@ -21,11 +21,25 @@ const BACK = '#f3eee3';
 
 // ---------- Saving ----------
 
+// What was saved, keeping only what the page can use, so a damaged or hand-edited save falls back to the
+// defaults instead of breaking the player.
 function load() {
-  try { return JSON.parse(localStorage.getItem(KEY)) || {}; } catch { return {}; }
+  let saved = null;
+  try { saved = JSON.parse(localStorage.getItem(KEY)); } catch { /* nothing readable saved */ }
+  const plain = (o) => o !== null && typeof o === 'object' && !Array.isArray(o);
+  if (!plain(saved)) saved = {};
+  const progress = {};
+  if (plain(saved.progress)) {
+    for (const [id, i] of Object.entries(saved.progress)) if (Number.isInteger(i) && i >= 0) progress[id] = i;
+  }
+  return {
+    ...saved,
+    paper: PAPERS.some((p) => p.id === saved.paper) ? saved.paper : 'vermilion',
+    slow: saved.slow === true,
+    progress,
+  };
 }
-const saved = load();
-const prefs = { paper: 'vermilion', slow: false, progress: {}, ...saved };
+const prefs = load();
 function save() {
   try { localStorage.setItem(KEY, JSON.stringify(prefs)); } catch { /* private window */ }
 }
