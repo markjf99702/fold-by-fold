@@ -326,6 +326,24 @@ for (const hash of ['#%', '#crane-3%', '#%F0%9F']) {
   await p.context().close();
 }
 
+// On a wide screen the cards in a row line up: names and step counts at the same height across the row.
+{
+  const p = await fresh('', { viewport: { width: 1280, height: 800 }, deviceScaleFactor: 1, hasTouch: false });
+  await p.waitForSelector('#home:not([hidden])');
+  const rows = await p.evaluate(() => {
+    const out = {};
+    for (const card of document.querySelectorAll('.model')) {
+      const top = Math.round(card.getBoundingClientRect().top);
+      const at = (q) => Math.round(card.querySelector(q).getBoundingClientRect().top) - top;
+      (out[top] ||= []).push([at('h3'), at('.meta')]);
+    }
+    return Object.values(out);
+  });
+  assert.ok(rows.length >= 2 && rows[0].length >= 3, `the cards aren't in rows: ${JSON.stringify(rows)}`);
+  for (const row of rows) assert.ok(row.every(([h, m]) => h === row[0][0] && m === row[0][1]), `the cards in a row don't line up: ${JSON.stringify(row)}`);
+  await p.context().close();
+}
+
 assert.deepEqual(problems.filter(p => !p.startsWith('failed:')), [], 'problems while using it');
 await browser.close();
 server.close();
