@@ -346,6 +346,25 @@ for (const hash of ['#%', '#crane-3%', '#%F0%9F']) {
   await p.context().close();
 }
 
+// Back from a model, the gallery is where you left it. The page puts it back itself (Chrome would often do it
+// anyway, but that depends on timing and not every browser does), so the browser's own way is turned off here.
+{
+  const p = await fresh();
+  await p.evaluate(() => { history.scrollRestoration = 'manual'; });
+  const frog = '.model:has(h3:text-is("Frog"))';
+  await p.locator(frog).scrollIntoViewIfNeeded();
+  const y = await p.evaluate(() => scrollY);
+  assert.ok(y > 300, `the gallery didn't scroll down (${y})`);
+  await p.click(frog);
+  await p.waitForSelector('#player:not([hidden])');
+  await p.click('#back');
+  await p.waitForSelector('#home:not([hidden])');
+  await p.waitForTimeout(100);
+  const back = await p.evaluate(() => scrollY);
+  assert.ok(Math.abs(back - y) < 2, `the gallery came back scrolled to ${back}, not ${y}`);
+  await p.context().close();
+}
+
 assert.deepEqual(problems.filter(p => !p.startsWith('failed:')), [], 'problems while using it');
 await browser.close();
 server.close();

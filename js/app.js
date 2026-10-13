@@ -364,9 +364,12 @@ function resetView() {
 
 // ---------- Screens and wiring ----------
 
+// The player starts at the top; the gallery comes back scrolled to where you left it.
+let homeY = 0;
 function show(id) {
+  if (id !== 'home' && !$('home').hidden) homeY = window.scrollY;
   for (const s of document.querySelectorAll('.screen')) s.hidden = s.id !== id;
-  window.scrollTo(0, 0);
+  window.scrollTo(0, id === 'home' ? homeY : 0);
 }
 
 function route() {
@@ -379,8 +382,8 @@ function route() {
     // you got to instead of going back to the link's step.
     if (m[2]) history.replaceState(history.state, '', '#' + m[1]);
   } else {
+    renderHome(); // first, so the cards are there to scroll back to
     show('home');
-    renderHome();
     document.title = 'Fold by Fold';
   }
 }
