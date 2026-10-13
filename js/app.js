@@ -327,7 +327,8 @@ function show(id) {
 }
 
 function route() {
-  const h = decodeURIComponent(location.hash.slice(1));
+  let h = '';
+  try { h = decodeURIComponent(location.hash.slice(1)); } catch { /* a link mangled on the way: the gallery */ }
   const m = /^([a-z-]+?)(?:-(\d+))?$/.exec(h);
   if (m && MODELS.some((x) => x.id === m[1])) {
     openModel(m[1], m[2] ? +m[2] - 1 : null);

@@ -287,6 +287,14 @@ for (const junk of ['{"progress":null}', '{"progress":"x"}', '{"progress":{"cran
   await p.context().close();
 }
 
+// A link mangled on the way (a stray %, an emoji cut in half) opens the gallery rather than a blank page.
+for (const hash of ['#%', '#crane-3%', '#%F0%9F']) {
+  const p = await fresh(hash);
+  await p.waitForSelector('#home:not([hidden])', { timeout: 5000 });
+  assert.ok(await p.locator('.model').count() >= 5, `no gallery for ${hash}`);
+  await p.context().close();
+}
+
 assert.deepEqual(problems.filter(p => !p.startsWith('failed:')), [], 'problems while using it');
 await browser.close();
 server.close();
