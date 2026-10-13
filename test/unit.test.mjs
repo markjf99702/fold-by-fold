@@ -117,6 +117,28 @@ for (const model of MODELS) {
   });
 }
 
+test('a step that names a corner to fold names the one that moves, as the paper lies', () => {
+  // Corners are named as they lie in front of you, so on a sheet that starts white side up the paper's
+  // own left and right are swapped. A corner on the fold line stays put, so it doesn't count.
+  const named = /(?:^|\. )Fold the (top|bottom|left|right)(?: (left|right))? corner/;
+  const toward = { top: [0, 1], bottom: [0, -1], right: [1, 0], left: [-1, 0] };
+  let checked = 0;
+  for (const model of MODELS) {
+    for (const [i, step] of build(model).steps.entries()) {
+      const m = named.exec(step.say);
+      if (!m || !['fold', 'foldUnfold'].includes(step.motion.kind)) continue;
+      const { from, motion } = step;
+      const v = m[2] ? [toward[m[2]][0], toward[m[1]][1]] : toward[m[1]];
+      const reach = (q) => q[0] * v[0] + q[1] * v[1];
+      const corner = from.order.flatMap((id) => from.world(id)).reduce((best, q) => (reach(q) > reach(best) + 1e-9 ? q : best));
+      const moves = motion.moving.flatMap((id) => from.world(id)).some((q) => closePt(q, corner) && Math.abs(side(motion.line, q)) > 1e-6);
+      assert.ok(moves, `${model.id} step ${i + 1} says "${m[0].replace(/^\. /, '')}", but a different corner moves`);
+      checked++;
+    }
+  }
+  assert.ok(checked >= 10, `only ${checked} steps name a corner`);
+});
+
 test('the checker catches paper passing through paper', () => {
   // Fold in half and in half again: two folds lie along the second crease, one nested inside the other.
   const half = fold(Sheet.square(), { p: [0, 0], d: [0, 1] }, { type: 'valley' }).to;

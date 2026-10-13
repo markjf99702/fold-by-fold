@@ -439,11 +439,11 @@ export const MODELS = [
     paper: { colorUp: false, size: [1, CARD] },
     steps: [
       {
-        say: 'Start with an index card standing up tall. Fold the top right corner down to the left edge, and unfold.',
+        say: 'Start with an index card standing up tall. Fold the top left corner down to the right edge, and unfold.',
         do: (h) => h.crease(h.through([0, CARD], [1, BODY]), { move: [1, CARD] }),
       },
       {
-        say: 'Fold the top left corner down to the right edge, and unfold. The creases make an X.',
+        say: 'Fold the top right corner down to the left edge, and unfold. The creases make an X.',
         do: (h) => h.crease(h.through([1, CARD], [0, BODY]), { move: [0, CARD] }),
       },
       {
@@ -550,11 +550,11 @@ export const MODELS = [
     paper: { colorUp: false },
     steps: [
       {
-        say: 'White side up. Fold the bottom left corner up to the top right corner, and unfold.',
+        say: 'White side up. Fold the bottom right corner up to the top left corner, and unfold.',
         do: (h) => h.crease(h.onto(K1, K3), { move: K1 }),
       },
       {
-        say: 'Fold the bottom right corner up to the top left corner, and unfold.',
+        say: 'Fold the bottom left corner up to the top right corner, and unfold.',
         do: (h) => h.crease(h.onto(K2, K4), { move: K2 }),
       },
       {
