@@ -92,6 +92,9 @@ for (const model of MODELS) {
       check(0, step.from);
       const bends = step.motion.kind === 'bend' || step.motion.parts?.some((p) => p.bend);
       if (!bends) check(1, step.motion.kind === 'foldUnfold' ? step.from : step.to);
+      // Halfway through a fold and unfold, every layer is where the fold puts it: a flap folded behind
+      // is under the rest, not level with it.
+      if (step.motion.kind === 'foldUnfold') check(0.5, step.motion.folded);
       // Nothing passes through the table, and every layer stays in one piece.
       for (let t = 0; t <= 1; t += 0.05) {
         for (const it of poses(step, t)) for (const p of corners(it)) assert.ok(p[2] > -1e-9, `${where} goes under the table at t=${t}`);

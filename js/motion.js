@@ -158,7 +158,11 @@ export function poses(step, t) {
   for (const id of from.order) {
     const f = from.facets.get(id);
     if (!moving.has(id)) {
-      const z = zFrom(id) + (zTo(id) - zFrom(id)) * e;
+      // In a fold and unfold, the layers that stay put make room for the flap too (lifting off a flap
+      // folded behind them) and settle back as it opens.
+      const z = motion.kind === 'foldUnfold'
+        ? zFrom(id) + (zLand(id) - zFrom(id)) * through
+        : zFrom(id) + (zTo(id) - zFrom(id)) * e;
       out.push({ facet: f, pose: flatPose(f.m, z) });
       continue;
     }
