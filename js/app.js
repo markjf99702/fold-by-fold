@@ -53,37 +53,75 @@ function built(id) {
   return builtCache.get(id);
 }
 
+// The swatches and cards are made once; after that, choosing a paper only updates them, so the swatch you
+// chose keeps the focus.
 function renderHome() {
   const sw = $('swatches');
-  sw.innerHTML = '';
-  for (const p of PAPERS) {
-    const b = document.createElement('button');
-    b.type = 'button';
-    b.className = 'swatch';
-    b.style.setProperty('--c', p.color);
-    b.setAttribute('role', 'radio');
-    b.setAttribute('aria-checked', p.id === prefs.paper);
-    b.setAttribute('aria-label', p.name);
-    b.title = p.name;
-    b.addEventListener('click', () => { prefs.paper = p.id; save(); renderHome(); });
-    sw.append(b);
+  if (!sw.childElementCount) {
+    for (const p of PAPERS) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'swatch';
+      b.dataset.paper = p.id;
+      b.style.setProperty('--c', p.color);
+      b.setAttribute('role', 'radio');
+      b.setAttribute('aria-label', p.name);
+      b.title = p.name;
+      b.addEventListener('click', () => pickPaper(p.id));
+      sw.append(b);
+    }
+    // Like any set of radio buttons: the arrow keys move along the colours, and Tab stops at the chosen one.
+    sw.addEventListener('keydown', (e) => {
+      const by = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[e.key];
+      if (!by) return;
+      e.preventDefault();
+      const k = PAPERS.findIndex((p) => p.id === (e.target.dataset.paper || prefs.paper));
+      const next = PAPERS[(k + by + PAPERS.length) % PAPERS.length];
+      pickPaper(next.id);
+      sw.querySelector(`[data-paper="${next.id}"]`).focus();
+    });
   }
   const list = $('models');
-  list.innerHTML = '';
-  for (const m of MODELS) {
-    const b = built(m.id);
-    const li = document.createElement('li');
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'model';
-    btn.innerHTML = `
-      <span class="thumb">${stateSVG(b.end, { front: paperColor(), back: BACK, label: `The finished ${m.name.toLowerCase()}` })}</span>
-      <h3>${m.name}</h3>
-      <p class="meta"><span class="level">${m.level}</span><span>${b.steps.length} steps</span></p>
-      <p class="blurb">${m.blurb}</p>`;
-    btn.addEventListener('click', () => { history.pushState({ from: 'home' }, '', '#' + m.id); route(); });
-    li.append(btn);
-    list.append(li);
+  if (!list.childElementCount) {
+    for (const m of MODELS) {
+      const b = built(m.id);
+      const li = document.createElement('li');
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'model';
+      btn.dataset.model = m.id;
+      btn.innerHTML = `
+        <span class="thumb"></span>
+        <h3>${m.name}</h3>
+        <p class="meta"><span class="level">${m.level}</span><span>${b.steps.length} steps</span></p>
+        <p class="blurb">${m.blurb}</p>`;
+      btn.addEventListener('click', () => { history.pushState({ from: 'home' }, '', '#' + m.id); route(); });
+      li.append(btn);
+      list.append(li);
+    }
+  }
+  paintHome();
+}
+
+function pickPaper(id) {
+  prefs.paper = id;
+  save();
+  paintHome();
+}
+
+// Shows the chosen paper: on the swatches, and in the pictures of the finished models.
+let thumbsIn = null;
+function paintHome() {
+  for (const b of $('swatches').children) {
+    const on = b.dataset.paper === prefs.paper;
+    b.setAttribute('aria-checked', on);
+    b.tabIndex = on ? 0 : -1;
+  }
+  if (thumbsIn === paperColor()) return;
+  thumbsIn = paperColor();
+  for (const card of document.querySelectorAll('#models .model')) {
+    const m = MODELS.find((x) => x.id === card.dataset.model);
+    card.querySelector('.thumb').innerHTML = stateSVG(built(m.id).end, { front: thumbsIn, back: BACK, label: `The finished ${m.name.toLowerCase()}` });
   }
 }
 

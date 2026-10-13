@@ -48,6 +48,17 @@ assert.equal(await sideways(), false, 'the gallery scrolls sideways on a phone')
 await page.click('.swatch[aria-label="Indigo"]');
 assert.equal(await page.getAttribute('.swatch[aria-label="Indigo"]', 'aria-checked'), 'true');
 assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem('fold-by-fold.v1')).paper), 'indigo');
+// From the keyboard too: the swatch keeps the focus once it's chosen, the pictures change colour, and the
+// arrow keys move along the colours the way they do in any set of radio buttons.
+const focused = () => page.evaluate(() => document.activeElement.getAttribute('aria-label'));
+await page.focus('.swatch[aria-label="Leaf green"]');
+await page.keyboard.press('Enter');
+assert.equal(await focused(), 'Leaf green', 'choosing a colour from the keyboard lost the focus');
+assert.ok(await page.locator('.model .thumb polygon[fill="#3f8a57"]').count() > 0, 'the pictures did not turn leaf green');
+await page.keyboard.press('ArrowLeft');
+assert.equal(await focused(), 'Indigo');
+assert.equal(await page.getAttribute('.swatch[aria-label="Indigo"]', 'aria-checked'), 'true');
+assert.equal(await page.locator('.swatch[tabindex="0"]').count(), 1, 'Tab should stop only at the chosen colour');
 
 // The cup opens on its first step.
 await page.click('.model:has(h3:text("Paper cup"))');
