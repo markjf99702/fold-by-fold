@@ -69,6 +69,8 @@ assert.equal(await page.evaluate(() => location.hash), '#cup');
 assert.match(await page.textContent('#stepCount'), /^Step 1 of \d+$/);
 assert.ok((await page.textContent('#say')).length > 10, 'no words for the step');
 assert.equal(await page.isVisible('#glError'), false, 'no 3D in this browser');
+// Nothing reads the picture back, so the browser needn't keep a copy of every frame (costly on phones).
+assert.equal(await page.evaluate(() => fold.view().gl.getContextAttributes().preserveDrawingBuffer), false, 'every frame is kept');
 assert.equal(await sideways(), false, 'the player scrolls sideways on a phone');
 
 // The paper is on the table, white side up, and the finished cup shows its indigo side.

@@ -135,7 +135,7 @@ export function hexToRgb(h) {
 export class View {
   constructor(canvas) {
     this.canvas = canvas;
-    const gl = canvas.getContext('webgl', { antialias: true, stencil: true, alpha: true, premultipliedAlpha: false, preserveDrawingBuffer: true });
+    const gl = canvas.getContext('webgl', { antialias: true, stencil: true, alpha: true, premultipliedAlpha: false, preserveDrawingBuffer: false });
     if (!gl) throw new Error('WebGL is not available');
     this.gl = gl;
     this.init();
