@@ -196,12 +196,17 @@ function paint() {
   $('prev').disabled = P.i === 0 && P.t === 0;
   $('next').disabled = P.i === n - 1;
   const last = P.i === n - 1;
-  let label = 'Play', icon = 'M7 4.5v15l12.5-7.5z';
-  if (P.playing) { label = 'Pause'; icon = 'M7 5h3.5v14H7zM13.5 5H17v14h-3.5z'; }
-  else if (P.t >= 1) { label = last ? 'Start again' : 'Next fold'; icon = last ? 'M4 12a8 8 0 1 0 2.4-5.7M4 4v4.5h4.5' : 'M5 4.5v15l10-7.5zM17 5h2.5v14H17z'; }
-  else if (P.t > 0) label = 'Carry on';
+  let label = 'Play', icon = '<path d="M7 4.5v15l12.5-7.5z"/>';
+  if (P.playing) { label = 'Pause'; icon = '<path d="M7 5h3.5v14H7zM13.5 5H17v14h-3.5z"/>'; }
+  else if (P.t >= 1) {
+    label = last ? 'Start again' : 'Next fold';
+    // The arrow going round is an open line, so it's drawn as one rather than filled in like the others.
+    icon = last
+      ? '<path d="M4 12a8 8 0 1 0 2.4-5.7M4 4v4.5h4.5" fill="none" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>'
+      : '<path d="M5 4.5v15l10-7.5zM17 5h2.5v14H17z"/>';
+  } else if (P.t > 0) label = 'Carry on';
   $('playLabel').textContent = label;
-  $('playIcon').innerHTML = `<path d="${icon}"/>`;
+  $('playIcon').innerHTML = icon;
   $('scrub').value = Math.round(P.t * 1000);
   $('speed').setAttribute('aria-pressed', prefs.slow);
   document.querySelectorAll('#ticks button').forEach((b, k) => {

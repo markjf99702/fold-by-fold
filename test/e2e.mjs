@@ -140,6 +140,8 @@ assert.equal(await sideways(), false, 'the player scrolls sideways on a desktop'
 // On narrow phones every button fits, even with the longest label on the main one.
 await page.evaluate((n) => fold.set(n - 1, 1), (await state()).steps);
 assert.equal(await page.textContent('#playLabel'), 'Start again');
+// Its icon, an open arrow going round, is drawn as a line rather than filled in.
+assert.equal(await page.evaluate(() => getComputedStyle(document.querySelector('#playIcon path')).fill), 'none', 'the Start again icon is filled in');
 for (const [width, height] of [[360, 780], [320, 568]]) {
   await page.setViewportSize({ width, height });
   await page.waitForTimeout(100);
