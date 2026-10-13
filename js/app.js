@@ -67,7 +67,7 @@ function renderHome() {
       <h3>${m.name}</h3>
       <p class="meta"><span class="level">${m.level}</span><span>${b.steps.length} steps</span></p>
       <p class="blurb">${m.blurb}</p>`;
-    btn.addEventListener('click', () => { location.hash = m.id; });
+    btn.addEventListener('click', () => { history.pushState({ from: 'home' }, '', '#' + m.id); route(); });
     li.append(btn);
     list.append(li);
   }
@@ -323,7 +323,12 @@ function route() {
   }
 }
 
-$('back').addEventListener('click', () => { location.hash = ''; });
+// Opened from the gallery, the back arrow goes back to it the way the browser's Back does, so Back from
+// the gallery then leaves instead of reopening the model. Opened from a link, it shows the gallery in place.
+$('back').addEventListener('click', () => {
+  if (history.state?.from === 'home') history.back();
+  else { history.replaceState(null, '', location.pathname + location.search); route(); }
+});
 $('play').addEventListener('click', primary);
 $('prev').addEventListener('click', () => {
   if (P.t > 0.02) { P.t = 0; P.playing = false; paint(); } else go(P.i - 1);

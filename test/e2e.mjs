@@ -194,6 +194,29 @@ async function fresh(hash = '', { init, ...opts } = {}) {
   await p.context().close();
 }
 
+// The back arrow returns to the gallery the way the browser's Back would, so Back from the gallery leaves
+// instead of reopening the model. Opened straight from a link, it goes to the gallery without adding a page.
+{
+  const p = await fresh();
+  const before = await p.evaluate(() => history.length);
+  await p.click('.model:has(h3:text("Paper cup"))');
+  await p.waitForSelector('#player:not([hidden])');
+  await p.click('#back');
+  await p.waitForSelector('#home:not([hidden])');
+  assert.equal(await p.evaluate(() => history.length), before + 1, 'the back arrow added a page to the history');
+  await p.goBack();
+  await p.waitForTimeout(300);
+  assert.equal(await p.isVisible('#player'), false, 'Back from the gallery reopened the model');
+  await p.goto(base + '#heart');
+  await p.waitForSelector('#player:not([hidden])');
+  const opened = await p.evaluate(() => history.length);
+  await p.click('#back');
+  await p.waitForSelector('#home:not([hidden])');
+  assert.equal(await p.evaluate(() => history.length), opened, 'the back arrow added a page to the history');
+  assert.equal(await p.evaluate(() => location.hash), '');
+  await p.context().close();
+}
+
 assert.deepEqual(problems.filter(p => !p.startsWith('failed:')), [], 'problems while using it');
 await browser.close();
 server.close();
