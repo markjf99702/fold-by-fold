@@ -372,10 +372,16 @@ $('scrub').addEventListener('input', (e) => {
 $('topView').addEventListener('click', () => { if (view) { view.aim(-90, 89.9); dirty = true; } });
 $('resetView').addEventListener('click', resetView);
 document.addEventListener('keydown', (e) => {
-  if ($('player').hidden || e.target.closest('input, button')) return;
-  if (e.key === ' ') { e.preventDefault(); primary(); }
-  else if (e.key === 'ArrowRight') go(P.i + 1, { play: true });
-  else if (e.key === 'ArrowLeft') go(P.i - 1);
+  // With Alt, Ctrl or Cmd held the keys are the browser's (Alt+← is Back).
+  if ($('player').hidden || e.altKey || e.ctrlKey || e.metaKey) return;
+  const onSlider = e.target.closest('input'); // the slider moves itself with the arrow keys
+  if (e.key === ' ') {
+    if (onSlider || e.target.closest('button')) return; // a button with focus presses itself
+    e.preventDefault();
+    primary();
+  } else if (e.key === 'ArrowRight' && !onSlider) {
+    if (P.i < P.b.steps.length - 1) go(P.i + 1, { play: true });
+  } else if (e.key === 'ArrowLeft' && !onSlider) go(P.i - 1);
 });
 window.addEventListener('hashchange', route);
 window.addEventListener('resize', () => { dirty = true; });

@@ -297,6 +297,24 @@ for (const hash of ['#%', '#crane-3%', '#%F0%9F']) {
   await p.context().close();
 }
 
+// The arrow keys step through the folds, also once a button has been pressed; → on the last step leaves it
+// be, and the slider keeps the arrow keys for itself.
+{
+  const p = await fresh('#cup-5');
+  await p.waitForFunction(() => fold.state.id === 'cup');
+  await p.keyboard.press('ArrowRight');
+  assert.deepEqual(await p.evaluate(() => [fold.state.i, fold.state.playing]), [4, false], '→ on the last step played it again');
+  await p.click('#play');
+  await p.keyboard.press('ArrowLeft');
+  assert.equal(await p.evaluate(() => fold.state.i), 3, '← did nothing once a button had been pressed');
+  await p.keyboard.press('ArrowRight');
+  assert.deepEqual(await p.evaluate(() => [fold.state.i, fold.state.playing]), [4, true], '→ did not play the next fold');
+  await p.focus('#scrub');
+  await p.keyboard.press('ArrowLeft');
+  assert.equal(await p.evaluate(() => fold.state.i), 4, 'the slider\'s arrow keys changed the step');
+  await p.context().close();
+}
+
 assert.deepEqual(problems.filter(p => !p.startsWith('failed:')), [], 'problems while using it');
 await browser.close();
 server.close();
