@@ -183,6 +183,12 @@ h1 {
   pointer-events: none; white-space: nowrap; transition: opacity .6s;
 }
 .hint.gone { opacity: 0; }
+/* With a mouse you zoom by scrolling, not pinching, so the hint says that instead. */
+.hint .mouse { display: none; }
+@media (hover: hover) and (pointer: fine) {
+  .hint .touch { display: none; }
+  .hint .mouse { display: inline; }
+}
 .gl-error { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; padding: 24px; margin: 0; }
 
 .panel {

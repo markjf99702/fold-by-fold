@@ -69,6 +69,8 @@ assert.equal(await page.evaluate(() => location.hash), '#cup');
 assert.match(await page.textContent('#stepCount'), /^Step 1 of \d+$/);
 assert.ok((await page.textContent('#say')).length > 10, 'no words for the step');
 assert.equal(await page.isVisible('#glError'), false, 'no 3D in this browser');
+// The hint says how to zoom with what you have: pinch on a phone, scroll with a mouse (further down).
+assert.equal(await page.innerText('#hint'), 'Drag to turn the paper · pinch to zoom');
 // Nothing reads the picture back, so the browser needn't keep a copy of every frame (costly on phones).
 assert.equal(await page.evaluate(() => fold.view().gl.getContextAttributes().preserveDrawingBuffer), false, 'every frame is kept');
 assert.equal(await sideways(), false, 'the player scrolls sideways on a phone');
@@ -371,6 +373,10 @@ for (const hash of ['#%', '#crane-3%', '#%F0%9F']) {
   });
   assert.ok(rows.length >= 2 && rows[0].length >= 3, `the cards aren't in rows: ${JSON.stringify(rows)}`);
   for (const row of rows) assert.ok(row.every(([h, m]) => h === row[0][0] && m === row[0][1]), `the cards in a row don't line up: ${JSON.stringify(row)}`);
+  // With a mouse, the hint under the paper says to scroll to zoom.
+  await p.click('.model:has(h3:text("Paper cup"))');
+  await p.waitForSelector('#player:not([hidden])');
+  assert.equal(await p.innerText('#hint'), 'Drag to turn the paper · scroll to zoom');
   await p.context().close();
 }
 
