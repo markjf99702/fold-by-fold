@@ -366,8 +366,8 @@ for (const hash of ['#%', '#crane-3%', '#%F0%9F']) {
 }
 
 // The frog's 34 ticks are too narrow to hit one with a finger, so a finger slides along the bar and the step under
-// it is picked as it goes; lifting it leaves that step. A mouse can drag along it too, and the ticks are still
-// buttons for the keyboard.
+// it is picked as it goes; lifting it leaves that step, and a tap picks the tick tapped. A finger going up or down
+// from the bar scrolls instead. A mouse can drag along it too, and the ticks are still buttons for the keyboard.
 {
   const p = await fresh('#frog');
   await p.waitForFunction(() => fold.state.id === 'frog');
@@ -383,7 +383,6 @@ for (const hash of ['#%', '#crane-3%', '#%F0%9F']) {
     for (let k = 1; k <= 8; k++) await touch('touchMove', [from[0] + (to[0] - from[0]) * k / 8, from[1]]);
   };
   await touch('touchStart', at[2]);
-  assert.equal(await step(), 2, 'touching a tick did not pick its step');
   await slide(at[2], at[9]);
   assert.equal(await step(), 9, 'sliding along the ticks did not pick the step under the finger');
   await slide(at[9], at[19]);
@@ -392,7 +391,26 @@ for (const hash of ['#%', '#crane-3%', '#%F0%9F']) {
   await p.waitForTimeout(300);
   assert.equal(await step(), 19, 'lifting the finger did not leave the step it was on');
   assert.equal(await p.getAttribute('#ticks li:nth-child(20) button', 'aria-current'), 'step');
+  const tap = await p.evaluate(() => { const r = document.querySelector('#ticks li:nth-child(5)').getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; });
+  await touch('touchStart', tap);
+  await touch('touchEnd');
+  await p.waitForTimeout(300);
+  assert.equal(await step(), 4, 'tapping a tick did not pick its step');
   await p.context().close();
+
+  // Held sideways on a small phone, the panel beside the paper scrolls when the words run long. A finger that
+  // swipes up from the bar scrolls it, and the step stays.
+  const s = await fresh('#crane-19', { viewport: { width: 568, height: 320 } });
+  await s.waitForFunction(() => fold.state.id === 'crane');
+  const scdp = await s.context().newCDPSession(s);
+  const [x, y] = await s.evaluate(() => { const r = document.querySelector('#ticks li:nth-child(5)').getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; });
+  await scdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] });
+  for (let k = 1; k <= 10; k++) await scdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x, y: y - k * 12 }] });
+  await scdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  await s.waitForTimeout(300);
+  assert.equal(await s.evaluate(() => fold.state.i), 18, 'a swipe up from the ticks picked a step instead of scrolling');
+  assert.ok(await s.evaluate(() => document.querySelector('.panel').scrollTop) > 0, 'a swipe up from the ticks did not scroll the panel');
+  await s.context().close();
 
   const m = await fresh('#frog', { hasTouch: false });
   await m.waitForFunction(() => fold.state.id === 'frog');

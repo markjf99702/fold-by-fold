@@ -187,7 +187,9 @@ function renderSteps() {
 
 // On a phone the bar of ticks is the way to jump to a step, but they're narrow (the frog's 34 share about 360 px),
 // so a finger can slide along the bar and the step under it is picked as it goes, the way the slider under the
-// words works. The ticks are still buttons, for the keyboard and screen readers.
+// words works. A finger picks once it moves along the bar, or as it lifts after a tap: one going up or down may be
+// scrolling the panel (it scrolls on a small phone held sideways), so until then it picks nothing. A mouse picks
+// as soon as it's pressed. The ticks are still buttons, for the keyboard and screen readers.
 let sliding = null;
 function slideTo(x, first) {
   const ticks = [...$('ticks').children];
@@ -440,12 +442,24 @@ $('scrub').addEventListener('input', (e) => {
 });
 $('ticks').addEventListener('pointerdown', (e) => {
   if (e.button !== 0) return; // a right click, say
-  sliding = e.pointerId;
+  sliding = { id: e.pointerId, x: e.clientX, y: e.clientY, along: e.pointerType === 'mouse' };
   $('ticks').setPointerCapture(e.pointerId);
-  slideTo(e.clientX, true);
+  if (sliding.along) slideTo(e.clientX, true);
 });
-$('ticks').addEventListener('pointermove', (e) => { if (e.pointerId === sliding) slideTo(e.clientX, false); });
-for (const type of ['pointerup', 'pointercancel']) $('ticks').addEventListener(type, (e) => { if (e.pointerId === sliding) sliding = null; });
+$('ticks').addEventListener('pointermove', (e) => {
+  if (e.pointerId !== sliding?.id) return;
+  const first = !sliding.along;
+  if (first && Math.abs(e.clientX - sliding.x) <= Math.abs(e.clientY - sliding.y)) return; // not along the bar yet
+  sliding.along = true;
+  slideTo(e.clientX, first);
+});
+$('ticks').addEventListener('pointerup', (e) => {
+  if (e.pointerId !== sliding?.id) return;
+  if (!sliding.along) slideTo(e.clientX, true); // a tap
+  sliding = null;
+});
+// The browser has taken the finger for scrolling.
+$('ticks').addEventListener('pointercancel', (e) => { if (e.pointerId === sliding?.id) sliding = null; });
 $('topView').addEventListener('click', () => { if (view) { view.aim(-90, 89.9); dirty = true; } });
 $('resetView').addEventListener('click', resetView);
 document.addEventListener('keydown', (e) => {
