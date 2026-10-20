@@ -15,9 +15,10 @@ self.addEventListener('install', e => {
 });
 
 self.addEventListener('activate', e => {
-  // The other tools at junkdrawer.works share this address and its caches, so only this one's old copies go.
+  // The other tools at junkdrawer.works share this address and its caches, so only this one's old copies go,
+  // matched by their whole name: another tool's name could start the same way (fold-by-fold-something-v1).
   e.waitUntil(caches.keys()
-    .then(keys => Promise.all(keys.filter(k => k.startsWith('fold-by-fold-') && k !== CACHE).map(k => caches.delete(k))))
+    .then(keys => Promise.all(keys.filter(k => k !== CACHE && /^fold-by-fold-v[0-9]+$/.test(k)).map(k => caches.delete(k))))
     .then(() => self.clients.claim()));
 });
 

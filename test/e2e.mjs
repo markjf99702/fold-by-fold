@@ -179,16 +179,17 @@ for (const dir of ['js', 'css', 'fonts']) {
 }
 
 // Other tools on junkdrawer.works share this address and its caches, so the offline copy clears out only
-// its own old caches, never theirs.
+// its own old caches, never theirs, even one whose name starts the same way.
 {
   const c = await browser.newContext();
   const p = await c.newPage();
   await p.goto(base + 'css/app.css'); // the same address, before the page sets up its offline copy
-  await p.evaluate(() => Promise.all([caches.open('another-tool-v1'), caches.open('fold-by-fold-v0')]));
+  const names = ['another-tool-v1', 'fold-by-fold-x-v1', 'fold-by-fold-v0'];
+  await p.evaluate((names) => Promise.all(names.map((k) => caches.open(k))), names);
   await p.goto(base);
   await p.waitForFunction(() => navigator.serviceWorker?.controller, null, { timeout: 20000 });
-  const kept = await p.evaluate(async () => [await caches.has('another-tool-v1'), await caches.has('fold-by-fold-v0')]);
-  assert.deepEqual(kept, [true, false], 'the offline copy cleared out the wrong caches');
+  const kept = await p.evaluate((names) => Promise.all(names.map((k) => caches.has(k))), names);
+  assert.deepEqual(kept, [true, true, false], 'the offline copy cleared out the wrong caches');
   await c.close();
 }
 
