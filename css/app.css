@@ -229,8 +229,9 @@ h1 {
   font-size: .85rem; font-weight: 700; cursor: pointer; color: var(--muted);
 }
 .speed[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
-/* Narrow phones: the buttons draw in a little so the row fits, and Play keeps one width for every label. */
-@media (max-width: 379px) {
+/* Narrow phones, and the panel beside the paper on a phone held sideways (further down): the buttons draw in a
+   little so the row fits, and Play keeps one width for every label. */
+@media (max-width: 379px), (max-width: 899px) and (orientation: landscape) and (max-height: 500px) {
   .controls { gap: 6px; }
   .ctl { min-width: 46px; padding: 0 10px; }
   .ctl.main { min-width: 128px; padding: 0 8px; }
@@ -261,6 +262,20 @@ h1 {
   }
   .step-list li button::before { counter-increment: s; content: counter(s); font-weight: 700; font-variant-numeric: tabular-nums; }
   .step-list li button[aria-current="step"] { background: var(--chip); color: var(--ink); }
+  .step-now { min-height: 0; }
+}
+
+/* A phone held sideways is too short for the words and buttons under the paper: they left it a strip a finger or
+   two tall. They go beside it instead, as on a wide screen, with the steps still along the top and only the
+   panel's right side kept clear of a notch; the panel scrolls if the words run long. */
+@media (max-width: 899px) and (orientation: landscape) and (max-height: 500px) {
+  .player {
+    grid-template-columns: minmax(0, 1fr) calc(clamp(320px, 50vw, 380px) + env(safe-area-inset-right));
+    grid-template-rows: auto minmax(0, 1fr);
+    grid-template-areas: "bar bar" "stage panel";
+  }
+  .panel { border-top: 0; border-left: 1px solid var(--line); min-height: 0; overflow: auto; padding-left: var(--gutter); }
+  .panel > * { flex-shrink: 0; } /* long words scroll the panel rather than running over the buttons */
   .step-now { min-height: 0; }
 }
 

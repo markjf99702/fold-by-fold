@@ -428,6 +428,44 @@ for (const hash of ['#%', '#crane-3%', '#%F0%9F']) {
   await p.context().close();
 }
 
+// On a phone held sideways the words and buttons go beside the paper, so the paper keeps the height of the screen
+// instead of a strip under them. The buttons fit beside it, and long words scroll the panel rather than running
+// over the slider and buttons. Held upright, they stay under the paper.
+{
+  const p = await fresh('#crane-19', { viewport: { width: 844, height: 390 } }); // the longest words of any step
+  await p.waitForFunction(() => fold.state.id === 'crane');
+  const layout = () => p.evaluate(() => {
+    const box = (q) => document.querySelector(q).getBoundingClientRect();
+    const panel = document.querySelector('.panel');
+    const [stage, bar, pn] = [box('#stage'), box('.bar'), panel.getBoundingClientRect()];
+    const order = ['#ticks', '.step-now', '.scrub', '.controls'].map(box);
+    const out = ['#prev', '#play', '#next', '#speed'].filter((q) => box(q).left < pn.left || box(q).right > pn.right);
+    panel.scrollTop = panel.scrollHeight;
+    const reach = box('.controls').bottom <= pn.bottom + 0.5;
+    panel.scrollTop = 0;
+    return {
+      beside: stage.right <= pn.left + 0.5, under: stage.bottom <= pn.top + 0.5, stageH: stage.height, room: innerHeight - bar.height,
+      overlap: order.some((b, k) => k > 0 && b.top < order[k - 1].bottom - 0.5) || box('#say').bottom > order[1].bottom + 0.5,
+      out, reach, sideways: document.documentElement.scrollWidth > innerWidth,
+    };
+  });
+  for (const [width, height] of [[844, 390], [667, 375], [568, 320]]) {
+    await p.setViewportSize({ width, height });
+    await p.waitForTimeout(100);
+    const r = await layout();
+    assert.ok(r.beside, `the words aren't beside the paper at ${width}x${height}`);
+    assert.ok(r.stageH >= r.room - 1, `the paper is a strip ${Math.round(r.stageH)} px tall at ${width}x${height}`);
+    assert.equal(r.overlap, false, `the words run over the slider or buttons at ${width}x${height}`);
+    assert.deepEqual(r.out, [], `buttons cut off at ${width}x${height}`);
+    assert.ok(r.reach, `the buttons can't be scrolled to at ${width}x${height}`);
+    assert.equal(r.sideways, false, `the player scrolls sideways at ${width}x${height}`);
+  }
+  await p.setViewportSize({ width: 390, height: 844 });
+  await p.waitForTimeout(100);
+  assert.ok((await layout()).under, 'held upright, the words are no longer under the paper');
+  await p.context().close();
+}
+
 assert.deepEqual(problems.filter(p => !p.startsWith('failed:')), [], 'problems while using it');
 await browser.close();
 server.close();
