@@ -198,7 +198,7 @@ h1 {
   background: var(--bg);
   border-top: 1px solid var(--line);
 }
-.ticks { list-style: none; margin: 0; padding: 0; display: flex; gap: 4px; }
+.ticks { list-style: none; margin: 0; padding: 0; display: flex; gap: 4px; touch-action: pan-y; } /* a finger slides along it */
 .ticks li { flex: 1; }
 .ticks button {
   appearance: none; border: 0; padding: 10px 0; width: 100%; background: none; cursor: pointer; display: block;

@@ -365,6 +365,49 @@ for (const hash of ['#%', '#crane-3%', '#%F0%9F']) {
   await p.context().close();
 }
 
+// The frog's 34 ticks are too narrow to hit one with a finger, so a finger slides along the bar and the step under
+// it is picked as it goes; lifting it leaves that step. A mouse can drag along it too, and the ticks are still
+// buttons for the keyboard.
+{
+  const p = await fresh('#frog');
+  await p.waitForFunction(() => fold.state.id === 'frog');
+  const at = await p.evaluate(() => [...document.querySelectorAll('#ticks li')].map((li) => {
+    const r = li.getBoundingClientRect();
+    return [r.left + r.width / 2, r.top + r.height / 2];
+  }));
+  assert.equal(at.length, 34);
+  const step = () => p.evaluate(() => fold.state.i);
+  const cdp = await p.context().newCDPSession(p);
+  const touch = (type, [x, y] = []) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: x === undefined ? [] : [{ x, y }] });
+  const slide = async (from, to) => {
+    for (let k = 1; k <= 8; k++) await touch('touchMove', [from[0] + (to[0] - from[0]) * k / 8, from[1]]);
+  };
+  await touch('touchStart', at[2]);
+  assert.equal(await step(), 2, 'touching a tick did not pick its step');
+  await slide(at[2], at[9]);
+  assert.equal(await step(), 9, 'sliding along the ticks did not pick the step under the finger');
+  await slide(at[9], at[19]);
+  assert.equal(await step(), 19, 'sliding further did not follow the finger');
+  await touch('touchEnd');
+  await p.waitForTimeout(300);
+  assert.equal(await step(), 19, 'lifting the finger did not leave the step it was on');
+  assert.equal(await p.getAttribute('#ticks li:nth-child(20) button', 'aria-current'), 'step');
+  await p.context().close();
+
+  const m = await fresh('#frog', { hasTouch: false });
+  await m.waitForFunction(() => fold.state.id === 'frog');
+  await m.mouse.move(...at[4]);
+  await m.mouse.down();
+  await m.mouse.move(at[12][0], at[12][1], { steps: 6 });
+  await m.mouse.up();
+  await m.waitForTimeout(200);
+  assert.equal(await m.evaluate(() => fold.state.i), 12, 'dragging the mouse along the ticks did not pick the step under it');
+  await m.focus('#ticks li:nth-child(6) button');
+  await m.keyboard.press('Enter');
+  assert.equal(await m.evaluate(() => fold.state.i), 5, 'a tick did nothing from the keyboard');
+  await m.context().close();
+}
+
 // On a wide screen the cards in a row line up: names and step counts at the same height across the row.
 {
   const p = await fresh('', { viewport: { width: 1280, height: 800 }, deviceScaleFactor: 1, hasTouch: false });

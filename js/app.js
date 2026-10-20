@@ -185,6 +185,20 @@ function renderSteps() {
   });
 }
 
+// On a phone the bar of ticks is the way to jump to a step, but they're narrow (the frog's 34 share about 360 px),
+// so a finger can slide along the bar and the step under it is picked as it goes, the way the slider under the
+// words works. The ticks are still buttons, for the keyboard and screen readers.
+let sliding = null;
+function slideTo(x, first) {
+  const ticks = [...$('ticks').children];
+  const mid = (li) => { const r = li.getBoundingClientRect(); return (r.left + r.right) / 2; };
+  const i = ticks.reduce((best, li, k) => (Math.abs(x - mid(li)) < Math.abs(x - mid(ticks[best])) ? k : best), 0);
+  if (!first && i === P.i) return;
+  go(i);
+  // A tick that had the focus hands it on, so a key pressed next acts on the step picked, not the one first touched.
+  if ($('ticks').contains(document.activeElement)) ticks[i].firstChild.focus({ preventScroll: true });
+}
+
 function go(i, { play = false, snap = false } = {}) {
   P.i = Math.max(0, Math.min(i, P.b.steps.length - 1));
   P.t = 0;
@@ -424,6 +438,14 @@ $('scrub').addEventListener('input', (e) => {
   P.playing = false;
   paint();
 });
+$('ticks').addEventListener('pointerdown', (e) => {
+  if (e.button !== 0) return; // a right click, say
+  sliding = e.pointerId;
+  $('ticks').setPointerCapture(e.pointerId);
+  slideTo(e.clientX, true);
+});
+$('ticks').addEventListener('pointermove', (e) => { if (e.pointerId === sliding) slideTo(e.clientX, false); });
+for (const type of ['pointerup', 'pointercancel']) $('ticks').addEventListener(type, (e) => { if (e.pointerId === sliding) sliding = null; });
 $('topView').addEventListener('click', () => { if (view) { view.aim(-90, 89.9); dirty = true; } });
 $('resetView').addEventListener('click', resetView);
 document.addEventListener('keydown', (e) => {
