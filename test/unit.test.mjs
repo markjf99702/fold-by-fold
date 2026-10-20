@@ -6,7 +6,8 @@ import { apply, area, bisector, side, centroid, overlapArea, line } from '../js/
 import { build } from '../js/build.js';
 import { poses, marks, corners, LAYER } from '../js/motion.js';
 import { MODELS } from '../js/models.js';
-import { stateSVG } from '../js/thumbs.js';
+import { outline, picture } from '../js/thumbs.js';
+import { FINISHED } from '../js/finished.js';
 import { crossings } from '../js/check.js';
 
 const close = (a, b, tol = 1e-9) => Math.abs(a - b) < tol;
@@ -106,8 +107,9 @@ for (const model of MODELS) {
         for (const k of m) assert.ok(['valley', 'mountain'].includes(k.type), `${where} mark type ${k.type}`);
       }
     }
-    const svg = stateSVG(b.end);
-    assert.equal(svg.match(/<polygon/g).length, b.end.facets.size);
+    // The gallery's picture of the finished model, worked out ahead of time, is still this model's.
+    assert.deepEqual(FINISHED[model.id], outline(b.end), `${model.id}'s picture in js/finished.js is out of date: run node tools/make-thumbs.mjs`);
+    assert.equal(picture(FINISHED[model.id]).match(/<polygon/g).length, b.end.facets.size);
   });
 
   test(`${model.name}: every folded state could be real paper, with nothing passing through anything`, () => {
@@ -116,6 +118,10 @@ for (const model of MODELS) {
     }
   });
 }
+
+test('js/finished.js has a picture for every model and nothing else', () => {
+  assert.deepEqual(Object.keys(FINISHED), MODELS.map((m) => m.id), 'run node tools/make-thumbs.mjs');
+});
 
 test('a step that names a corner to fold names the one that moves, as the paper lies', () => {
   // Corners are named as they lie in front of you, so on a sheet that starts white side up the paper's

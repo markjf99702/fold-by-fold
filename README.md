@@ -23,7 +23,7 @@
 - **It remembers where you got to** in each model, and the paper colour. A link can go straight to a step: `#helmet-6` is step 6 of the helmet.
 - No account and no server. It works offline and installs to a phone's home screen.
 
-The paper is modelled the way it really folds, not drawn as a picture. The sheet is a set of flat pieces, each one knowing where it sits on the table, whether it's turned over, and what's above and below it. A fold cuts every piece it crosses, turns over the pieces on the moving side, and stacks them in the right order. That same model drives the 3D animation, the diagram marks and the pictures of the finished models, so they can't disagree.
+The paper is modelled the way it really folds, not drawn as a picture. The sheet is a set of flat pieces, each one knowing where it sits on the table, whether it's turned over, and what's above and below it. A fold cuts every piece it crosses, turns over the pieces on the moving side, and stacks them in the right order. That same model drives the 3D animation, the diagram marks and the pictures of the finished models, so they can't disagree. The pictures are worked out ahead of time, so the gallery doesn't have to fold all ten models before it can show them, and `npm test` fails if one no longer matches its model.
 
 ## Running it
 
@@ -35,6 +35,7 @@ npm install                   # only for the tools below: esbuild and upng-js
 npm test                      # the folding engine (Node 20+), then the real page in Chromium (needs Playwright)
 node tools/screenshots.mjs    # redraws docs/*.png and og.png
 node tools/make-icons.mjs     # redraws the PNG icons from icon.svg
+node tools/make-thumbs.mjs    # works out the gallery's pictures again, after adding or changing a model
 npm run build                 # dist/fold-by-fold.html, the whole thing in one file
 ```
 
@@ -53,7 +54,7 @@ A model is a list of steps in `js/models.js`, each with the words to show and th
 }
 ```
 
-`h.valley` and `h.mountain` fold, `h.crease` folds and unfolds, `h.together` makes several folds at once, and `h.turnOver` and `h.turn` move the whole model. `h.mech` closes several creases as one linked motion, for collapses and petal folds; `h.squash` makes a squash fold; `h.reverse` makes an inside reverse fold, and `h.reverseOpen` makes it the way stiff paper allows, by turning the layers over it back like a page. `move` names a point on the part that moves; `flap` instead folds just the layer holding that point, and whatever is joined to it (or a list of points, for layers joined only along the fold itself); `into: { below: point }` tucks the flap into a pocket. `npm test` folds every step of every model and checks that nothing passes through the table, that every animation lands exactly where the fold says, and that every folded state could be real paper: no layer passes through another at a crease.
+`h.valley` and `h.mountain` fold, `h.crease` folds and unfolds, `h.together` makes several folds at once, and `h.turnOver` and `h.turn` move the whole model. `h.mech` closes several creases as one linked motion, for collapses and petal folds; `h.squash` makes a squash fold; `h.reverse` makes an inside reverse fold, and `h.reverseOpen` makes it the way stiff paper allows, by turning the layers over it back like a page. `move` names a point on the part that moves; `flap` instead folds just the layer holding that point, and whatever is joined to it (or a list of points, for layers joined only along the fold itself); `into: { below: point }` tucks the flap into a pocket. Then run `node tools/make-thumbs.mjs` to work out its picture for the gallery. `npm test` folds every step of every model and checks that nothing passes through the table, that every animation lands exactly where the fold says, and that every folded state could be real paper: no layer passes through another at a crease.
 
 A collapse, squash or petal fold is worked out as a mechanism: the paper between the moving creases is rigid, the creases are hinges, and a small solver keeps every loop of hinges closed while the main crease follows its schedule and the rest go wherever the paper takes them. An inside reverse fold can't be made that way with the flap closed, because the tip would have to pass through its own layers. So the neck, tail and legs are shown the way you'd do it with stiff paper: the layers over the flap turn back like the page of a book, the flap lies open, and the point folds up as the page comes back, all as one rigid motion. Small ones near a tip (the crane's head, the frog's feet) swing round in place instead, with a strip of paper bending across the crease the way real paper gives there.
 
@@ -68,7 +69,8 @@ The traditional frog is folded the way stiff paper allows, which differs a littl
 - `js/build.js`: turns a model's steps into the folded states between them. `js/models.js`: the models.
 - `js/motion.js`: where every piece of paper is, in 3D, at any moment of a fold, and the diagram marks for it.
 - `js/render.js`: the WebGL drawing: two-sided paper, the cutting mat, shadows, the marks and the camera.
-- `js/thumbs.js`: the flat pictures of each finished model. `js/app.js`: the page, the player and its controls.
+- `js/thumbs.js`: the flat pictures of the finished models on the gallery's cards. `js/finished.js`: their shapes, worked out ahead of time by `tools/make-thumbs.mjs`.
+- `js/app.js`: the page, the player and its controls.
 - `fonts/`: Shippori Mincho B1 and Zen Kaku Gothic New (SIL Open Font License), served from here so nothing loads from elsewhere.
 - `sw.js`: keeps a copy for using offline. `npm test` checks that it lists every file the page needs.
-- `tools/`: the screenshot and icon scripts. `scripts/build.mjs`: the single-file build.
+- `tools/`: the screenshot and icon scripts, and `make-thumbs.mjs` for the gallery's pictures. `scripts/build.mjs`: the single-file build.

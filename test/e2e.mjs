@@ -42,6 +42,8 @@ assert.equal(await page.isVisible('#home'), true, 'no gallery');
 const cards = await page.locator('.model').count();
 assert.ok(cards >= 5, `only ${cards} models`);
 assert.equal(await page.locator('.model .thumb svg polygon').count() > cards, true, 'the model pictures are empty');
+// The pictures were worked out ahead of time, so the gallery shows them without folding a single model.
+assert.deepEqual(await page.evaluate(() => fold.built), [], 'the gallery folded models to show their pictures');
 assert.equal(await sideways(), false, 'the gallery scrolls sideways on a phone');
 // A screen reader names each card by its model; the picture on it is left out.
 assert.equal(await page.getByRole('button', { name: /^Paper cup\b/ }).count(), 1, 'the paper cup card is not named for its model');
@@ -225,6 +227,11 @@ async function fresh(hash = '', { init, arg, ...opts } = {}) {
   await p.waitForFunction(() => fold.state.id === 'crane');
   assert.equal(await p.evaluate(() => fold.state.i), 6, 'a reload went back to the step in the link');
   assert.equal(await p.evaluate(() => JSON.parse(localStorage.getItem('fold-by-fold.v1')).progress.crane), 6);
+  // Back to the gallery from there, the cards show their pictures without folding the other models.
+  await p.click('#back');
+  await p.waitForSelector('#home:not([hidden])');
+  assert.ok(await p.locator('.model .thumb svg polygon').count() > 10, 'the model pictures are empty');
+  assert.deepEqual(await p.evaluate(() => fold.built), ['crane'], 'going back to the gallery folded the other models');
   await p.context().close();
 }
 

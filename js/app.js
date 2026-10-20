@@ -4,7 +4,8 @@ import { MODELS } from './models.js';
 import { build } from './build.js';
 import { poses, marks } from './motion.js';
 import { View } from './render.js';
-import { stateSVG } from './thumbs.js';
+import { picture } from './thumbs.js';
+import { FINISHED } from './finished.js';
 
 const KEY = 'fold-by-fold.v1';
 const $ = (id) => document.getElementById(id);
@@ -47,6 +48,8 @@ const paperColor = () => (PAPERS.find((p) => p.id === prefs.paper) || PAPERS[0])
 
 // ---------- Home ----------
 
+// A model is folded when it's opened. The gallery doesn't fold any: the pictures of the finished models were
+// worked out ahead of time (js/finished.js), and a model's steps are as many as its list says.
 const builtCache = new Map();
 function built(id) {
   if (!builtCache.has(id)) builtCache.set(id, build(MODELS.find((m) => m.id === id)));
@@ -84,7 +87,6 @@ function renderHome() {
   const list = $('models');
   if (!list.childElementCount) {
     for (const m of MODELS) {
-      const b = built(m.id);
       const li = document.createElement('li');
       const btn = document.createElement('button');
       btn.type = 'button';
@@ -93,7 +95,7 @@ function renderHome() {
       btn.innerHTML = `
         <span class="thumb"></span>
         <h3>${m.name}</h3>
-        <p class="meta"><span class="level">${m.level}</span><span>${b.steps.length} steps</span></p>
+        <p class="meta"><span class="level">${m.level}</span><span>${m.steps.length} steps</span></p>
         <p class="blurb">${m.blurb}</p>`;
       btn.addEventListener('click', () => openFromHome(m.id));
       li.append(btn);
@@ -121,7 +123,7 @@ function paintHome() {
   thumbsIn = paperColor();
   // The card's own words say what the model is, so the picture goes unlabelled and screen readers skip it.
   for (const card of document.querySelectorAll('#models .model')) {
-    card.querySelector('.thumb').innerHTML = stateSVG(built(card.dataset.model).end, { front: thumbsIn, back: BACK });
+    card.querySelector('.thumb').innerHTML = picture(FINISHED[card.dataset.model], { front: thumbsIn, back: BACK });
   }
 }
 
@@ -444,6 +446,7 @@ window.fold = {
   get state() { return { id: P.id, i: P.i, t: P.t, playing: P.playing, steps: P.b ? P.b.steps.length : 0 }; },
   set(i, t) { P.i = i; P.t = t; P.playing = false; paint(); frameCamera(true); },
   view: () => view,
+  get built() { return [...builtCache.keys()]; }, // the models folded so far
 };
 
 route();
