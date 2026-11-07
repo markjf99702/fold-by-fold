@@ -377,6 +377,8 @@ for (const hash of ['#%', '#crane-3%', '#%F0%9F']) {
   }));
   assert.equal(at.length, 34);
   const step = () => p.evaluate(() => fold.state.i);
+  // A touch move reaches the page with the next frame, after CDP has answered, so wait a moment for the step.
+  const stepNow = async (want) => { await p.waitForFunction((n) => fold.state.i === n, want, { timeout: 1000 }).catch(() => {}); return step(); };
   const cdp = await p.context().newCDPSession(p);
   const touch = (type, [x, y] = []) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: x === undefined ? [] : [{ x, y }] });
   const slide = async (from, to) => {
@@ -384,9 +386,9 @@ for (const hash of ['#%', '#crane-3%', '#%F0%9F']) {
   };
   await touch('touchStart', at[2]);
   await slide(at[2], at[9]);
-  assert.equal(await step(), 9, 'sliding along the ticks did not pick the step under the finger');
+  assert.equal(await stepNow(9), 9, 'sliding along the ticks did not pick the step under the finger');
   await slide(at[9], at[19]);
-  assert.equal(await step(), 19, 'sliding further did not follow the finger');
+  assert.equal(await stepNow(19), 19, 'sliding further did not follow the finger');
   await touch('touchEnd');
   await p.waitForTimeout(300);
   assert.equal(await step(), 19, 'lifting the finger did not leave the step it was on');
