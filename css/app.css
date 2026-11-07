@@ -122,7 +122,11 @@ h1 {
   box-shadow: 0 1px 2px rgba(0, 0, 0, .2), inset 0 0 0 1px rgba(0, 0, 0, .08);
   transform: rotate(0deg);
   transition: transform .15s;
+  position: relative;
 }
+/* Small things to tap reach a finger's 44 px without taking more room: here, and on Slow, the slider, the bar of
+   ticks and the footer links. */
+.swatch::after { content: ''; position: absolute; inset: -4px; }
 .swatch[aria-checked="true"] { box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--ink); }
 .swatch:hover { transform: rotate(-4deg); }
 
@@ -173,7 +177,7 @@ h1 {
 .symbol-list .head.hollow { fill: var(--card); stroke-width: 1.6; }
 
 .jd-foot { text-align: center; font-size: .85rem; color: var(--muted); padding: 8px 0 max(4px, env(safe-area-inset-bottom)); }
-.jd-foot a { color: inherit; text-decoration: none; }
+.jd-foot a { color: inherit; text-decoration: none; display: inline-block; padding: 12px 4px; margin: -12px -4px; }
 .jd-foot a:hover, .jd-foot a:focus-visible { text-decoration: underline; }
 
 /* ---------- Player ---------- */
@@ -223,10 +227,10 @@ h1 {
   border-top: 1px solid var(--line);
 }
 .ticks, .scrub, .controls { flex: none; }
-.ticks { list-style: none; margin: 0; padding: 0; display: flex; gap: 4px; touch-action: pan-y; } /* a finger slides along it */
+.ticks { list-style: none; margin: -10px 0; padding: 0; display: flex; gap: 4px; touch-action: pan-y; } /* a finger slides along it */
 .ticks li { flex: 1; }
 .ticks button {
-  appearance: none; border: 0; padding: 10px 0; width: 100%; background: none; cursor: pointer; display: block;
+  appearance: none; border: 0; padding: 20px 0; width: 100%; background: none; cursor: pointer; display: block;
 }
 .ticks button::before { content: ''; display: block; height: 4px; border-radius: 2px; background: var(--line); }
 .ticks button.done::before { background: color-mix(in srgb, var(--accent) 45%, var(--line)); }
@@ -251,7 +255,9 @@ h1 {
 .chip .hollow { stroke-width: 1.6; }
 .say { margin: 0; font-size: 1.05rem; line-height: 1.45; min-height: 3.95em; } /* with the chip, 5.6em */
 
-.scrub input { width: 100%; accent-color: var(--accent); margin: 0; height: 28px; }
+/* The slider reaches 8 px above and below the room it takes, and sits 8 px lower on its line to make up for it, so
+   the track stays where it always was. */
+.scrub input { width: 100%; accent-color: var(--accent); margin: -8px 0; height: 44px; vertical-align: -8px; }
 .controls { display: flex; align-items: center; gap: 10px; justify-content: center; }
 .ctl {
   appearance: none; border: 0; background: var(--chip); border-radius: 99px; min-width: 52px; height: 48px; padding: 0 14px;
@@ -262,8 +268,9 @@ h1 {
 .ctl:disabled { opacity: .35; cursor: default; }
 .speed {
   appearance: none; border: 1.5px solid var(--line); background: none; border-radius: 99px; height: 36px; padding: 0 12px;
-  font-size: .85rem; font-weight: 700; cursor: pointer; color: var(--muted);
+  font-size: .85rem; font-weight: 700; cursor: pointer; color: var(--muted); position: relative;
 }
+.speed::before { content: ''; position: absolute; inset: -5.5px -4px; }
 .speed[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
 /* Narrow phones, and the panel beside the paper on a phone held sideways (further down): the buttons draw in a
    little so the row fits, and Play keeps one width for every label. */

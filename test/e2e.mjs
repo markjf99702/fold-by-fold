@@ -309,6 +309,31 @@ async function fresh(hash = '', { init, arg, ...opts } = {}) {
   await p.context().close();
 }
 
+// On a phone the small things to tap reach the 44 px a finger needs (Apple's guidelines, and WCAG 2.2's enhanced
+// target size), past the room they take: a swatch, the footer links, Slow, the slider and the bar of ticks.
+{
+  const p = await fresh();
+  await p.waitForSelector('#home:not([hidden])');
+  const reach = (qs) => p.evaluate((qs) => qs.map((q) => {
+    const e = document.querySelector(q);
+    e.scrollIntoView({ block: 'center' });
+    const r = e.getBoundingClientRect();
+    const hit = (x, y) => { const h = document.elementFromPoint(x, y); return !!h && (h === e || e.contains(h)); };
+    let tall = 0, wide = 0;
+    for (let y = Math.floor(r.top) - 25; y <= r.bottom + 25; y++) if (hit(r.left + r.width / 2, y)) tall++;
+    for (let x = Math.floor(r.left) - 25; x <= r.right + 25; x++) if (hit(x, r.top + r.height / 2)) wide++;
+    return [q, tall, wide];
+  }), qs);
+  const sizes = await reach(['.swatch:nth-child(3)', '.jd-foot a:last-child']);
+  await p.click('.model:has(h3:text("Crane"))');
+  await p.waitForFunction(() => fold.state.id === 'crane');
+  sizes.push(...await reach(['#speed', '#scrub', '#ticks li:nth-child(4) button']));
+  // The slider, the ticks and the links are wide already; the swatches and Slow need the width too.
+  const small = sizes.filter(([q, tall, wide]) => tall < 44 || (/swatch|speed/.test(q) && wide < 44));
+  assert.deepEqual(small, [], 'too small to tap: [what, px tall, px wide]');
+  await p.context().close();
+}
+
 // A step that stands the model up is seen from its own angle once its fold moves, by the slider as much as by Play.
 // The angle stays with that step: the next model opens seen from above, as usual.
 {
