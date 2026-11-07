@@ -433,12 +433,19 @@ function resetView() {
 
 // ---------- Screens and wiring ----------
 
-// The player starts at the top; the gallery comes back scrolled to where you left it.
+// The player starts at the top; the gallery comes back scrolled to where you left it, with the focus on the card
+// you opened. If the phone was turned in between, the cards have moved, so it comes back to that card instead.
 let homeY = 0;
+let opened = null; // the card opened from the gallery, and how wide the screen was then
 function show(id) {
   if (id !== 'home' && !$('home').hidden) homeY = window.scrollY;
   for (const s of document.querySelectorAll('.screen')) s.hidden = s.id !== id;
-  window.scrollTo(0, id === 'home' ? homeY : 0);
+  if (id !== 'home') { window.scrollTo(0, 0); return; }
+  const card = opened && document.querySelector(`#models .model[data-model="${opened.id}"]`);
+  if (card && opened.width !== innerWidth) card.scrollIntoView({ block: 'center' });
+  else window.scrollTo(0, homeY);
+  card?.focus({ preventScroll: true });
+  opened = null;
 }
 
 // In a frame on another page (a viewer showing the single-file copy, say) the address may not be the page's own
@@ -463,6 +470,7 @@ function route() {
 }
 
 function openFromHome(id) {
+  opened = { id, width: innerWidth };
   if (framed) { location.hash = id; return; }
   history.pushState({ from: 'home' }, '', '#' + id);
   route();

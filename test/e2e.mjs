@@ -609,6 +609,19 @@ for (const [width, height] of [[1280, 800], [390, 844], [360, 780]]) {
   await p.waitForTimeout(100);
   const back = await p.evaluate(() => scrollY);
   assert.ok(Math.abs(back - y) < 2, `the gallery came back scrolled to ${back}, not ${y}`);
+  // The focus is back on the card you opened, for the keyboard and screen readers.
+  assert.equal(await p.evaluate(() => document.activeElement.dataset.model), 'frog', 'the focus did not come back to the card');
+  // Turned sideways in the model, the cards are three across when you come back, so it comes back to the card
+  // rather than to the same distance down the page.
+  await p.click(frog);
+  await p.waitForSelector('#player:not([hidden])');
+  await p.setViewportSize({ width: 844, height: 390 });
+  await p.waitForTimeout(100);
+  await p.click('#back');
+  await p.waitForSelector('#home:not([hidden])');
+  await p.waitForTimeout(100);
+  const seen = await p.evaluate(() => { const r = document.querySelector('.model[data-model="frog"]').getBoundingClientRect(); return [r.top >= 0 && r.bottom <= innerHeight, document.activeElement.dataset.model]; });
+  assert.deepEqual(seen, [true, 'frog'], 'back after turning the phone, the frog\'s card is out of sight or lost the focus');
   await p.context().close();
 }
 
