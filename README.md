@@ -19,7 +19,7 @@
 - **Each step starts as a diagram.** Before a fold, the paper shows the marks a printed diagram would: a dashed line for a valley fold (toward you), dashes and dots for a mountain fold (behind), and an arrow for which way it goes. The arrowhead is solid for a valley fold, hollow on one side for a mountain fold, and hollow on both sides to open a fold out again; a fold and unfold has one at each end. The name of the fold and what to do are written underneath.
 - **Press Play and it folds.** The flap turns over about the crease and lands on its new layer, and the next step waits for you. Slow makes every fold take a little over twice as long.
 - **Scrub it.** The slider under the words is the fold itself: drag it to stop the paper anywhere between flat and folded, and back.
-- **Turn it around.** Drag the paper to see it from any side, pinch or scroll to zoom, and double-tap to put the view back. The square button looks straight down, the way a diagram does.
+- **Turn it around.** Drag the paper to see it from any side, pinch or scroll to zoom, and double-tap to put the view back (so does the button with four corners round a dot). The square button looks straight down, the way a diagram does.
 - **It remembers where you got to** in each model, and the paper colour. A link can go straight to a step: `#helmet-6` is step 6 of the helmet.
 - No account and no server. It works offline and installs to a phone's home screen.
 
