@@ -181,7 +181,7 @@ await page.evaluate((n) => fold.set(n - 1, 1), (await state()).steps);
 assert.equal(await page.textContent('#playLabel'), 'Start again');
 // Its icon, an open arrow going round, is drawn as a line rather than filled in.
 assert.equal(await page.evaluate(() => getComputedStyle(document.querySelector('#playIcon path')).fill), 'none', 'the Start again icon is filled in');
-for (const [width, height] of [[360, 780], [320, 568]]) {
+for (const [width, height] of [[360, 780], [320, 568], [280, 653]]) {
   await page.setViewportSize({ width, height });
   await page.waitForTimeout(100);
   assert.equal(await sideways(), false, `the player scrolls sideways at ${width} px`);
@@ -270,6 +270,25 @@ async function fresh(hash = '', { init, arg, ...opts } = {}) {
   await p.waitForFunction(() => fold.state.i === 9);
   await p.click('#play');
   assert.equal(await saved(), 9, 'playing the link\'s step did not make it your place');
+  await p.context().close();
+}
+
+// On a narrow phone a long model name takes two lines in the bar rather than losing its end.
+{
+  const p = await fresh('', { viewport: { width: 320, height: 568 } });
+  await p.waitForSelector('#home:not([hidden])');
+  const ids = await p.evaluate(() => [...document.querySelectorAll('.model')].map((b) => b.dataset.model));
+  const cut = [];
+  for (const id of ids) {
+    await p.evaluate((id) => { location.hash = id; }, id);
+    await p.waitForFunction((id) => fold.state.id === id, id);
+    const r = await p.evaluate(() => {
+      const e = document.getElementById('modelName');
+      return e.scrollWidth > e.clientWidth || e.scrollHeight > e.clientHeight + parseFloat(getComputedStyle(e).lineHeight) / 2;
+    });
+    if (r) cut.push(id);
+  }
+  assert.deepEqual(cut, [], 'model names cut off in the bar at 320 px');
   await p.context().close();
 }
 
