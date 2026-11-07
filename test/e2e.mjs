@@ -5,6 +5,7 @@ import { createServer } from 'node:http';
 import { readFile, readdir } from 'node:fs/promises';
 import { join, dirname, extname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { createHash } from 'node:crypto';
 import assert from 'node:assert/strict';
 
 const require = createRequire(import.meta.url);
@@ -13,14 +14,35 @@ try { pw = require('playwright'); } catch { pw = require(join(execSync('npm root
 const UPNG = require('upng-js');
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.png': 'image/png', '.woff2': 'font/woff2', '.webmanifest': 'application/manifest+json', '.json': 'application/json' };
-const server = createServer(async (req, res) => {
-  const path = decodeURIComponent(new URL(req.url, 'http://x').pathname);
-  let body;
-  try { body = await readFile(join(root, path === '/' ? 'index.html' : path)); } catch { res.writeHead(404); res.end(); return; }
-  res.writeHead(200, { 'content-type': TYPES[extname(path)] || 'text/html' });
-  res.end(body);
+// The server answers the way GitHub Pages does: a browser may keep each file for ten minutes, and asks again by its
+// ETag. `net` is the connection: 'up', 'down' (the server drops every connection) or 'stalled' (a train, a captive
+// wifi: it takes each request and holds on to it). With `release` set it serves the next release (see the offline
+// checks).
+let net = 'up', release = false;
+const held = [];
+const server = createServer((req, res) => {
+  if (net === 'down') { req.socket.destroy(); return; }
+  if (net === 'stalled') { held.push([req, res]); return; }
+  serve(req, res);
 }).listen(0);
+async function serve(req, res) {
+  let path = decodeURIComponent(new URL(req.url, 'http://x').pathname);
+  if (path.endsWith('/')) path += 'index.html';
+  let body;
+  try { body = await readFile(join(root, path)); } catch { res.writeHead(404); res.end(); return; }
+  if (release && path === '/sw.js') body = Buffer.from(String(body).replace(/const FILES = '[0-9a-f]*'/, "const FILES = 'next'"));
+  if (release && path === '/index.html') body = Buffer.concat([body, Buffer.from('<!-- the next release -->\n')]);
+  const etag = `"${createHash('sha1').update(body).digest('hex').slice(0, 16)}"`;
+  const head = { etag, 'cache-control': 'max-age=600', 'content-type': TYPES[extname(path)] || 'text/html' };
+  if (req.headers['if-none-match'] === etag) { res.writeHead(304, head); res.end(); return; }
+  res.writeHead(200, head);
+  res.end(body);
+}
 const base = `http://localhost:${server.address().port}/`;
+// Waits for ok() to come true, for up to ms, or fails saying what didn't happen.
+const until = async (ok, ms, what) => {
+  for (const end = Date.now() + ms; !(await ok());) { assert.ok(Date.now() < end, what); await new Promise((r) => setTimeout(r, 100)); }
+};
 
 // Software WebGL, so this runs on machines without a graphics card too.
 const browser = await pw.chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
@@ -214,6 +236,7 @@ const sw = await readFile(join(root, 'sw.js'), 'utf8');
 for (const dir of ['js', 'css', 'fonts']) {
   for (const f of await readdir(join(root, dir))) assert.ok(sw.includes(`'${dir}/${f}'`), `sw.js doesn't list ${dir}/${f}`);
 }
+for (const f of ['index.html', 'icon.svg', 'manifest.webmanifest', 'icon-192.png']) assert.ok(sw.includes(`'${f}'`), `sw.js doesn't list ${f}`);
 
 // Other tools on junkdrawer.works share this address and its caches, so the offline copy clears out only
 // its own old caches, never theirs, even one whose name starts the same way.
@@ -230,13 +253,50 @@ for (const dir of ['js', 'css', 'fonts']) {
   await c.close();
 }
 
-// Works offline once it has been opened.
-await page.waitForFunction(() => navigator.serviceWorker?.controller, null, { timeout: 10000 }).catch(() => {});
-await ctx.setOffline(true);
-await page.reload();
-await page.waitForSelector('#player:not([hidden])');
-assert.equal((await state()).id, 'helmet', 'the page did not load offline');
-await ctx.setOffline(false);
+// Works offline once it has been opened: after one visit to the gallery, a model never opened before opens and folds
+// with no connection. The server goes down as well as the browser: in some Chromium builds the browser's offline switch
+// alone doesn't stop the service worker's own requests, and this passed with no copy at all.
+{
+  const c = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, hasTouch: true });
+  const p = await c.newPage();
+  p.on('pageerror', e => problems.push(e.message));
+  await p.goto(base);
+  await p.waitForFunction(() => navigator.serviceWorker?.controller, null, { timeout: 20000 });
+  await p.close();
+  net = 'down';
+  await c.setOffline(true);
+  const off = await c.newPage();
+  off.on('pageerror', e => problems.push(e.message));
+  await off.goto(base + '#frog').catch(() => {});
+  await off.waitForFunction(() => window.fold?.state.id === 'frog', null, { timeout: 10000 }).catch(() => assert.fail('the frog did not open offline'));
+  await off.click('#play');
+  await off.waitForFunction(() => fold.state.t >= 1, null, { timeout: 15000 }).catch(() => assert.fail('the frog\'s first fold did not play offline'));
+  await off.close();
+  await c.setOffline(false);
+
+  // On a connection that's up but not answering, a new tab opens from the copy too, after the worker's few seconds'
+  // wait for the network: the page and every file it loads (were any of them left waiting on the network, it wouldn't
+  // open).
+  net = 'stalled';
+  const slow = await c.newPage();
+  slow.on('pageerror', e => problems.push(e.message));
+  const t0 = Date.now();
+  slow.goto(base + '#crane', { timeout: 0 }).catch(() => {});
+  await slow.waitForFunction(() => window.fold?.state.id === 'crane', null, { timeout: 8000, polling: 100 }).catch(() => {});
+  const took = Date.now() - t0;
+  assert.ok(took < 8000, `the crane took ${took} ms to open on a stalled connection`);
+  net = 'up';
+  for (const [req, res] of held.splice(0)) serve(req, res);
+
+  // A new release: every file in the new copy comes from the server, though the browser still has its own copies of
+  // the old ones for ten minutes. (The next release changes index.html, and so FILES in sw.js, as a real one does.)
+  release = true;
+  await slow.evaluate(async () => (await navigator.serviceWorker.getRegistration()).update());
+  await until(() => slow.evaluate(async () => !!(await (await caches.match('index.html'))?.text())?.includes('<!-- the next release -->')),
+    10000, "the new release's offline copy kept the old index.html");
+  release = false;
+  await c.close();
+}
 
 // A page of its own, for the checks below that need a fresh start: nothing saved and no history.
 async function fresh(hash = '', { init, arg, ...opts } = {}) {
@@ -759,4 +819,13 @@ for (const [width, height] of [[375, 553], [320, 460]]) {
 assert.deepEqual(problems.filter(p => !p.startsWith('failed:')), [], 'problems while using it');
 await browser.close();
 server.close();
+
+// sw.js changes whenever a file it keeps does, so a release replaces the whole offline copy at once: FILES in sw.js is
+// a fingerprint of every file in SHELL (sha1 of each, in the list's order, an address like './' read as its
+// index.html; the first 8 hex of the sha1 of those).
+const shell = [...sw.match(/SHELL = \[([^\]]*)\]/)[1].replace(/\/\/.*/g, '').matchAll(/'([^']*)'/g)].map(m => m[1]);
+const all = createHash('sha1');
+for (const f of shell) all.update(createHash('sha1').update(await readFile(join(root, f.endsWith('/') ? f + 'index.html' : f))).digest());
+const files = all.digest('hex').slice(0, 8);
+assert.equal(sw.match(/const FILES = '([0-9a-f]*)'/)?.[1], files, `a file sw.js keeps for offline has changed: set FILES in sw.js to '${files}'`);
 console.log('all good');
