@@ -175,6 +175,7 @@ function openModel(id, i = null) {
 }
 
 function renderSteps() {
+  shown = null; // new lists, so the step is marked in them afresh
   const ticks = $('ticks'), list = $('stepList');
   ticks.innerHTML = '';
   list.innerHTML = '';
@@ -269,18 +270,29 @@ function primary() {
   else start();
 }
 
+// Shows the step and where its fold is. The slider calls this on every move, so what only changes with the step
+// (its words, its place in the lists) is redone only when the step does.
 let shown = null; // the step whose words are up
 function paint() {
   const step = P.b.steps[P.i];
   const n = P.b.steps.length;
-  $('stepCount').textContent = `Step ${P.i + 1} of ${n}`;
-  $('chip').innerHTML = chipFor(step);
-  $('say').textContent = step.say;
   paintControls();
   if (step !== shown) {
     shown = step;
+    $('stepCount').textContent = `Step ${P.i + 1} of ${n}`;
+    $('chip').innerHTML = chipFor(step);
+    $('say').textContent = step.say;
     words.scrollTop = 0; // a new step's words start at the top
     fadeWords();
+    document.querySelectorAll('#ticks button').forEach((b, k) => {
+      if (k === P.i) b.setAttribute('aria-current', 'step'); else b.removeAttribute('aria-current');
+    });
+    const list = $('stepList');
+    [...list.children].forEach((li, k) => {
+      if (k === P.i) li.firstChild.setAttribute('aria-current', 'step'); else li.firstChild.removeAttribute('aria-current');
+    });
+    // Only where the list is shown (beside the paper on a wide screen): elsewhere it would cost a layout for nothing.
+    if (list.offsetParent) list.children[P.i].firstChild.scrollIntoView({ block: 'nearest' });
   }
   $('next').disabled = P.i === n - 1;
   const last = P.i === n - 1;
@@ -293,17 +305,13 @@ function paint() {
       ? '<path d="M4 12a8 8 0 1 0 2.4-5.7M4 4v4.5h4.5" fill="none" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>'
       : '<path d="M5 4.5v15l10-7.5zM17 5h2.5v14H17z"/>';
   } else if (P.t > 0) label = 'Carry on';
-  $('playLabel').textContent = label;
-  $('playIcon').innerHTML = icon;
+  if ($('playLabel').textContent !== label) {
+    $('playLabel').textContent = label;
+    $('playIcon').innerHTML = icon;
+  }
   $('scrub').value = Math.round(P.t * 1000);
   $('speed').setAttribute('aria-pressed', prefs.slow);
-  document.querySelectorAll('#ticks button').forEach((b, k) => {
-    b.classList.toggle('done', k < P.i || (k === P.i && P.t >= 1));
-    if (k === P.i) b.setAttribute('aria-current', 'step'); else b.removeAttribute('aria-current');
-  });
-  document.querySelectorAll('#stepList button').forEach((b, k) => {
-    if (k === P.i) { b.setAttribute('aria-current', 'step'); b.scrollIntoView({ block: 'nearest' }); } else b.removeAttribute('aria-current');
-  });
+  document.querySelectorAll('#ticks button').forEach((b, k) => b.classList.toggle('done', k < P.i || (k === P.i && P.t >= 1)));
   dirty = true;
 }
 

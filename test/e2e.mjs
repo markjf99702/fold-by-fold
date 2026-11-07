@@ -174,6 +174,7 @@ await page.waitForSelector('#home:not([hidden])');
 await page.click('.model:has(h3:text("Samurai helmet"))');
 await page.waitForFunction(() => fold.state.id === 'helmet');
 assert.equal((await state()).i, 2, 'did not pick up where you left off');
+assert.equal(await page.getAttribute('#ticks li:nth-child(3) button', 'aria-current'), 'step', 'the step is not marked on the bar after reopening the model');
 
 // On a short desktop window the words, slider and buttons keep their own space, and the list of steps
 // scrolls under them.
@@ -501,6 +502,32 @@ for (const hash of ['#%', '#crane-3%', '#%F0%9F']) {
   await p.focus('#scrub');
   await p.keyboard.press('ArrowLeft');
   assert.equal(await p.evaluate(() => fold.state.i), 4, 'the slider\'s arrow keys changed the step');
+  await p.context().close();
+}
+
+// Scrubbing on a phone does only what the slider changes: the list of steps, hidden there, isn't scrolled to the step
+// on every move (on a slow phone that was most of the cost). On a wide screen the list still follows the step.
+{
+  const p = await fresh('#frog-16');
+  await p.waitForFunction(() => fold.state.id === 'frog');
+  const scrolls = await p.evaluate(() => {
+    let n = 0;
+    const own = Element.prototype.scrollIntoView;
+    Element.prototype.scrollIntoView = function (...a) { n++; return own.apply(this, a); };
+    const s = document.getElementById('scrub');
+    for (let k = 1; k <= 20; k++) { s.value = String(k * 40); s.dispatchEvent(new Event('input', { bubbles: true })); }
+    Element.prototype.scrollIntoView = own;
+    return n;
+  });
+  assert.equal(scrolls, 0, `scrubbing scrolled the hidden list of steps ${scrolls} times`);
+  await p.setViewportSize({ width: 1000, height: 560 });
+  await p.waitForTimeout(100);
+  await p.evaluate(() => document.querySelector('#ticks li:nth-child(31) button').click());
+  const seen = await p.evaluate(() => {
+    const list = document.getElementById('stepList').getBoundingClientRect(), b = document.querySelector('#stepList [aria-current="step"]').getBoundingClientRect();
+    return b.top >= list.top - 0.5 && b.bottom <= list.bottom + 0.5;
+  });
+  assert.ok(seen, 'on a wide screen the list of steps did not scroll to the step');
   await p.context().close();
 }
 
