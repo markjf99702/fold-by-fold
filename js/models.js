@@ -1,6 +1,7 @@
 // The models. Each step has what to say and what to do, in the helpers from build.js.
 // Paper points are [u, v] on the unit square; `move` names a paper point on the part that moves;
-// `flap` folds only the layer holding that point and whatever is joined to it.
+// `flap` folds only the layer holding that point and whatever is joined to it. A step with `unfold: true`
+// opens folds made before, and its marks say so.
 
 const R2 = Math.SQRT2;
 
@@ -189,6 +190,7 @@ const BIRD_BASE = [
     {
       say: 'Unfold the two side flaps. Their creases stay to guide the next step.',
       name: 'Unfold',
+      unfold: true,
       do: (h) => h.together(
         (k) => k.valley(k.through(K3, P23), { flap: [0.93, 0.66] }),
         (k) => k.valley(k.through(K3, P34), { flap: [0.66, 0.93] }),
@@ -225,6 +227,7 @@ const BIRD_BASE = [
     {
       say: 'Unfold the side flaps again.',
       name: 'Unfold',
+      unfold: true,
       do: (h) => h.together(
         (k) => k.valley(k.through(K1, P12), { flap: [0.34, 0.07] }),
         (k) => k.valley(k.through(K1, P41), { flap: [0.07, 0.34] }),

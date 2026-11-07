@@ -240,11 +240,22 @@ function lifted(items) {
 
 // What a diagram would draw for this step: the fold line across the moving layers and an arrow from the
 // moving part to where it lands. All in 3D table coordinates.
+//
+// The arrow's head follows the usual convention (Lang, 'Origami Diagramming Conventions'): a solid head for a
+// valley fold, a single-sided hollow one for a mountain fold, and a double-sided hollow one for unfolding. A
+// fold and unfold has a hollow head at its tail too (`back`), for coming back.
 export function marks(step) {
+  const m = stepMarks(step);
+  // Opening a fold made earlier: the line is the crease that's already there, and the arrow unfolds.
+  if (m && step.unfold) for (const k of m) { k.unfold = true; if (k.arrow) k.arrow.head = 'unfold'; }
+  return m;
+}
+
+function stepMarks(step) {
   const { from, motion } = step;
   if (motion.kind === 'mech' && motion.squash) {
     const q = motion.squash, z = (Math.max(...from.levels().values()) + 1) * LAYER + 0.002;
-    return [{ type: 'valley', line: q.line.map((p) => [p[0], p[1], z]), arrow: { from: [...q.from, z], to: [...q.to, z], over: true, angle: 180 } }];
+    return [{ type: 'valley', line: q.line.map((p) => [p[0], p[1], z]), arrow: { from: [...q.from, z], to: [...q.to, z], over: true, angle: 180, head: 'valley' } }];
   }
   if (motion.kind === 'mech' && motion.parts) {
     return motion.parts.map((p) => markFor(from, { ...p, sign: -1, type: 'mountain', kind: 'fold' })).filter(Boolean);
@@ -293,7 +304,10 @@ function markFor(from, motion) {
   return {
     type: motion.type,
     line: [[a[0], a[1], z], [b[0], b[1], z]],
-    arrow: { from: [start[0], start[1], z], to: [end[0], end[1], z], over: motion.sign > 0, angle: motion.kind === 'bend' ? motion.angle : 180 },
+    arrow: {
+      from: [start[0], start[1], z], to: [end[0], end[1], z], over: motion.sign > 0, angle: motion.kind === 'bend' ? motion.angle : 180,
+      head: motion.type === 'mountain' ? 'mountain' : 'valley', back: motion.kind === 'foldUnfold',
+    },
   };
 }
 
@@ -317,7 +331,7 @@ function mechMarks(step) {
   }
   if (motion.arrow && out.length) {
     const p = from.at(motion.arrow), q = to.at(motion.arrow);
-    out[0].arrow = { from: [p[0], p[1], z], to: [q[0], q[1], z], over: true, angle: 180 };
+    out[0].arrow = { from: [p[0], p[1], z], to: [q[0], q[1], z], over: true, angle: 180, head: 'valley' };
   }
   return out.length ? out : null;
 }

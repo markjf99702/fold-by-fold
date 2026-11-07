@@ -21,7 +21,10 @@ export function build(model) {
       e.message = `${model.id} step ${i + 1}: ${e.message}`;
       throw e;
     }
-    steps.push({ ...r, say: step.say, name: step.name || nameOf(r.motion), note: step.note || null, view: step.view || null });
+    steps.push({
+      ...r, say: step.say, name: step.name || nameOf(r.motion), note: step.note || null, view: step.view || null,
+      unfold: step.unfold === true, // it opens a fold made before, rather than making a new one
+    });
     sheet = r.to;
   }
   return { model, start, steps, end: sheet };

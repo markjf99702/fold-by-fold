@@ -224,6 +224,39 @@ test('a collapse is marked as it is seen from above, white side up, so the creas
   assert.equal(markOn(crane[9], K3, P34)?.type, 'mountain');
 });
 
+test('each arrow has the head a diagram gives it: solid for a valley fold, hollow on one side for a mountain fold, hollow on both to unfold', () => {
+  const steps = (id) => build(MODELS.find((m) => m.id === id)).steps;
+  const arrows = (step) => (marks(step) || []).filter((m) => m.arrow).map((m) => m.arrow);
+  const heads = (step) => arrows(step).map((a) => `${a.head}${a.back ? '+back' : ''}`);
+  const cup = steps('cup'), crane = steps('crane'), wb = steps('waterbomb'), bird = steps('flapping-bird');
+  assert.deepEqual(heads(cup[0]), ['valley']);
+  assert.deepEqual(heads(cup[4]), ['mountain'], "the cup's step 5 folds behind");
+  // A fold and unfold has a hollow head at its tail too, for coming back.
+  assert.deepEqual(heads(crane[0]), ['valley+back']);
+  assert.deepEqual(heads(wb[2]), ['mountain+back'], "the waterbomb's step 3 folds behind and unfolds");
+  assert.deepEqual(heads(crane[18]), ['mountain'], 'an inside reverse fold is marked as a mountain fold');
+  // The crane's and the flapping bird's side flaps open again before each petal fold.
+  for (const [id, s] of [['crane', crane], ['flapping-bird', bird]]) {
+    for (const i of [8, 13]) {
+      assert.equal(s[i].name, 'Unfold');
+      assert.deepEqual(heads(s[i]), ['unfold', 'unfold'], `${id} step ${i + 1}`);
+      assert.ok(marks(s[i]).every((m) => m.unfold), `${id} step ${i + 1} draws a new fold line`);
+    }
+  }
+  let n = 0;
+  for (const model of MODELS) {
+    for (const [i, step] of build(model).steps.entries()) {
+      for (const a of arrows(step)) {
+        assert.ok(['valley', 'mountain', 'unfold'].includes(a.head), `${model.id} step ${i + 1}: head ${a.head}`);
+        assert.equal(!!a.back, step.motion.kind === 'foldUnfold', `${model.id} step ${i + 1}`);
+        if (!step.unfold) assert.equal(a.head === 'mountain', !a.over, `${model.id} step ${i + 1}: a mountain arrow goes behind`);
+        n++;
+      }
+    }
+  }
+  assert.ok(n > 100, `only ${n} arrows`);
+});
+
 function inside(poly, q) {
   let c = false;
   for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {

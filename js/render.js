@@ -395,14 +395,17 @@ export class View {
       for (const [q, t] of [[a1, 0], [b1, L], [b2, L], [a1, 0], [b2, L], [a2, 0]]) out.push(q[0], q[1], q[2], ...color, t);
       return out;
     };
-    const dash = m.type === 'mountain' ? 2 : 1;
-    this.drawFlat(this.buf.marks, lineData(0.0075, halo), vp, dash, this.markAlpha);
-    this.drawFlat(this.buf.marks, lineData(0.0042, ink), vp, dash, this.markAlpha);
+    // Opening a fold needs no line: the crease is the flap's own folded edge, and the arrow says to open it.
+    if (!m.unfold) {
+      const dash = m.type === 'mountain' ? 2 : 1;
+      this.drawFlat(this.buf.marks, lineData(0.0075, halo), vp, dash, this.markAlpha);
+      this.drawFlat(this.buf.marks, lineData(0.0042, ink), vp, dash, this.markAlpha);
+    }
     // The arrow: an arc from the moving part over the fold, facing the camera.
     if (!m.arrow) return;
     const arc = arrowPath(m.arrow);
-    this.drawFlat(this.buf.marks, ribbon(arc, eye, 0.011, halo, true), vp, 0, this.markAlpha);
-    this.drawFlat(this.buf.marks, ribbon(arc, eye, 0.0055, ink, true), vp, 0, this.markAlpha);
+    this.drawFlat(this.buf.marks, ribbon(arc, eye, m.arrow, halo, ink, true), vp, 0, this.markAlpha);
+    this.drawFlat(this.buf.marks, ribbon(arc, eye, m.arrow, halo, ink, false), vp, 0, this.markAlpha);
   }
 
   drawFlat(buffer, data, vp, dash, alpha) {
@@ -458,27 +461,70 @@ function arrowPath(ar) {
   return pts;
 }
 
-// A strip along a path, turned to face the eye, with an arrowhead at the end.
-function ribbon(pts, eye, w, color, head) {
+// The arrow's shaft, a strip along the path turned to face the eye, with its heads: first the halo under it
+// all (halo true), then the ink.
+const SHAFT = 0.0055, PAD = 0.0055, OUTLINE = 0.0042;
+function ribbon(pts, eye, arrow, halo, ink, under) {
   const out = [];
-  const push = (q) => out.push(q[0], q[1], q[2], ...color, 0);
-  for (let i = 0; i < pts.length - 1; i++) {
-    const a = pts[i], b = pts[i + 1];
-    const t = v3.norm(v3.sub(b, a));
-    const toEye = v3.norm(v3.sub(eye, a));
-    const s = v3.mul(v3.norm(v3.cross(t, toEye)), w);
-    const a1 = v3.add(a, s), a2 = v3.sub(a, s), b1 = v3.add(b, s), b2 = v3.sub(b, s);
-    [a1, b1, b2, a1, b2, a2].forEach(push);
+  const w = under ? SHAFT + PAD : SHAFT;
+  const push = (q, color) => out.push(q[0], q[1], q[2], ...color, 0);
+  // Each point's two sides, across the path there, so neighbouring pieces meet without gaps or overlaps.
+  const n = pts.length - 1;
+  const sides = pts.map((q, i) => {
+    const t = v3.norm(v3.sub(pts[Math.min(i + 1, n)], pts[Math.max(i - 1, 0)]));
+    const s = v3.mul(v3.norm(v3.cross(t, v3.norm(v3.sub(eye, q)))), w);
+    return [v3.add(q, s), v3.sub(q, s)];
+  });
+  for (let i = 0; i < n; i++) {
+    const [a1, a2] = sides[i], [b1, b2] = sides[i + 1];
+    for (const q of [a1, b1, b2, a1, b2, a2]) push(q, under ? halo : ink);
   }
-  if (head) {
-    const b = pts[pts.length - 1], a = pts[pts.length - 3];
-    const t = v3.norm(v3.sub(b, a));
-    const toEye = v3.norm(v3.sub(eye, b));
-    const s = v3.norm(v3.cross(t, toEye));
-    const L = w * 6, H = w * 3.6;
-    const tip = v3.add(b, v3.mul(t, L * 0.6));
-    const back = v3.sub(b, v3.mul(t, L * 0.4));
-    [tip, v3.add(back, v3.mul(s, H)), v3.sub(back, v3.mul(s, H))].forEach(push);
-  }
+  const mid = v3.lerp(pts[0], pts[n], 0.5);
+  arrowHead(push, pts[n], v3.norm(v3.sub(pts[n], pts[n - 2])), eye, arrow.head || 'valley', mid, halo, ink, under);
+  // A fold and unfold comes back: an unfolding head at the tail, pointing back where it started.
+  if (arrow.back) arrowHead(push, pts[0], v3.norm(v3.sub(pts[0], pts[2])), eye, 'unfold', mid, halo, ink, under);
   return out;
+}
+
+// An arrowhead at point b of a path heading along t, flat to the eye. Drawn in its own plane: x along the
+// path, y across it. 'valley' is a solid head; 'mountain' a hollow head on one side only, the outside of the
+// curve, with the shaft running on to its point; 'unfold' a hollow head on both sides. Hollow means an ink
+// outline filled with the halo's colour.
+function arrowHead(push, b, t, eye, kind, mid, halo, ink, under) {
+  let s = v3.norm(v3.cross(t, v3.norm(v3.sub(eye, b))));
+  let shape, inset;
+  if (kind === 'mountain') {
+    if (v3.dot(s, v3.sub(b, mid)) < 0) s = v3.mul(s, -1);
+    const L = 0.05, H = 0.028;
+    // The point, the barb, and the shaft's far side; its edge along the shaft is as thick as the shaft.
+    shape = [[0.6 * L, -SHAFT], [-0.4 * L, H], [-0.4 * L, -SHAFT]];
+    inset = [OUTLINE, OUTLINE, 2 * SHAFT];
+  } else {
+    const L = kind === 'valley' ? 0.036 : 0.046, H = kind === 'valley' ? 0.021 : 0.025;
+    shape = [[0.6 * L, 0], [-0.4 * L, H], [-0.4 * L, -H]];
+    inset = OUTLINE;
+  }
+  const at = ([x, y]) => v3.add(b, v3.add(v3.mul(t, x), v3.mul(s, y)));
+  const fill = (poly, color) => {
+    for (let i = 1; i < poly.length - 1; i++) for (const q of [poly[0], poly[i], poly[i + 1]]) push(at(q), color);
+  };
+  if (under) { fill(offsetPoly(shape, -PAD), halo); return; }
+  fill(shape, ink);
+  if (kind !== 'valley') fill(offsetPoly(shape, inset), [halo[0], halo[1], halo[2], 1]);
+}
+
+// A convex polygon (counterclockwise) with its edges moved in by d (a number, or one per edge); out if negative.
+function offsetPoly(poly, d) {
+  const n = poly.length;
+  const lines = poly.map((p, i) => {
+    const q = poly[(i + 1) % n], l = Math.hypot(q[0] - p[0], q[1] - p[1]);
+    const e = [(q[0] - p[0]) / l, (q[1] - p[1]) / l], k = Array.isArray(d) ? d[i] : d;
+    return { p: [p[0] - e[1] * k, p[1] + e[0] * k], e };
+  });
+  return lines.map((b, i) => {
+    const a = lines[(i + n - 1) % n];
+    const den = a.e[0] * b.e[1] - a.e[1] * b.e[0];
+    const u = ((b.p[0] - a.p[0]) * b.e[1] - (b.p[1] - a.p[1]) * b.e[0]) / den;
+    return [a.p[0] + a.e[0] * u, a.p[1] + a.e[1] * u];
+  });
 }
