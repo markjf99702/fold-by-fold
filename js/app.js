@@ -295,7 +295,11 @@ function frameCamera(snap) {
   if (!view) return;
   const s = P.b.steps[P.i];
   const a = s.from.bounds(), b = s.to.bounds();
-  const x0 = Math.min(a.x0, b.x0), x1 = Math.max(a.x1, b.x1), y0 = Math.min(a.y0, b.y0), y1 = Math.max(a.y1, b.y1);
+  let x0 = Math.min(a.x0, b.x0), x1 = Math.max(a.x1, b.x1), y0 = Math.min(a.y0, b.y0), y1 = Math.max(a.y1, b.y1);
+  // A symbol beside the model (turning it over or around) is in the picture too.
+  for (const m of marks(s) || []) {
+    for (const [x, y] of m.path || []) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
+  }
   // A step that stands the model up says how big it gets and how high to look.
   const v = aimedFor === s ? s.view : null;
   view.frame((x0 + x1) / 2, (y0 + y1) / 2, Math.max(x1 - x0, y1 - y0, v?.size || 0, 0.55), v?.lift || 0);

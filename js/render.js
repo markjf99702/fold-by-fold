@@ -386,6 +386,13 @@ export class View {
 
   drawMark(m, vp, eye) {
     const ink = [0.09, 0.11, 0.16, 1], halo = [1, 1, 1, 0.92];
+    if (m.path) {
+      // A symbol lying flat on the table beside the model.
+      const flat = (q, t) => v3.norm(v3.cross([0, 0, 1], t));
+      this.drawFlat(this.buf.marks, ribbon(m.path, flat, m.arrow, halo, ink, true), vp, 0, this.markAlpha);
+      this.drawFlat(this.buf.marks, ribbon(m.path, flat, m.arrow, halo, ink, false), vp, 0, this.markAlpha);
+      return;
+    }
     // The line: a flat strip lying on the paper.
     const [a, b] = m.line;
     const dir = v3.norm(v3.sub(b, a));
@@ -406,8 +413,9 @@ export class View {
     // The arrow: an arc from the moving part over the fold, facing the camera.
     if (!m.arrow) return;
     const arc = arrowPath(m.arrow);
-    this.drawFlat(this.buf.marks, ribbon(arc, eye, m.arrow, halo, ink, true), vp, 0, this.markAlpha);
-    this.drawFlat(this.buf.marks, ribbon(arc, eye, m.arrow, halo, ink, false), vp, 0, this.markAlpha);
+    const facing = (q, t) => v3.norm(v3.cross(t, v3.norm(v3.sub(eye, q))));
+    this.drawFlat(this.buf.marks, ribbon(arc, facing, m.arrow, halo, ink, true), vp, 0, this.markAlpha);
+    this.drawFlat(this.buf.marks, ribbon(arc, facing, m.arrow, halo, ink, false), vp, 0, this.markAlpha);
   }
 
   drawFlat(buffer, data, vp, dash, alpha) {
@@ -463,18 +471,18 @@ function arrowPath(ar) {
   return pts;
 }
 
-// The arrow's shaft, a strip along the path turned to face the eye, with its heads: first the halo under it
-// all (halo true), then the ink.
+// The arrow's shaft, a strip along the path, with its heads: first the halo under it all (under true), then
+// the ink. across(q, t) is the way across the strip at point q, where the path heads along t: turned to face
+// the eye for an arrow standing over the paper, or flat for one lying on the table.
 const SHAFT = 0.0055, PAD = 0.0055, OUTLINE = 0.0042;
-function ribbon(pts, eye, arrow, halo, ink, under) {
+function ribbon(pts, across, arrow, halo, ink, under) {
   const out = [];
   const w = under ? SHAFT + PAD : SHAFT;
   const push = (q, color) => out.push(q[0], q[1], q[2], ...color, 0);
   // Each point's two sides, across the path there, so neighbouring pieces meet without gaps or overlaps.
   const n = pts.length - 1;
   const sides = pts.map((q, i) => {
-    const t = v3.norm(v3.sub(pts[Math.min(i + 1, n)], pts[Math.max(i - 1, 0)]));
-    const s = v3.mul(v3.norm(v3.cross(t, v3.norm(v3.sub(eye, q)))), w);
+    const s = v3.mul(across(q, v3.norm(v3.sub(pts[Math.min(i + 1, n)], pts[Math.max(i - 1, 0)]))), w);
     return [v3.add(q, s), v3.sub(q, s)];
   });
   for (let i = 0; i < n; i++) {
@@ -482,18 +490,21 @@ function ribbon(pts, eye, arrow, halo, ink, under) {
     for (const q of [a1, b1, b2, a1, b2, a2]) push(q, under ? halo : ink);
   }
   const mid = v3.lerp(pts[0], pts[n], 0.5);
-  arrowHead(push, pts[n], v3.norm(v3.sub(pts[n], pts[n - 2])), eye, arrow.head || 'valley', mid, halo, ink, under);
+  const end = v3.norm(v3.sub(pts[n], pts[n - 2]));
+  arrowHead(push, pts[n], end, across(pts[n], end), arrow.head || 'valley', mid, halo, ink, under);
   // A fold and unfold comes back: an unfolding head at the tail, pointing back where it started.
-  if (arrow.back) arrowHead(push, pts[0], v3.norm(v3.sub(pts[0], pts[2])), eye, 'unfold', mid, halo, ink, under);
+  if (arrow.back) {
+    const tail = v3.norm(v3.sub(pts[0], pts[2]));
+    arrowHead(push, pts[0], tail, across(pts[0], tail), 'unfold', mid, halo, ink, under);
+  }
   return out;
 }
 
-// An arrowhead at point b of a path heading along t, flat to the eye. Drawn in its own plane: x along the
-// path, y across it. 'valley' is a solid head; 'mountain' a hollow head on one side only, the outside of the
+// An arrowhead at point b of a path heading along t, with s the way across it. Drawn in its own plane: x along
+// the path, y across it. 'valley' is a solid head; 'mountain' a hollow head on one side only, the outside of the
 // curve, with the shaft running on to its point; 'unfold' a hollow head on both sides. Hollow means an ink
 // outline filled with the halo's colour.
-function arrowHead(push, b, t, eye, kind, mid, halo, ink, under) {
-  let s = v3.norm(v3.cross(t, v3.norm(v3.sub(eye, b))));
+function arrowHead(push, b, t, s, kind, mid, halo, ink, under) {
   let shape, inset;
   if (kind === 'mountain') {
     if (v3.dot(s, v3.sub(b, mid)) < 0) s = v3.mul(s, -1);

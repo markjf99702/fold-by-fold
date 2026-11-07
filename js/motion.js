@@ -279,9 +279,41 @@ function stepMarks(step) {
   if (motion.kind === 'multi') {
     return motion.parts.map((p) => markFor(from, { ...p, kind: p.bend ? 'bend' : 'fold' })).filter(Boolean);
   }
+  if (motion.kind === 'turnOver' || motion.kind === 'turn') return [moveMark(step)];
   if (!['fold', 'foldUnfold', 'bend'].includes(motion.kind)) return null;
   const m = markFor(from, motion);
   return m ? [m] : null;
+}
+
+// Turning the whole model over or around moves no crease, so a diagram draws a symbol beside it instead. Here
+// it lies flat on the table just in front of the model: for turning over, a valley fold arrow with a loop in
+// it, its long side across the line the model turns about (Lang, 'Origami Diagramming Conventions'); for
+// turning around, a circular arrow going the way it turns. { type, path: points on the table, arrow }.
+function moveMark(step) {
+  const { from, motion } = step;
+  const b = from.bounds();
+  const size = Math.max(b.x1 - b.x0, b.y1 - b.y0, 0.55);
+  const gap = 0.07 * size, z = 0.001, N = 56;
+  const path = [];
+  if (motion.kind === 'turnOver') {
+    // A loop at the top of an arch: x = k(t - B sin t), y = kB cos t for t from -pi to pi.
+    const k = (0.42 * size) / (2 * Math.PI), B = 1.5;
+    // Turning over side to side, the left edge comes up and over to the right; end to end, the top comes down.
+    const side = motion.how !== 'end';
+    for (let i = 0; i <= N; i++) {
+      const t = -Math.PI + (2 * Math.PI * i) / N;
+      const u = k * (t - B * Math.sin(t)), v = k * B * (Math.cos(t) - 1);
+      path.push(side ? [b.cx + u, b.y0 - gap + v, z] : [b.x1 + gap - v, b.cy - u, z]);
+    }
+  } else {
+    const r = 0.075 * size, cy = b.y0 - gap - r, dir = Math.sign(motion.deg) || 1;
+    const a0 = Math.PI / 2 - dir * Math.PI / 5;
+    for (let i = 0; i <= N; i++) {
+      const a = a0 + dir * (i / N) * (5 * Math.PI / 3);
+      path.push([b.cx + r * Math.cos(a), cy + r * Math.sin(a), z]);
+    }
+  }
+  return { type: motion.kind === 'turnOver' ? 'turnOver' : 'rotate', path, arrow: { head: 'valley' } };
 }
 
 function markFor(from, motion) {

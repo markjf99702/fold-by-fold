@@ -226,7 +226,7 @@ test('a collapse is marked as it is seen from above, white side up, so the creas
 
 test('each arrow has the head a diagram gives it: solid for a valley fold, hollow on one side for a mountain fold, hollow on both to unfold', () => {
   const steps = (id) => build(MODELS.find((m) => m.id === id)).steps;
-  const arrows = (step) => (marks(step) || []).filter((m) => m.arrow).map((m) => m.arrow);
+  const arrows = (step) => (marks(step) || []).filter((m) => m.arrow && m.line).map((m) => m.arrow);
   const heads = (step) => arrows(step).map((a) => `${a.head}${a.back ? '+back' : ''}`);
   const cup = steps('cup'), crane = steps('crane'), wb = steps('waterbomb'), bird = steps('flapping-bird');
   assert.deepEqual(heads(cup[0]), ['valley']);
@@ -283,4 +283,40 @@ test('each step is labelled with the symbol for what it draws: Rotate its own, m
       if (/inside reverse/i.test(step.name)) assert.equal(symbol(step), 'mountain', `${model.id} step ${i + 1}`);
     }
   }
+});
+
+test('turning the model over or around draws its symbol on the table just in front of it, the way it turns', () => {
+  let n = 0;
+  for (const model of MODELS) {
+    for (const [i, step] of build(model).steps.entries()) {
+      const kind = step.motion.kind;
+      if (kind !== 'turnOver' && kind !== 'turn') continue;
+      const where = `${model.id} step ${i + 1}`;
+      const m = marks(step);
+      assert.equal(m?.length, 1, where);
+      const [{ type, path, arrow }] = m;
+      assert.equal(type, kind === 'turnOver' ? 'turnOver' : 'rotate', where);
+      assert.equal(arrow.head, 'valley', where);
+      // Flat on the table, clear of the paper, in front of it and no wider than it.
+      const b = step.from.bounds(), size = Math.max(b.x1 - b.x0, b.y1 - b.y0, 0.55);
+      for (const q of path) {
+        assert.ok(q[2] > 0 && q[2] < 0.002, `${where} is not on the table`);
+        assert.ok(q[1] < b.y0 - 0.01 && q[1] > b.y0 - 0.4 * size, `${where} is not just in front of the model`);
+        assert.ok(Math.abs(q[0] - b.cx) < 0.3 * size, `${where} reaches past the model's sides`);
+      }
+      const dx = path.at(-1)[0] - path[0][0];
+      if (kind === 'turnOver') assert.ok(dx > 0.1 * size, `${where}: the left edge comes up and over to the right`);
+      else {
+        // Which way round it goes: counterclockwise for a positive turn.
+        let turning = 0;
+        for (let k = 1; k < path.length - 1; k++) {
+          const u = [path[k][0] - path[k - 1][0], path[k][1] - path[k - 1][1]], v = [path[k + 1][0] - path[k][0], path[k + 1][1] - path[k][1]];
+          turning += u[0] * v[1] - u[1] * v[0];
+        }
+        assert.equal(Math.sign(turning), Math.sign(step.motion.deg), where);
+      }
+      n++;
+    }
+  }
+  assert.equal(n, 18, 'sixteen steps turn a model over and two turn it around');
 });
