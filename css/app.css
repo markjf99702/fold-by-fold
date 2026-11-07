@@ -123,9 +123,13 @@ h1 {
   list-style: none; margin: 0; padding: 0;
   display: grid; grid-template-columns: repeat(auto-fill, minmax(158px, 1fr)); gap: 12px;
 }
+/* The cards in a row share their rows, so a name on two lines moves the step counts and words down in its
+   neighbours too, and they all line up. */
+.models li { display: grid; grid-row: span 4; grid-template-rows: subgrid; }
 .model {
   appearance: none; border: 0; width: 100%; height: 100%; text-align: left; cursor: pointer;
   background: var(--card); border-radius: 14px; padding: 12px; display: grid; gap: 10px; align-content: start;
+  grid-row: span 4; grid-template-rows: subgrid; row-gap: 10px;
   box-shadow: 0 1px 0 var(--line), 0 6px 18px rgba(40, 30, 15, .07);
   transition: transform .15s;
 }

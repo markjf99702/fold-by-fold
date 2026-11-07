@@ -523,25 +523,31 @@ for (const hash of ['#%', '#crane-3%', '#%F0%9F']) {
   await m.context().close();
 }
 
-// On a wide screen the cards in a row line up: names and step counts at the same height across the row.
-{
-  const p = await fresh('', { viewport: { width: 1280, height: 800 }, deviceScaleFactor: 1, hasTouch: false });
+// The cards in a row line up: names, step counts and words at the same height across the row. On a wide screen,
+// and on a phone too, where a name on two lines (Paper airplane) sits beside one on one line (Paper cup), and with
+// a card saying which step you got to.
+for (const [width, height] of [[1280, 800], [390, 844], [360, 780]]) {
+  const wide = width >= 700;
+  const p = await fresh('', { viewport: { width, height }, ...(wide ? { deviceScaleFactor: 1, hasTouch: false } : {}), init: () => localStorage.setItem('fold-by-fold.v1', '{"progress":{"plane":2,"crane":9}}') });
   await p.waitForSelector('#home:not([hidden])');
+  await p.evaluate(() => document.fonts.ready);
   const rows = await p.evaluate(() => {
     const out = {};
     for (const card of document.querySelectorAll('.model')) {
       const top = Math.round(card.getBoundingClientRect().top);
       const at = (q) => Math.round(card.querySelector(q).getBoundingClientRect().top) - top;
-      (out[top] ||= []).push([at('h3'), at('.meta')]);
+      (out[top] ||= []).push([at('h3'), at('.meta'), at('.blurb')]);
     }
     return Object.values(out);
   });
-  assert.ok(rows.length >= 2 && rows[0].length >= 3, `the cards aren't in rows: ${JSON.stringify(rows)}`);
-  for (const row of rows) assert.ok(row.every(([h, m]) => h === row[0][0] && m === row[0][1]), `the cards in a row don't line up: ${JSON.stringify(row)}`);
-  // With a mouse, the hint under the paper says to scroll to zoom.
-  await p.click('.model:has(h3:text("Paper cup"))');
-  await p.waitForSelector('#player:not([hidden])');
-  assert.equal(await p.innerText('#hint'), 'Drag to turn the paper · scroll to zoom');
+  assert.ok(rows.length >= 2 && rows[0].length >= 2, `the cards aren't in rows at ${width} px: ${JSON.stringify(rows)}`);
+  for (const row of rows) assert.ok(row.every((card) => card.every((y, k) => y === row[0][k])), `the cards in a row don't line up at ${width} px: ${JSON.stringify(row)}`);
+  if (wide) {
+    // With a mouse, the hint under the paper says to scroll to zoom.
+    await p.click('.model:has(h3:text("Paper cup"))');
+    await p.waitForSelector('#player:not([hidden])');
+    assert.equal(await p.innerText('#hint'), 'Drag to turn the paper · scroll to zoom');
+  }
   await p.context().close();
 }
 
