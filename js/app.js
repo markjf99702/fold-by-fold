@@ -475,6 +475,12 @@ $('back').addEventListener('click', () => {
   else if (history.state?.from === 'home') history.back();
   else { history.replaceState(null, '', location.pathname + location.search); route(); }
 });
+// Down to the key of marks. It's a button, not a #link: on this page an address after # opens a model.
+$('toKey').addEventListener('click', () => {
+  const key = $('symbolsTitle');
+  key.parentElement.scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' });
+  key.focus({ preventScroll: true });
+});
 $('play').addEventListener('click', primary);
 $('prev').addEventListener('click', () => {
   if (P.t > 0.02) { P.t = 0; P.playing = false; paint(); } else go(P.i - 1);

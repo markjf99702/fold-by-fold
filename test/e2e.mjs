@@ -48,6 +48,13 @@ assert.equal(await sideways(), false, 'the gallery scrolls sideways on a phone')
 // A screen reader names each card by its model; the picture on it is left out.
 assert.equal(await page.getByRole('button', { name: /^Paper cup\b/ }).count(), 1, 'the paper cup card is not named for its model');
 
+// The link under the opening words goes down to the key of marks, staying on the gallery.
+await page.click('#toKey');
+await page.waitForFunction(() => Math.abs(document.getElementById('symbolsTitle').getBoundingClientRect().top) < 40, null, { timeout: 3000 }).catch(() => {});
+assert.ok(Math.abs(await page.evaluate(() => document.getElementById('symbolsTitle').getBoundingClientRect().top)) < 40, 'the link did not go down to the key');
+assert.deepEqual(await page.evaluate(() => [location.hash, document.activeElement.id, document.getElementById('home').hidden]), ['', 'symbolsTitle', false]);
+await page.evaluate(() => scrollTo(0, 0));
+
 // Picking a paper colour sticks.
 await page.click('.swatch[aria-label="Indigo"]');
 assert.equal(await page.getAttribute('.swatch[aria-label="Indigo"]', 'aria-checked'), 'true');

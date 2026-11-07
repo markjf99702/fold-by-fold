@@ -105,6 +105,13 @@ h1 {
   line-height: 1; margin: 0 0 12px; letter-spacing: -.01em;
 }
 .lede { margin: 0; font-size: 1.06rem; color: var(--muted); }
+.fold-along { margin: 8px 0 0; font-size: .95rem; color: var(--muted); }
+/* A quiet link down to the key. Its hit area reaches a finger's height without spacing the lines out. */
+.to-key {
+  appearance: none; border: 0; background: none; cursor: pointer; margin: -6px 0; padding: 12px 0; display: inline-block;
+  font-size: .95rem; color: var(--accent); text-decoration: underline; text-underline-offset: 3px;
+}
+.symbols h2:focus { outline: none; }
 
 .paper-pick { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .pick-label { font-weight: 700; font-size: .9rem; }
@@ -144,7 +151,7 @@ h1 {
 .model .blurb { margin: 0; font-size: .88rem; line-height: 1.45; }
 @media (min-width: 700px) { .models { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; } }
 
-.symbols { background: var(--card); border-radius: 14px; padding: 16px; box-shadow: 0 1px 0 var(--line); }
+.symbols { background: var(--card); border-radius: 14px; padding: 16px; box-shadow: 0 1px 0 var(--line); scroll-margin-top: 12px; }
 .symbols h2 { font-family: var(--display); font-weight: 800; font-size: 1.4rem; margin: 0 0 4px; }
 .symbols > p { margin: 0 0 12px; color: var(--muted); max-width: 40em; }
 .symbol-list { margin: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 14px; }
