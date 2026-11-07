@@ -95,7 +95,7 @@ function renderHome() {
       btn.innerHTML = `
         <span class="thumb"></span>
         <h3>${m.name}</h3>
-        <p class="meta"><span class="level">${m.level}</span><span>${m.steps.length} steps</span></p>
+        <p class="meta"><span class="level">${m.level}</span><span class="count"></span></p>
         <p class="blurb">${m.blurb}</p>`;
       btn.addEventListener('click', () => openFromHome(m.id));
       li.append(btn);
@@ -111,9 +111,16 @@ function pickPaper(id) {
   paintHome();
 }
 
-// Shows the chosen paper: on the swatches, and in the pictures of the finished models.
+// Shows where you got to in each model, and the chosen paper: on the swatches, and in the pictures of the finished
+// models. A model you've begun says which step you're on in place of how many steps it has; on its last step, that
+// you've reached it, not that it's folded.
 let thumbsIn = null;
 function paintHome() {
+  for (const card of document.querySelectorAll('#models .model')) {
+    const n = MODELS.find((m) => m.id === card.dataset.model).steps.length;
+    const i = Math.min(prefs.progress[card.dataset.model] || 0, n - 1);
+    card.querySelector('.count').textContent = i > 0 ? `Step ${i + 1} of ${n}` : `${n} steps`;
+  }
   for (const b of $('swatches').children) {
     const on = b.dataset.paper === prefs.paper;
     b.setAttribute('aria-checked', on);

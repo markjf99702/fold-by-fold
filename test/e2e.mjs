@@ -247,9 +247,14 @@ async function fresh(hash = '', { init, arg, ...opts } = {}) {
   await p.waitForFunction(() => fold.state.id === 'crane');
   assert.equal(await p.evaluate(() => fold.state.i), 6, 'a reload went back to the step in the link');
   assert.equal(await p.evaluate(() => JSON.parse(localStorage.getItem('fold-by-fold.v1')).progress.crane), 6);
+  const craneSteps = await p.evaluate(() => fold.state.steps);
   // Back to the gallery from there, the cards show their pictures without folding the other models.
   await p.click('#back');
   await p.waitForSelector('#home:not([hidden])');
+  // The crane's card says where you got to, still named for its model first; the others still say how long they are.
+  assert.equal(await p.textContent('.model[data-model="crane"] .count'), `Step 7 of ${craneSteps}`, 'the crane\'s card doesn\'t say where you got to');
+  assert.equal(await p.getByRole('button', { name: /^Crane\b/ }).count(), 1, 'the crane card is no longer named for its model');
+  assert.match(await p.textContent('.model[data-model="cup"] .count'), /^\d+ steps$/, 'a model not begun says where you got to');
   assert.ok(await p.locator('.model .thumb svg polygon').count() > 10, 'the model pictures are empty');
   assert.deepEqual(await p.evaluate(() => fold.built), ['crane'], 'going back to the gallery folded the other models');
   await p.context().close();
