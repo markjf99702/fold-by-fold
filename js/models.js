@@ -250,7 +250,7 @@ export const MODELS = [
     id: 'cup',
     name: 'Paper cup',
     level: 'Easy',
-    blurb: 'A cup that holds water for a minute or two. Five folds.',
+    blurb: 'A cup that holds water for a minute or two.',
     paper: { colorUp: false, turn: 45 },
     steps: [
       {
@@ -340,7 +340,7 @@ export const MODELS = [
     id: 'heart',
     name: 'Heart',
     level: 'Easy',
-    blurb: 'A flat heart with a colored front, for a card or a note. Ten folds.',
+    blurb: 'A flat heart with a colored front, for a card or a note.',
     paper: { colorUp: false, turn: 45 },
     steps: [
       {
@@ -782,7 +782,7 @@ export const MODELS = [
         ),
       },
       {
-        say: 'Petal fold the last face. This is the frog base: four long points at the bottom, four short ones at the top.',
+        say: 'Petal fold the last face. This is the frog base: four long points at the top, four short ones at the bottom.',
         name: 'Petal fold',
         do: (h) => h.mech(petal(FACE.K2, [0.2, 0.8])),
       },
