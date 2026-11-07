@@ -372,3 +372,14 @@ test('every arrow starts on the paper that moves and ends on paper where it land
   }
   assert.deepEqual(problems, []);
 });
+
+test('a tuck is marked as one: its arrow breaks where the point goes in under the pocket', () => {
+  const tucks = [];
+  for (const model of MODELS) {
+    for (const [i, step] of build(model).steps.entries()) {
+      const n = (marks(step) || []).filter((m) => m.arrow?.tuck).length;
+      if (n) tucks.push(`${model.id} ${i + 1}: ${n}`);
+    }
+  }
+  assert.deepEqual(tucks, ['waterbomb 8: 2', 'waterbomb 13: 2']);
+});

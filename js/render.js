@@ -495,6 +495,8 @@ function ribbon(pts, across, arrow, halo, ink, under, k = 1) {
     return [v3.add(q, s), v3.sub(q, s)];
   });
   for (let i = 0; i < n; i++) {
+    // A tuck's arrow breaks where it goes in under the edge of the pocket.
+    if (arrow.tuck && i / n > 0.64 && i / n < 0.76) continue;
     const [a1, a2] = sides[i], [b1, b2] = sides[i + 1];
     for (const q of [a1, b1, b2, a1, b2, a2]) push(q, under ? halo : ink);
   }
