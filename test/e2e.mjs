@@ -437,8 +437,7 @@ for (const hash of ['#%', '#crane-3%', '#%F0%9F']) {
   assert.equal(await step(), 4, 'tapping a tick did not pick its step');
   await p.context().close();
 
-  // Held sideways on a small phone, the panel beside the paper scrolls when the words run long. A finger that
-  // swipes up from the bar scrolls it, and the step stays.
+  // Held sideways on a small phone, a finger that swipes up from the bar is going somewhere else: the step stays.
   const s = await fresh('#crane-19', { viewport: { width: 568, height: 320 } });
   await s.waitForFunction(() => fold.state.id === 'crane');
   const scdp = await s.context().newCDPSession(s);
@@ -447,8 +446,7 @@ for (const hash of ['#%', '#crane-3%', '#%F0%9F']) {
   for (let k = 1; k <= 10; k++) await scdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x, y: y - k * 12 }] });
   await scdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
   await s.waitForTimeout(300);
-  assert.equal(await s.evaluate(() => fold.state.i), 18, 'a swipe up from the ticks picked a step instead of scrolling');
-  assert.ok(await s.evaluate(() => document.querySelector('.panel').scrollTop) > 0, 'a swipe up from the ticks did not scroll the panel');
+  assert.equal(await s.evaluate(() => fold.state.i), 18, 'a swipe up from the ticks picked a step');
   await s.context().close();
 
   const m = await fresh('#frog', { hasTouch: false });
@@ -529,27 +527,25 @@ for (const hash of ['#%', '#crane-3%', '#%F0%9F']) {
 }
 
 // On a phone held sideways the words and buttons go beside the paper, so the paper keeps the height of the screen
-// instead of a strip under them. The buttons fit beside it, and long words scroll the panel rather than running
-// over the slider and buttons. Held upright, they stay under the paper.
+// instead of a strip under them. The slider and buttons fit beside it and stay in view, and long words scroll in
+// their own box above them, fading out at the bottom while there's more. Held upright, they stay under the paper.
 {
   const p = await fresh('#crane-19', { viewport: { width: 844, height: 390 } }); // the longest words of any step
   await p.waitForFunction(() => fold.state.id === 'crane');
   const layout = () => p.evaluate(() => {
     const box = (q) => document.querySelector(q).getBoundingClientRect();
     const panel = document.querySelector('.panel');
-    const [stage, bar, pn] = [box('#stage'), box('.bar'), panel.getBoundingClientRect()];
+    const [stage, bar, pn, play] = [box('#stage'), box('.bar'), panel.getBoundingClientRect(), box('#play')];
     const order = ['#ticks', '.step-now', '.scrub', '.controls'].map(box);
     const out = ['#prev', '#play', '#next', '#speed'].filter((q) => box(q).left < pn.left || box(q).right > pn.right);
-    panel.scrollTop = panel.scrollHeight;
-    const reach = box('.controls').bottom <= pn.bottom + 0.5;
-    panel.scrollTop = 0;
     return {
       beside: stage.right <= pn.left + 0.5, under: stage.bottom <= pn.top + 0.5, stageH: stage.height, room: innerHeight - bar.height,
-      overlap: order.some((b, k) => k > 0 && b.top < order[k - 1].bottom - 0.5) || box('#say').bottom > order[1].bottom + 0.5,
-      out, reach, sideways: document.documentElement.scrollWidth > innerWidth,
+      overlap: order.some((b, k) => k > 0 && b.top < order[k - 1].bottom - 0.5),
+      out, play: play.top >= pn.top - 0.5 && play.bottom <= Math.min(pn.bottom, innerHeight) + 0.5 && panel.scrollTop === 0,
+      sideways: document.documentElement.scrollWidth > innerWidth,
     };
   });
-  for (const [width, height] of [[844, 390], [667, 375], [568, 320]]) {
+  for (const [width, height] of [[844, 390], [667, 375], [844, 340], [568, 320]]) {
     await p.setViewportSize({ width, height });
     await p.waitForTimeout(100);
     const r = await layout();
@@ -557,12 +553,39 @@ for (const hash of ['#%', '#crane-3%', '#%F0%9F']) {
     assert.ok(r.stageH >= r.room - 1, `the paper is a strip ${Math.round(r.stageH)} px tall at ${width}x${height}`);
     assert.equal(r.overlap, false, `the words run over the slider or buttons at ${width}x${height}`);
     assert.deepEqual(r.out, [], `buttons cut off at ${width}x${height}`);
-    assert.ok(r.reach, `the buttons can't be scrolled to at ${width}x${height}`);
+    assert.ok(r.play, `Play is out of sight at ${width}x${height}`);
     assert.equal(r.sideways, false, `the player scrolls sideways at ${width}x${height}`);
   }
+  // At 568x320 the words are longer than their box: it fades at the bottom until it's scrolled to the end.
+  assert.equal(await p.evaluate(() => document.querySelector('.step-now').classList.contains('more')), true, 'long words don\'t fade out where they\'re cut off');
+  await p.evaluate(() => { const w = document.querySelector('.step-now'); w.scrollTop = w.scrollHeight; });
+  await p.waitForFunction(() => !document.querySelector('.step-now').classList.contains('more'), null, { timeout: 2000 }).catch(() => {});
+  assert.equal(await p.evaluate(() => document.querySelector('.step-now').classList.contains('more')), false, 'the words still fade out at their end');
   await p.setViewportSize({ width: 390, height: 844 });
   await p.waitForTimeout(100);
   assert.ok((await layout()).under, 'held upright, the words are no longer under the paper');
+  await p.context().close();
+}
+
+// On a short phone held upright (an iPhone SE in Safari, or smaller), long words don't squeeze the paper to a strip
+// or push Play off the screen: at every step of the crane and the frog the paper keeps over a third of the height.
+for (const [width, height] of [[375, 553], [320, 460]]) {
+  const p = await fresh('#crane', { viewport: { width, height } });
+  await p.waitForFunction(() => fold.state.id === 'crane');
+  for (const id of ['crane', 'frog']) {
+    await p.evaluate((id) => { location.hash = id; }, id);
+    await p.waitForFunction((id) => fold.state.id === id, id);
+    const short = await p.evaluate(() => {
+      const bad = [];
+      for (let i = 0; i < fold.state.steps; i++) {
+        fold.set(i, 0);
+        const stage = document.getElementById('stage').getBoundingClientRect(), play = document.getElementById('play').getBoundingClientRect();
+        if (stage.height < 0.35 * innerHeight || play.top < 0 || play.bottom > innerHeight) bad.push(`step ${i + 1}: paper ${Math.round(stage.height)} px, Play ${Math.round(play.top)}-${Math.round(play.bottom)}`);
+      }
+      return bad;
+    });
+    assert.deepEqual(short, [], `the ${id}'s words crowd the paper or Play at ${width}x${height}`);
+  }
   await p.context().close();
 }
 

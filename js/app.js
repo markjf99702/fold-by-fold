@@ -187,9 +187,9 @@ function renderSteps() {
 
 // On a phone the bar of ticks is the way to jump to a step, but they're narrow (the frog's 34 share about 360 px),
 // so a finger can slide along the bar and the step under it is picked as it goes, the way the slider under the
-// words works. A finger picks once it moves along the bar, or as it lifts after a tap: one going up or down may be
-// scrolling the panel (it scrolls on a small phone held sideways), so until then it picks nothing. A mouse picks
-// as soon as it's pressed. The ticks are still buttons, for the keyboard and screen readers.
+// words works. A finger picks once it moves along the bar, or as it lifts after a tap: one going up or down is
+// swiping somewhere else, so until then it picks nothing. A mouse picks as soon as it's pressed. The ticks are
+// still buttons, for the keyboard and screen readers.
 let sliding = null;
 function slideTo(x, first) {
   const ticks = [...$('ticks').children];
@@ -251,12 +251,18 @@ function primary() {
   else start();
 }
 
+let shown = null; // the step whose words are up
 function paint() {
   const step = P.b.steps[P.i];
   const n = P.b.steps.length;
   $('stepCount').textContent = `Step ${P.i + 1} of ${n}`;
   $('chip').innerHTML = chipFor(step);
   $('say').textContent = step.say;
+  if (step !== shown) {
+    shown = step;
+    words.scrollTop = 0; // a new step's words start at the top
+    fadeWords();
+  }
   $('prev').disabled = P.i === 0 && P.t === 0;
   $('next').disabled = P.i === n - 1;
   const last = P.i === n - 1;
@@ -282,6 +288,14 @@ function paint() {
   });
   dirty = true;
 }
+
+// Words that run past their box on a short screen fade out at the bottom until they're scrolled to the end.
+const words = document.querySelector('.step-now');
+function fadeWords() {
+  words.classList.toggle('more', words.scrollTop + words.clientHeight < words.scrollHeight - 2);
+}
+words.addEventListener('scroll', fadeWords, { passive: true });
+if ('ResizeObserver' in window) new ResizeObserver(fadeWords).observe(words);
 
 // The step's symbol beside its name, drawn as the key under the gallery draws it.
 const CHIP = {

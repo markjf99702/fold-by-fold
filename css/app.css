@@ -162,7 +162,8 @@ h1 {
   height: 100dvh;
   display: grid;
   grid-template-columns: minmax(0, 1fr); /* a long model name shortens with an ellipsis instead of widening the page */
-  grid-template-rows: auto minmax(0, 1fr) auto;
+  /* The paper keeps at least 40% of a short screen, and the words, slider and buttons have the rest. */
+  grid-template-rows: auto minmax(clamp(150px, 40dvh, 360px), 1fr) minmax(0, auto);
   grid-template-areas: "bar" "stage" "panel";
 }
 .bar {
@@ -175,7 +176,7 @@ h1 {
 .bar-title p { margin: 0; font-size: .82rem; color: var(--muted); }
 .bar-end { display: flex; gap: 8px; }
 
-.stage { grid-area: stage; position: relative; min-height: 0; }
+.stage { grid-area: stage; position: relative; min-height: 0; container-type: size; }
 .stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; cursor: grab; }
 .stage canvas:active { cursor: grabbing; }
 .hint {
@@ -184,6 +185,8 @@ h1 {
   pointer-events: none; white-space: nowrap; transition: opacity .6s;
 }
 .hint.gone { opacity: 0; }
+/* On a stage only a few fingers tall the hint would cover the paper. */
+@container (max-height: 240px) { .hint { display: none; } }
 /* With a mouse you zoom by scrolling, not pinching, so the hint says that instead. */
 .hint .mouse { display: none; }
 @media (hover: hover) and (pointer: fine) {
@@ -196,9 +199,11 @@ h1 {
   grid-area: panel;
   padding: 10px max(var(--gutter), env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(var(--gutter), env(safe-area-inset-left));
   display: flex; flex-direction: column; gap: 10px;
+  min-height: 0; overflow: hidden;
   background: var(--bg);
   border-top: 1px solid var(--line);
 }
+.ticks, .scrub, .controls { flex: none; }
 .ticks { list-style: none; margin: 0; padding: 0; display: flex; gap: 4px; touch-action: pan-y; } /* a finger slides along it */
 .ticks li { flex: 1; }
 .ticks button {
@@ -208,14 +213,24 @@ h1 {
 .ticks button.done::before { background: color-mix(in srgb, var(--accent) 45%, var(--line)); }
 .ticks button[aria-current="step"]::before { background: var(--accent); height: 6px; margin-top: -1px; }
 
-.step-now { display: grid; gap: 4px; min-height: 5.6em; }
+/* Words too long for the room left scroll in their own box, fading at the bottom while there's more, so the
+   slider and buttons stay where they are. The box keeps about three lines, so the paper doesn't jump about
+   between steps with a line or two of words. */
+.step-now {
+  display: grid; align-content: start; gap: 4px;
+  flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
+}
+.step-now.more {
+  -webkit-mask-image: linear-gradient(#000 calc(100% - 1.3em), transparent);
+  mask-image: linear-gradient(#000 calc(100% - 1.3em), transparent);
+}
 .chip {
   margin: 0; display: inline-flex; align-items: center; gap: 8px; font-size: .78rem; font-weight: 700;
   letter-spacing: .06em; text-transform: uppercase; color: var(--muted);
 }
 .chip svg { width: 34px; height: 12px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .chip .hollow { stroke-width: 1.6; }
-.say { margin: 0; font-size: 1.05rem; line-height: 1.45; }
+.say { margin: 0; font-size: 1.05rem; line-height: 1.45; min-height: 3.95em; } /* with the chip, 5.6em */
 
 .scrub input { width: 100%; accent-color: var(--accent); margin: 0; height: 28px; }
 .controls { display: flex; align-items: center; gap: 10px; justify-content: center; }
@@ -240,6 +255,12 @@ h1 {
   .speed { padding: 0 10px; }
 }
 
+/* A short phone held upright: the panel draws in so the words keep two lines or so beside the paper's 40%. */
+@media (max-height: 560px) and (orientation: portrait) {
+  .panel { gap: 6px; padding-top: 6px; padding-bottom: max(8px, env(safe-area-inset-bottom)); }
+  .ctl { height: 44px; }
+}
+
 .step-list { display: none; }
 
 @media (min-width: 900px) {
@@ -250,7 +271,7 @@ h1 {
   }
   /* The words and controls keep their size at the top; the list of steps scrolls under them. The panel's
      left side is mid-screen, so only its right side keeps clear of a notch, and the panel is that much wider. */
-  .panel { border-top: 0; border-left: 1px solid var(--line); min-height: 0; padding-top: 16px; padding-left: var(--gutter); }
+  .panel { border-top: 0; border-left: 1px solid var(--line); min-height: 0; overflow: visible; padding-top: 16px; padding-left: var(--gutter); }
   .panel > * { flex-shrink: 0; }
   .ticks { display: none; }
   .step-list {
@@ -264,21 +285,21 @@ h1 {
   }
   .step-list li button::before { counter-increment: s; content: counter(s); font-weight: 700; font-variant-numeric: tabular-nums; }
   .step-list li button[aria-current="step"] { background: var(--chip); color: var(--ink); }
-  .step-now { min-height: 0; }
+  .step-now { flex: none; overflow: visible; }
+  .say { min-height: 0; }
 }
 
 /* A phone held sideways is too short for the words and buttons under the paper: they left it a strip a finger or
    two tall. They go beside it instead, as on a wide screen, with the steps still along the top and only the
-   panel's right side kept clear of a notch; the panel scrolls if the words run long. */
+   panel's right side kept clear of a notch; long words scroll in their own box, above the slider and buttons. */
 @media (max-width: 899px) and (orientation: landscape) and (max-height: 500px) {
   .player {
     grid-template-columns: minmax(0, 1fr) calc(clamp(320px, 50vw, 380px) + env(safe-area-inset-right));
     grid-template-rows: auto minmax(0, 1fr);
     grid-template-areas: "bar bar" "stage panel";
   }
-  .panel { border-top: 0; border-left: 1px solid var(--line); min-height: 0; overflow: auto; padding-left: var(--gutter); }
-  .panel > * { flex-shrink: 0; } /* long words scroll the panel rather than running over the buttons */
-  .step-now { min-height: 0; }
+  .panel { border-top: 0; border-left: 1px solid var(--line); padding-left: var(--gutter); }
+  .say { min-height: 0; }
 }
 
 @media (prefers-reduced-motion: reduce) {
