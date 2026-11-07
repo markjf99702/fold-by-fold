@@ -128,13 +128,13 @@ h1 {
 
 .models {
   list-style: none; margin: 0; padding: 0;
-  display: grid; grid-template-columns: repeat(auto-fill, minmax(158px, 1fr)); gap: 12px;
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(136px, 1fr)); gap: 12px; /* two across at 320 px */
 }
 /* The cards in a row share their rows, so a name on two lines moves the step counts and words down in its
    neighbours too, and they all line up. */
-.models li { display: grid; grid-row: span 4; grid-template-rows: subgrid; }
+.models li { display: grid; grid-row: span 4; grid-template-rows: subgrid; min-width: 0; }
 .model {
-  appearance: none; border: 0; width: 100%; height: 100%; text-align: left; cursor: pointer;
+  appearance: none; border: 0; width: 100%; height: 100%; min-width: 0; text-align: left; cursor: pointer;
   background: var(--card); border-radius: 14px; padding: 12px; display: grid; gap: 10px; align-content: start;
   grid-row: span 4; grid-template-rows: subgrid; row-gap: 10px;
   box-shadow: 0 1px 0 var(--line), 0 6px 18px rgba(40, 30, 15, .07);
@@ -145,11 +145,19 @@ h1 {
   aspect-ratio: 1; border-radius: 9px; background: var(--mat); display: grid; place-items: center; overflow: hidden;
 }
 .model .thumb svg { width: 78%; height: 78%; filter: drop-shadow(0 3px 4px rgba(0, 0, 0, .25)); }
-.model h3 { font-family: var(--display); font-weight: 800; font-size: 1.3rem; margin: 0; line-height: 1.2; }
-.model .meta { margin: 0; font-size: .82rem; color: var(--muted); display: flex; gap: 8px; align-items: center; }
+.model h3 { font-family: var(--display); font-weight: 800; font-size: 1.3rem; margin: 0; line-height: 1.2; overflow-wrap: break-word; }
+@media (max-width: 359px) { .model h3 { font-size: 1.15rem; } } /* two across on a 320 px phone, Waterbomb and all */
+.model .meta { margin: 0; font-size: .82rem; color: var(--muted); display: flex; flex-wrap: wrap; column-gap: 8px; align-items: center; }
 .model .level { font-weight: 700; color: var(--accent); }
 .model .blurb { margin: 0; font-size: .88rem; line-height: 1.45; }
 @media (min-width: 700px) { .models { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; } }
+/* A phone held sideways: a smaller title and wider pictures, so the first cards show on the first screen and a
+   card's picture and its name fit on the screen together. */
+@media (orientation: landscape) and (max-height: 500px) {
+  .home { gap: 16px; padding-top: max(16px, env(safe-area-inset-top)); }
+  h1 { font-size: clamp(2.2rem, 11vh, 3rem); }
+  .model .thumb { aspect-ratio: 4 / 3; }
+}
 
 .symbols { background: var(--card); border-radius: 14px; padding: 16px; box-shadow: 0 1px 0 var(--line); scroll-margin-top: 12px; }
 .symbols h2 { font-family: var(--display); font-weight: 800; font-size: 1.4rem; margin: 0 0 4px; }

@@ -289,6 +289,11 @@ async function fresh(hash = '', { init, arg, ...opts } = {}) {
 {
   const p = await fresh('', { viewport: { width: 320, height: 568 } });
   await p.waitForSelector('#home:not([hidden])');
+  await p.evaluate(() => document.fonts.ready);
+  // The gallery has two cards across there too, all the same width, a one-word name like Waterbomb included.
+  const widths = await p.evaluate(() => [...document.querySelectorAll('.model')].map((c) => [Math.round(c.getBoundingClientRect().left), Math.round(c.getBoundingClientRect().width)]));
+  assert.equal(new Set(widths.map(([x]) => x)).size, 2, `the gallery isn't two cards across at 320 px: ${JSON.stringify(widths)}`);
+  assert.ok(widths.every(([, w]) => w === widths[0][1]), `the cards aren't all one width at 320 px: ${JSON.stringify(widths)}`);
   const ids = await p.evaluate(() => [...document.querySelectorAll('.model')].map((b) => b.dataset.model));
   const cut = [];
   for (const id of ids) {
