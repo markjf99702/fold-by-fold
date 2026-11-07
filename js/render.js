@@ -58,8 +58,14 @@ const MAT_VS = `
 attribute vec3 aPos; uniform mat4 uViewProj; varying vec2 vP;
 void main() { vP = aPos.xy; gl_Position = uViewProj * vec4(aPos, 1.0); }`;
 
+// The mat reaches far enough to fill the view up to the horizon from a low angle, fading out only at its far
+// edge; its grid fades sooner, before its lines get too fine to draw steadily.
 const MAT_FS = `
+#ifdef GL_FRAGMENT_PRECISION_HIGH
+precision highp float;
+#else
 precision mediump float;
+#endif
 uniform vec3 uMat; uniform vec3 uLine; uniform vec2 uCenter; uniform float uFade;
 varying vec2 vP;
 float gridLine(vec2 p, float step, float w) {
@@ -67,11 +73,12 @@ float gridLine(vec2 p, float step, float w) {
   return 1.0 - smoothstep(0.0, w, min(g.x, g.y));
 }
 void main() {
-  float minor = gridLine(vP, 0.1, 0.0022) * 0.35;
-  float major = gridLine(vP, 0.5, 0.004);
-  vec3 col = mix(uMat, uLine, max(minor, major));
   float d = length(vP - uCenter);
-  float a = 1.0 - smoothstep(uFade * 0.55, uFade, d);
+  float grid = 1.0 - smoothstep(2.0, 5.0, d);
+  float minor = gridLine(vP, 0.1, 0.0022) * 0.35 * (1.0 - smoothstep(1.2, 3.0, d));
+  float major = gridLine(vP, 0.5, 0.004);
+  vec3 col = mix(uMat, uLine, max(minor, major) * grid);
+  float a = 1.0 - smoothstep(uFade * 0.5, uFade, d);
   gl_FragColor = vec4(col * a, a);
 }`;
 
@@ -286,7 +293,7 @@ export class View {
   drawMat(vp) {
     const gl = this.gl, { p, loc } = this.mat;
     const [cx, cy] = this.cam.target;
-    const S = 3.2;
+    const S = 24;
     const quad = new Float32Array([cx - S, cy - S, -0.0005, cx + S, cy - S, -0.0005, cx + S, cy + S, -0.0005,
       cx - S, cy - S, -0.0005, cx + S, cy + S, -0.0005, cx - S, cy + S, -0.0005]);
     gl.useProgram(p);
