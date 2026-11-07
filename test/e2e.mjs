@@ -504,6 +504,25 @@ for (const hash of ['#%', '#crane-3%', '#%F0%9F']) {
   await p.context().close();
 }
 
+// A double tap on the paper puts the view back, found from the taps themselves: phones don't all report a double tap
+// as a double click (Safari on an iPhone hasn't always), so here the page never hears of one.
+{
+  const p = await fresh('#cup');
+  await p.waitForFunction(() => fold.state.id === 'cup');
+  await p.evaluate(() => { window.addEventListener('dblclick', (e) => e.stopPropagation(), true); const v = fold.view(); v.cam.yaw = -150; v.cam.pitch = 20; });
+  const [x, y] = await p.evaluate(() => { const r = document.getElementById('gl').getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; });
+  const cdp = await p.context().newCDPSession(p);
+  for (let k = 0; k < 2; k++) {
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] });
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  }
+  await p.waitForFunction(() => fold.view().goal.yaw === null && fold.view().cam.yaw !== -150, null, { timeout: 3000 }).catch(() => {});
+  assert.deepEqual(await p.evaluate(() => [Math.round(fold.view().cam.yaw), Math.round(fold.view().cam.pitch)]), [-90, 58], 'a double tap did not put the view back');
+  // In the player, a swipe down can't pull the page to reload it.
+  assert.equal(await p.evaluate(() => getComputedStyle(document.documentElement).overscrollBehaviorY), 'none');
+  await p.context().close();
+}
+
 // The frog's 34 ticks are too narrow to hit one with a finger, so a finger slides along the bar and the step under
 // it is picked as it goes; lifting it leaves that step, and a tap picks the tick tapped. A finger going up or down
 // from the bar scrolls instead. A mouse can drag along it too, and the ticks are still buttons for the keyboard.

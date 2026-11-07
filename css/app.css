@@ -187,6 +187,8 @@ h1 {
 .jd-foot a:hover, .jd-foot a:focus-visible { text-decoration: underline; }
 
 /* ---------- Player ---------- */
+/* A swipe down in the player is never meant to reload the page and lose the fold. */
+html:has(#player:not([hidden])) { overscroll-behavior-y: none; }
 .player {
   height: 100dvh;
   display: grid;

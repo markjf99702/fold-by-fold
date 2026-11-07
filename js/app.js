@@ -389,17 +389,23 @@ function wireCamera() {
   const hint = $('hint');
   const hideHint = () => hint.classList.add('gone');
   setTimeout(hideHint, 7000);
+  // A double tap puts the view back. It's picked out here from the taps themselves, since phones don't all report
+  // a double tap to the page; a double click is left to the mouse. A tap is one finger that hardly moves.
+  let tap = null, lastTap = null, pointer = 'mouse';
   c.addEventListener('pointerdown', (e) => {
     c.setPointerCapture(e.pointerId);
     pts.set(e.pointerId, [e.clientX, e.clientY]);
     if (pts.size === 2) pinch = spread();
+    pointer = e.pointerType;
+    tap = pointer !== 'mouse' && pts.size === 1 ? { id: e.pointerId, x: e.clientX, y: e.clientY } : null;
   });
   c.addEventListener('pointermove', (e) => {
     if (!pts.has(e.pointerId)) return;
     const [x, y] = pts.get(e.pointerId);
     pts.set(e.pointerId, [e.clientX, e.clientY]);
+    if (tap && Math.hypot(e.clientX - tap.x, e.clientY - tap.y) >= 10) tap = null;
     if (pts.size === 1) {
-      view.goal.yaw = view.goal.pitch = null; // a drag takes over from a turn on its way
+      if (e.clientX !== x || e.clientY !== y) view.goal.yaw = view.goal.pitch = null; // a drag takes over from a turn on its way
       view.cam.yaw -= (e.clientX - x) * 0.35;
       view.cam.pitch = Math.max(-80, Math.min(89.9, view.cam.pitch + (e.clientY - y) * 0.3));
       hideHint();
@@ -411,10 +417,23 @@ function wireCamera() {
     dirty = true;
   });
   const up = (e) => { pts.delete(e.pointerId); pinch = pts.size === 2 ? spread() : 0; };
-  c.addEventListener('pointerup', up);
-  c.addEventListener('pointercancel', up);
+  c.addEventListener('pointerup', (e) => {
+    up(e);
+    if (tap?.id !== e.pointerId) { if (pointer !== 'mouse') lastTap = null; return; }
+    if (lastTap && e.timeStamp - lastTap.t < 300 && Math.hypot(tap.x - lastTap.x, tap.y - lastTap.y) < 24) {
+      resetView();
+      lastTap = null;
+    } else lastTap = { t: e.timeStamp, x: tap.x, y: tap.y };
+    tap = null;
+  });
+  c.addEventListener('pointercancel', (e) => { up(e); tap = lastTap = null; });
   c.addEventListener('wheel', (e) => { e.preventDefault(); view.zoomBy(Math.exp(e.deltaY * 0.0012)); dirty = true; }, { passive: false });
-  c.addEventListener('dblclick', resetView);
+  c.addEventListener('dblclick', () => { if (pointer === 'mouse') resetView(); });
+  // The paper takes pinches for its own zoom. If the page itself has been zoomed in (by a pinch on the words, say),
+  // a pinch on the paper zooms the page back out instead, since the paper may be most of what's on screen.
+  if (window.visualViewport) {
+    visualViewport.addEventListener('resize', () => { c.style.touchAction = visualViewport.scale > 1.01 ? 'pinch-zoom' : ''; });
+  }
   function spread() {
     const [a, b] = [...pts.values()];
     return Math.hypot(a[0] - b[0], a[1] - b[1]);
