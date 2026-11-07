@@ -27,7 +27,9 @@ void main() {
   float sky = 0.5 + 0.5 * n.z;
   vec3 v = normalize(uEye - vPos);
   float rim = pow(1.0 - max(dot(n, v), 0.0), 3.0);
-  vec3 col = base * (0.42 + 0.18 * sky + 0.52 * diff) * (0.965 + 0.05 * grain);
+  // A room's light: soft enough that paper turned from the lamp, or seen from underneath, keeps its colour, and
+  // flat paper facing up as bright as ever.
+  vec3 col = base * (0.60 + 0.10 * sky + 0.40 * diff) * (0.965 + 0.05 * grain);
   col += vec3(0.05) * rim;
   gl_FragColor = vec4(col, 1.0);
 }`;
@@ -284,7 +286,8 @@ export class View {
     gl.depthFunc(gl.LEQUAL);
     this.drawPaper(vp, eye);
     this.drawEdges(vp);
-    if (this.marks && this.markAlpha > 0.01) {
+    // The marks are drawn over everything, so from underneath they'd show through the paper, mirrored.
+    if (this.marks && this.markAlpha > 0.01 && !below) {
       gl.disable(gl.DEPTH_TEST);
       this.drawMarks(vp, eye);
     }
