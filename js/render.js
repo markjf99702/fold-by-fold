@@ -50,7 +50,8 @@ void main() {
     if (uDash < 1.5) { if (x > 0.031) discard; }
     else { if (!(x < 0.03 || (x > 0.042 && x < 0.052))) discard; }
   }
-  gl_FragColor = vec4(vColor.rgb, vColor.a * uAlpha);
+  float a = vColor.a * uAlpha;
+  gl_FragColor = vec4(vColor.rgb * a, a); // premultiplied, like everything drawn here
 }`;
 
 const MAT_VS = `
@@ -71,7 +72,7 @@ void main() {
   vec3 col = mix(uMat, uLine, max(minor, major));
   float d = length(vP - uCenter);
   float a = 1.0 - smoothstep(uFade * 0.55, uFade, d);
-  gl_FragColor = vec4(col, a);
+  gl_FragColor = vec4(col * a, a);
 }`;
 
 function compile(gl, vs, fs) {
@@ -135,7 +136,7 @@ export function hexToRgb(h) {
 export class View {
   constructor(canvas) {
     this.canvas = canvas;
-    const gl = canvas.getContext('webgl', { antialias: true, stencil: true, alpha: true, premultipliedAlpha: false, preserveDrawingBuffer: false });
+    const gl = canvas.getContext('webgl', { antialias: true, stencil: true, alpha: true, premultipliedAlpha: true, preserveDrawingBuffer: false });
     if (!gl) throw new Error('WebGL is not available');
     this.gl = gl;
     this.init();
@@ -259,10 +260,11 @@ export class View {
     const below = eye[2] < 0;
 
     gl.enable(gl.BLEND);
-    // The canvas is clear where nothing is drawn, so the mat's far edge can fade into the page. A half-clear
-    // stroke over the mat (a shadow, an edge) mixes in its colour but leaves the canvas as solid as it was,
-    // or the page would show through it.
-    gl.blendFuncSeparate(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA, gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+    // The canvas is clear where nothing is drawn, so the mat's far edge can fade into the page. Colours are
+    // premultiplied by how solid they are, so a half-clear stroke over the mat (a shadow, an edge) mixes in its
+    // colour but leaves the canvas as solid as it was, and the mat's fading edge keeps its own colour rather
+    // than going grey on the way out.
+    gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
 
     // The mat, and the paper's shadow on it. Seen from underneath, the mat is left out.
     if (!below) {
