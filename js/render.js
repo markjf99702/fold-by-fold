@@ -400,8 +400,11 @@ export class View {
     if (!m.arrow) return;
     const arc = arrowPath(m.arrow);
     const facing = (q, t) => v3.norm(v3.cross(t, v3.norm(v3.sub(eye, q))));
-    this.drawFlat(this.buf.marks, ribbon(arc, facing, m.arrow, halo, ink, true), vp, 0, this.markAlpha);
-    this.drawFlat(this.buf.marks, ribbon(arc, facing, m.arrow, halo, ink, false), vp, 0, this.markAlpha);
+    // A short arrow (a small tip folding) is drawn finer, so its head doesn't swamp it.
+    const r = Math.hypot(m.arrow.to[0] - m.arrow.from[0], m.arrow.to[1] - m.arrow.from[1]) / 2;
+    const k = Math.max(0.45, Math.min(1, r / 0.1));
+    this.drawFlat(this.buf.marks, ribbon(arc, facing, m.arrow, halo, ink, true, k), vp, 0, this.markAlpha);
+    this.drawFlat(this.buf.marks, ribbon(arc, facing, m.arrow, halo, ink, false, k), vp, 0, this.markAlpha);
   }
 
   // A fold line: a flat strip lying on the paper, dashed for a valley fold and dash-dotted for a mountain fold.
@@ -479,11 +482,11 @@ function arrowPath(ar) {
 
 // The arrow's shaft, a strip along the path, with its heads: first the halo under it all (under true), then
 // the ink. across(q, t) is the way across the strip at point q, where the path heads along t: turned to face
-// the eye for an arrow standing over the paper, or flat for one lying on the table.
+// the eye for an arrow standing over the paper, or flat for one lying on the table. k scales it all down.
 const SHAFT = 0.0055, PAD = 0.0055, OUTLINE = 0.0042;
-function ribbon(pts, across, arrow, halo, ink, under) {
+function ribbon(pts, across, arrow, halo, ink, under, k = 1) {
   const out = [];
-  const w = under ? SHAFT + PAD : SHAFT;
+  const w = (under ? SHAFT + PAD : SHAFT) * k;
   const push = (q, color) => out.push(q[0], q[1], q[2], ...color, 0);
   // Each point's two sides, across the path there, so neighbouring pieces meet without gaps or overlaps.
   const n = pts.length - 1;
@@ -497,11 +500,11 @@ function ribbon(pts, across, arrow, halo, ink, under) {
   }
   const mid = v3.lerp(pts[0], pts[n], 0.5);
   const end = v3.norm(v3.sub(pts[n], pts[n - 2]));
-  arrowHead(push, pts[n], end, across(pts[n], end), arrow.head || 'valley', mid, halo, ink, under);
+  arrowHead(push, pts[n], end, across(pts[n], end), arrow.head || 'valley', mid, halo, ink, under, k);
   // A fold and unfold comes back: an unfolding head at the tail, pointing back where it started.
   if (arrow.back) {
     const tail = v3.norm(v3.sub(pts[0], pts[2]));
-    arrowHead(push, pts[0], tail, across(pts[0], tail), 'unfold', mid, halo, ink, under);
+    arrowHead(push, pts[0], tail, across(pts[0], tail), 'unfold', mid, halo, ink, under, k);
   }
   return out;
 }
@@ -510,24 +513,24 @@ function ribbon(pts, across, arrow, halo, ink, under) {
 // the path, y across it. 'valley' is a solid head; 'mountain' a hollow head on one side only, the outside of the
 // curve, with the shaft running on to its point; 'unfold' a hollow head on both sides. Hollow means an ink
 // outline filled with the halo's colour.
-function arrowHead(push, b, t, s, kind, mid, halo, ink, under) {
+function arrowHead(push, b, t, s, kind, mid, halo, ink, under, k = 1) {
   let shape, inset;
   if (kind === 'mountain') {
     if (v3.dot(s, v3.sub(b, mid)) < 0) s = v3.mul(s, -1);
-    const L = 0.05, H = 0.028;
+    const L = 0.05 * k, H = 0.028 * k, w = SHAFT * k;
     // The point, the barb, and the shaft's far side; its edge along the shaft is as thick as the shaft.
-    shape = [[0.6 * L, -SHAFT], [-0.4 * L, H], [-0.4 * L, -SHAFT]];
-    inset = [OUTLINE, OUTLINE, 2 * SHAFT];
+    shape = [[0.6 * L, -w], [-0.4 * L, H], [-0.4 * L, -w]];
+    inset = [OUTLINE * k, OUTLINE * k, 2 * w];
   } else {
-    const L = kind === 'valley' ? 0.036 : 0.046, H = kind === 'valley' ? 0.021 : 0.025;
+    const L = (kind === 'valley' ? 0.036 : 0.046) * k, H = (kind === 'valley' ? 0.021 : 0.025) * k;
     shape = [[0.6 * L, 0], [-0.4 * L, H], [-0.4 * L, -H]];
-    inset = OUTLINE;
+    inset = OUTLINE * k;
   }
   const at = ([x, y]) => v3.add(b, v3.add(v3.mul(t, x), v3.mul(s, y)));
   const fill = (poly, color) => {
     for (let i = 1; i < poly.length - 1; i++) for (const q of [poly[0], poly[i], poly[i + 1]]) push(at(q), color);
   };
-  if (under) { fill(offsetPoly(shape, -PAD), halo); return; }
+  if (under) { fill(offsetPoly(shape, -PAD * k), halo); return; }
   fill(shape, ink);
   if (kind !== 'valley') fill(offsetPoly(shape, inset), [halo[0], halo[1], halo[2], 1]);
 }

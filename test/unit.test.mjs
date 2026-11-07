@@ -2,7 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Sheet, fold, turnOver, together, creases, isFlipped } from '../js/paper.js';
-import { apply, area, bisector, side, centroid, overlapArea, line } from '../js/geom.js';
+import { apply, area, bisector, side, centroid, overlapArea, line, inside as covers } from '../js/geom.js';
 import { build } from '../js/build.js';
 import { poses, marks, symbol, corners, LAYER } from '../js/motion.js';
 import { MODELS } from '../js/models.js';
@@ -342,4 +342,33 @@ test('folds made together along one line share the line, and their arrows sit si
       assert.equal(meets, 1, 'a line runs on past the end of the next one');
     }
   }
+});
+
+test('every arrow starts on the paper that moves and ends on paper where it lands, and every fold line crosses paper', () => {
+  // On a facet or its edge (facets are convex).
+  const onPaper = (sheet, q) => sheet.order.some((id) => covers(sheet.world(id), q, 1e-6));
+  const problems = [];
+  for (const model of MODELS) {
+    for (const [i, step] of build(model).steps.entries()) {
+      const { motion } = step;
+      if (motion.kind === 'turnOver' || motion.kind === 'turn') continue;
+      const where = `${model.id} step ${i + 1}`;
+      const landing = motion.kind === 'foldUnfold' ? motion.folded : step.to;
+      const bends = motion.kind === 'bend' || motion.parts?.some((p) => p.bend);
+      const moving = motion.kind === 'mech' ? null : new Set(motion.moving || motion.parts?.flatMap((p) => p.moving || []) || []);
+      for (const m of marks(step)) {
+        if (m.line) {
+          const [a, b] = m.line;
+          for (let s = 0.15; s <= 0.85 + 1e-9; s += 0.05) {
+            if (!onPaper(step.from, [a[0] + (b[0] - a[0]) * s, a[1] + (b[1] - a[1]) * s])) { problems.push(`${where}: its line runs off the paper`); break; }
+          }
+        }
+        if (!m.arrow) continue;
+        const f = m.arrow.from.slice(0, 2), t = m.arrow.to.slice(0, 2);
+        if (moving?.size && ![...moving].some((id) => covers(step.from.world(id), f, 1e-6))) problems.push(`${where}: its arrow starts off the paper that moves, at ${f.map((x) => x.toFixed(3))}`);
+        if (!bends && !onPaper(landing, t)) problems.push(`${where}: its arrow ends off the paper, at ${t.map((x) => x.toFixed(3))}`);
+      }
+    }
+  }
+  assert.deepEqual(problems, []);
 });

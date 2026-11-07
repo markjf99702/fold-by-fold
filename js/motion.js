@@ -4,7 +4,9 @@
 // the moving facets turn about the fold line (lifted halfway between where they start and where they
 // land, so they arrive exactly on their new layer); everything else stays put.
 
-import { apply, det, dot, sub, side, reflectPoint, centroid, area, add, mul, line, intersect, norm, cross } from './geom.js';
+import {
+  apply, det, dot, sub, side, reflectPoint, centroid, area, add, mul, line, intersect, norm, cross, lerp, inside, overlapArea, sharedSegment,
+} from './geom.js';
 
 export const LAYER = 0.0035; // thickness of one layer of paper, in sheet widths
 
@@ -269,50 +271,63 @@ function stepMarks(step) {
     return [{ type: 'valley', line: q.line.map((p) => [p[0], p[1], z]), arrow: { from: [...q.from, z], to: [...q.to, z], over: true, angle: 180, head: 'valley' } }];
   }
   if (motion.kind === 'mech' && motion.parts) {
-    return padded(motion.parts.map((p) => markFor(from, { ...p, sign: -1, type: 'mountain', kind: 'fold' })));
+    return padded(sharingLines(motion.parts.flatMap((p) => markFor(from, { ...p, sign: -1, type: 'mountain', kind: 'fold' }))));
   }
   if (motion.kind === 'mech') return mechMarks(step);
-  if (motion.kind === 'reverse') return padded([markFor(from, { ...motion, sign: -1, type: 'mountain', kind: 'fold' })]);
+  if (motion.kind === 'reverse') return padded(sharingLines(markFor(from, { ...motion, sign: -1, type: 'mountain', kind: 'fold' })));
   if (motion.kind === 'multi') {
-    return padded(sharingLines(motion.parts, motion.parts.map((p) => markFor(from, { ...p, kind: p.bend ? 'bend' : 'fold' }))));
+    return padded(sharingLines(motion.parts.flatMap((p) => markFor(from, { ...p, kind: p.bend ? 'bend' : 'fold' }))));
   }
   if (motion.kind === 'turnOver' || motion.kind === 'turn') return [moveMark(step)];
   if (!['fold', 'foldUnfold', 'bend'].includes(motion.kind)) return null;
-  return padded([markFor(from, motion)]);
+  return padded(sharingLines(markFor(from, motion)));
 }
 
 // Folds made together along one line (both wings at once, say) share one line, drawn in the style of the front
 // fold, the valley. Their arrows sit side by side along it, the front one first, so neither hides the other;
-// folds that go the same way have one arrow between them. marks[i] is parts[i]'s mark, or null.
-function sharingLines(parts, marks) {
+// folds that go the same way have one arrow between them. Each mark knows its fold's line (L) and whether a
+// point is on the paper it moves (on), from markFor.
+function sharingLines(marks) {
   const out = [], taken = new Set();
-  const same = (A, B) => Math.abs(cross(A.d, B.d)) < 1e-6 && Math.abs(side(A, B.p)) < 1e-6;
+  const span = (m) => m.line.map((q) => dot(sub(q, m.L.p), m.L.d)).sort((x, y) => x - y);
+  const same = (m, o) => {
+    if (Math.abs(cross(m.L.d, o.L.d)) > 1e-6 || Math.abs(side(m.L, o.L.p)) > 1e-6) return false;
+    const [a0, a1] = span(m), b = o.line.map((q) => dot(sub(q, m.L.p), m.L.d)).sort((x, y) => x - y);
+    return a0 < b[1] + 1e-6 && b[0] < a1 + 1e-6; // and they overlap along it
+  };
   marks.forEach((m, i) => {
-    if (!m || taken.has(i)) return;
-    const group = [i];
-    for (let j = i + 1; j < marks.length; j++) if (marks[j] && !taken.has(j) && same(parts[i].line, parts[j].line)) { group.push(j); taken.add(j); }
+    if (taken.has(i)) return;
+    const group = [m];
+    for (let j = i + 1; j < marks.length; j++) if (!taken.has(j) && same(m, marks[j])) { group.push(marks[j]); taken.add(j); }
     if (group.length === 1) { out.push(m); return; }
-    const L = parts[i].line, along = (q) => dot(sub(q, L.p), L.d);
-    const ss = group.flatMap((k) => marks[k].line.map(along));
+    const L = m.L, along = (q) => dot(sub(q, L.p), L.d);
+    const ss = group.flatMap((k) => k.line.map(along));
     const lo = Math.min(...ss), hi = Math.max(...ss), z = m.line[0][2];
     const at = (s) => { const q = add(L.p, mul(L.d, s)); return [q[0], q[1], z]; };
-    const front = marks[group.find((k) => marks[k].type === 'valley') ?? i];
+    const front = group.find((k) => k.type === 'valley') || m;
     const arrows = [];
-    for (const k of [front, ...group.map((g) => marks[g]).filter((g) => g !== front)]) {
+    for (const k of [front, ...group.filter((g) => g !== front)]) {
       const a = k.arrow, way = sub(a.to, a.from);
       if (!arrows.some(({ arrow: b }) => b.over === a.over && dot(sub(b.to, b.from), way) > 0)) arrows.push(k);
     }
     arrows.forEach((k, n) => {
       if (arrows.length > 1) {
-        // Slide it along the line to its place: a third of the way along, two thirds, and so on.
-        const d = lo + ((n + 1) / (arrows.length + 1)) * (hi - lo) - along(k.arrow.from);
-        k.arrow.from = [k.arrow.from[0] + L.d[0] * d, k.arrow.from[1] + L.d[1] * d, z];
-        k.arrow.to = [k.arrow.to[0] + L.d[0] * d, k.arrow.to[1] + L.d[1] * d, z];
+        // Slide it along the line toward its place, a third of the way along, two thirds, and so on, as far as
+        // it can go and still start on the paper it moves.
+        const from = k.arrow.from, base = along(from), want = lo + ((n + 1) / (arrows.length + 1)) * (hi - lo) - base;
+        let best = 0;
+        for (let q = 0; q <= 40; q++) {
+          const d = (want * q) / 40;
+          if (k.on([from[0] + L.d[0] * d, from[1] + L.d[1] * d])) best = d; else break;
+        }
+        k.arrow.from = [from[0] + L.d[0] * best, from[1] + L.d[1] * best, z];
+        k.arrow.to = [k.arrow.to[0] + L.d[0] * best, k.arrow.to[1] + L.d[1] * best, z];
       }
       out.push(n === 0 ? { type: front.type, line: [at(lo), at(hi)], arrow: k.arrow } : { type: k.type, line: null, arrow: k.arrow });
     });
   });
-  return out;
+  // Plain marks from here on.
+  return out.map((m) => ({ type: m.type, line: m.line, arrow: m.arrow }));
 }
 
 // Fold lines run a little past the paper they cross, so their ends show, except where two lines meet (corners
@@ -323,7 +338,7 @@ function padded(marks) {
   for (const m of list) {
     if (!m.line) continue;
     const [a, b] = m.line, len = Math.hypot(b[0] - a[0], b[1] - a[1]);
-    const d = [(b[0] - a[0]) / len, (b[1] - a[1]) / len], pad = len * 0.06 + 0.02;
+    const d = [(b[0] - a[0]) / len, (b[1] - a[1]) / len], pad = len * 0.08;
     const shared = (q) => ends.some(([o, e]) => o !== m && Math.hypot(e[0] - q[0], e[1] - q[1]) < 1e-6);
     const sa = shared(a), sb = shared(b);
     m.line = [sa ? a : [a[0] - d[0] * pad, a[1] - d[1] * pad, a[2]], sb ? b : [b[0] + d[0] * pad, b[1] + d[1] * pad, b[2]]];
@@ -362,34 +377,71 @@ function moveMark(step) {
   return { type: motion.kind === 'turnOver' ? 'turnOver' : 'rotate', path, arrow: { head: 'valley' } };
 }
 
+// One mark for each separate piece of paper the fold moves (both bumps of the heart, say), as a diagram marks
+// them: the line across the piece, and an arrow from its middle over the line to where that lands.
 function markFor(from, motion) {
-  const L = motion.line;
   const levels = from.levels();
-  // How far along the line the moving layers reach.
-  let lo = Infinity, hi = -Infinity, top = 0;
-  let ax = 0, ay = 0, aw = 0;
-  for (const id of motion.moving) {
+  let top = 0;
+  for (const id of from.order) top = Math.max(top, levels.get(id));
+  const z = (top + 1) * LAYER + 0.002;
+  return pieces(from, motion.moving).map((ids) => pieceMark(from, motion, ids, z)).filter(Boolean);
+}
+
+// The moving facets in pieces: facets lying on each other or joined along an edge are one piece.
+function pieces(from, ids) {
+  const group = new Map(ids.map((id) => [id, id]));
+  const find = (id) => (group.get(id) === id ? id : find(group.get(id)));
+  const touch = (a, b) => {
+    const A = from.world(a), B = from.world(b);
+    if (overlapArea(A, B) > 1e-7) return true;
+    for (let i = 0; i < A.length; i++) for (let j = 0; j < B.length; j++) {
+      if (sharedSegment(A[i], A[(i + 1) % A.length], B[j], B[(j + 1) % B.length])) return true;
+    }
+    return false;
+  };
+  for (let i = 0; i < ids.length; i++) for (let j = i + 1; j < ids.length; j++) {
+    if (find(ids[i]) !== find(ids[j]) && touch(ids[i], ids[j])) group.set(find(ids[i]), find(ids[j]));
+  }
+  const out = new Map();
+  for (const id of ids) { const r = find(id); if (!out.has(r)) out.set(r, []); out.get(r).push(id); }
+  return [...out.values()];
+}
+
+const NEAR = 0.07; // the closest an arrow starts to its line, so it doesn't shrink to a squiggle
+
+function pieceMark(from, motion, ids, z) {
+  const L = motion.line;
+  // How far along the line the piece reaches, its middle, and its point farthest from the line.
+  let lo = Infinity, hi = -Infinity, ax = 0, ay = 0, aw = 0, far = null, farOff = 0, farFacet = null, big = null, bigArea = 0;
+  for (const id of ids) {
     const w = from.world(id);
     for (const q of w) {
-      if (Math.abs(side(L, q)) < 1e-6) {
+      const off = Math.abs(side(L, q));
+      if (off < 1e-6) {
         const s = dot(sub(q, L.p), L.d);
         lo = Math.min(lo, s); hi = Math.max(hi, s);
-      }
+      } else if (off > farOff) { far = q; farOff = off; farFacet = w; }
     }
     const a = Math.abs(area(w)), c = centroid(w);
     ax += c[0] * a; ay += c[1] * a; aw += a;
+    if (a > bigArea) { big = w; bigArea = a; }
   }
-  for (const id of from.order) top = Math.max(top, levels.get(id));
-  if (!isFinite(lo)) return null;
-  const z = (top + 1) * LAYER + 0.002;
-  const a = add(L.p, mul(L.d, lo)), b = add(L.p, mul(L.d, hi)); // padded() runs it on past the paper
-  // The arrow runs from the middle of the moving part, over the line, to its mirror image; never so
-  // close to the line that it shrinks to a squiggle.
-  let start = aw ? [ax / aw, ay / aw] : L.p;
+  if (!isFinite(lo) || !big) return null;
+  const on = (q) => ids.some((id) => inside(from.world(id), q, 1e-6));
+  // The arrow starts in the middle of the piece, or in its biggest facet if the middle falls in a gap.
+  let start = [ax / aw, ay / aw];
+  if (!on(start)) start = centroid(big);
   const off = side(L, start);
-  if (Math.abs(off) < 0.07) start = [start[0] - L.d[1] * (0.07 - off), start[1] + L.d[0] * (0.07 - off)];
+  if (Math.abs(off) < NEAR && far) {
+    // Too close to the line: straight out to NEAR from it, or most of the way across a narrower piece, or else
+    // (a slanting tip, say) next to the piece's point farthest from the line.
+    const reach = Math.min(NEAR, 0.85 * farOff) - off;
+    const out = [start[0] - L.d[1] * reach, start[1] + L.d[0] * reach];
+    start = on(out) ? out : lerp(far, centroid(farFacet), 0.15);
+  }
   const end = reflectPoint(L, start);
-  return {
+  const a = add(L.p, mul(L.d, lo)), b = add(L.p, mul(L.d, hi)); // padded() runs it on past the paper
+  const m = {
     type: motion.type,
     line: [[a[0], a[1], z], [b[0], b[1], z]],
     arrow: {
@@ -397,6 +449,8 @@ function markFor(from, motion) {
       head: motion.type === 'mountain' ? 'mountain' : 'valley', back: motion.kind === 'foldUnfold',
     },
   };
+  // For sharingLines: the fold's line, and whether a point is on this piece.
+  return Object.assign(m, { L, on });
 }
 
 // A collapse or petal fold: the creases that close, drawn where they lie now, and an arrow following one
