@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { Sheet, fold, turnOver, together, creases, isFlipped } from '../js/paper.js';
 import { apply, area, bisector, side, centroid, overlapArea, line } from '../js/geom.js';
 import { build } from '../js/build.js';
-import { poses, marks, corners, LAYER } from '../js/motion.js';
+import { poses, marks, symbol, corners, LAYER } from '../js/motion.js';
 import { MODELS } from '../js/models.js';
 import { outline, picture } from '../js/thumbs.js';
 import { FINISHED } from '../js/finished.js';
@@ -265,3 +265,22 @@ function inside(poly, q) {
   }
   return c;
 }
+
+test('each step is labelled with the symbol for what it draws: Rotate its own, mixed folds both lines, every inside reverse fold a mountain', () => {
+  const steps = (id) => build(MODELS.find((m) => m.id === id)).steps;
+  const crane = steps('crane'), frog = steps('frog');
+  assert.equal(symbol(steps('plane')[4]), 'rotate');
+  assert.equal(symbol(frog[24]), 'rotate');
+  assert.equal(symbol(steps('fortune-teller')[3]), 'turnOver');
+  assert.equal(symbol(crane[8]), 'unfold');
+  assert.equal(symbol(crane[5]), 'both', 'a collapse');
+  assert.equal(symbol(crane[9]), 'both', 'a petal fold');
+  assert.equal(symbol(crane[21]), 'both', 'valley and mountain');
+  assert.equal(symbol(frog[6]), 'valley', 'a squash fold draws one valley line');
+  assert.equal(symbol(steps('cup')[4]), 'mountain');
+  for (const model of MODELS) {
+    for (const [i, step] of build(model).steps.entries()) {
+      if (/inside reverse/i.test(step.name)) assert.equal(symbol(step), 'mountain', `${model.id} step ${i + 1}`);
+    }
+  }
+});

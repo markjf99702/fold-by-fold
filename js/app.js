@@ -2,7 +2,7 @@
 
 import { MODELS } from './models.js';
 import { build } from './build.js';
-import { poses, marks } from './motion.js';
+import { poses, marks, symbol } from './motion.js';
 import { View } from './render.js';
 import { picture } from './thumbs.js';
 import { FINISHED } from './finished.js';
@@ -275,22 +275,16 @@ function paint() {
   dirty = true;
 }
 
+// The step's symbol beside its name, drawn as the key under the gallery draws it.
 const CHIP = {
   valley: '<svg viewBox="0 0 34 12"><path d="M1 6H33" stroke-dasharray="5 3.5"/></svg>',
   mountain: '<svg viewBox="0 0 34 12"><path d="M1 6H33" stroke-dasharray="5 2.5 .5 2.5"/></svg>',
-  turn: '<svg viewBox="0 0 34 12"><path d="M5 9C5 2 29 2 29 9"/><path d="M25 6l4 3 3-4"/></svg>',
   both: '<svg viewBox="0 0 34 12"><path d="M1 3H33" stroke-dasharray="5 3.5"/><path d="M1 9H33" stroke-dasharray="5 2.5 .5 2.5"/></svg>',
+  turnOver: '<svg viewBox="0 0 34 12"><path d="M5 9C5 2 29 2 29 9"/><path d="M25 6l4 3 3-4"/></svg>',
+  rotate: '<svg viewBox="0 0 34 12"><path d="M20.7 2.9A4.8 4.8 0 1 0 21.5 7.6"/><path d="M23.1 9.7L22 6.1l-3.1 2.1"/></svg>',
+  unfold: '<svg viewBox="0 0 34 12"><path d="M6 10C6 3 22 2 24 6.5"/><path class="hollow" d="M20.4 6.6l5.2 3.3.3-6.1z"/></svg>',
 };
-function chipFor(step) {
-  const m = step.motion;
-  const type = m.type || (m.parts && m.parts[0].type);
-  let icon = CHIP.valley;
-  if (type === 'mountain') icon = CHIP.mountain;
-  if (m.kind === 'turnOver' || m.kind === 'turn') icon = CHIP.turn;
-  if (m.kind === 'reverse') icon = CHIP.mountain;
-  if (m.kind === 'mech') icon = CHIP.both;
-  return `${icon}<span>${step.name}</span>`;
-}
+const chipFor = (step) => `${CHIP[symbol(step)]}<span>${step.name}</span>`;
 
 // ---------- Drawing and the camera ----------
 
