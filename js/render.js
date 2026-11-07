@@ -380,12 +380,15 @@ export class View {
   }
 
   // Fold lines on the paper, each with a curved arrow over it.
+  // All the lines first, so no line's halo cuts across another fold's arrow.
   drawMarks(vp, eye) {
-    for (const m of this.marks) this.drawMark(m, vp, eye);
+    const ink = [0.09, 0.11, 0.16, 1], halo = [1, 1, 1, 0.92];
+    for (const m of this.marks) if (m.line) this.drawLine(m, ink, halo, vp);
+    for (const m of this.marks) this.drawMark(m, vp, eye, ink, halo);
   }
 
-  drawMark(m, vp, eye) {
-    const ink = [0.09, 0.11, 0.16, 1], halo = [1, 1, 1, 0.92];
+  // A mark's arrow, or a symbol beside the model.
+  drawMark(m, vp, eye, ink, halo) {
     if (m.path) {
       // A symbol lying flat on the table beside the model.
       const flat = (q, t) => v3.norm(v3.cross([0, 0, 1], t));
@@ -393,7 +396,16 @@ export class View {
       this.drawFlat(this.buf.marks, ribbon(m.path, flat, m.arrow, halo, ink, false), vp, 0, this.markAlpha);
       return;
     }
-    // The line: a flat strip lying on the paper.
+    // The arrow: an arc from the moving part over the fold, facing the camera.
+    if (!m.arrow) return;
+    const arc = arrowPath(m.arrow);
+    const facing = (q, t) => v3.norm(v3.cross(t, v3.norm(v3.sub(eye, q))));
+    this.drawFlat(this.buf.marks, ribbon(arc, facing, m.arrow, halo, ink, true), vp, 0, this.markAlpha);
+    this.drawFlat(this.buf.marks, ribbon(arc, facing, m.arrow, halo, ink, false), vp, 0, this.markAlpha);
+  }
+
+  // A fold line: a flat strip lying on the paper, dashed for a valley fold and dash-dotted for a mountain fold.
+  drawLine(m, ink, halo, vp) {
     const [a, b] = m.line;
     const dir = v3.norm(v3.sub(b, a));
     const side = v3.cross([0, 0, 1], dir);
@@ -410,12 +422,6 @@ export class View {
       this.drawFlat(this.buf.marks, lineData(0.0075, halo), vp, dash, this.markAlpha);
       this.drawFlat(this.buf.marks, lineData(0.0042, ink), vp, dash, this.markAlpha);
     }
-    // The arrow: an arc from the moving part over the fold, facing the camera.
-    if (!m.arrow) return;
-    const arc = arrowPath(m.arrow);
-    const facing = (q, t) => v3.norm(v3.cross(t, v3.norm(v3.sub(eye, q))));
-    this.drawFlat(this.buf.marks, ribbon(arc, facing, m.arrow, halo, ink, true), vp, 0, this.markAlpha);
-    this.drawFlat(this.buf.marks, ribbon(arc, facing, m.arrow, halo, ink, false), vp, 0, this.markAlpha);
   }
 
   drawFlat(buffer, data, vp, dash, alpha) {

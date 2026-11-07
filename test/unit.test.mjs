@@ -203,7 +203,7 @@ test('crane: each reverse-folded point ends up between the front and back of the
 function markOn(step, a, b) {
   const p = step.from.at(a), q = step.from.at(b);
   const on = (m, x, y) => closePt(m.line[0].slice(0, 2), x, 1e-9) && closePt(m.line[1].slice(0, 2), y, 1e-9);
-  return (marks(step) || []).find((m) => on(m, p, q) || on(m, q, p));
+  return (marks(step) || []).find((m) => m.line && (on(m, p, q) || on(m, q, p)));
 }
 
 test('a collapse is marked as it is seen from above, white side up, so the creases made as valleys show as valleys', () => {
@@ -226,7 +226,7 @@ test('a collapse is marked as it is seen from above, white side up, so the creas
 
 test('each arrow has the head a diagram gives it: solid for a valley fold, hollow on one side for a mountain fold, hollow on both to unfold', () => {
   const steps = (id) => build(MODELS.find((m) => m.id === id)).steps;
-  const arrows = (step) => (marks(step) || []).filter((m) => m.arrow && m.line).map((m) => m.arrow);
+  const arrows = (step) => (marks(step) || []).filter((m) => m.arrow && !m.path).map((m) => m.arrow);
   const heads = (step) => arrows(step).map((a) => `${a.head}${a.back ? '+back' : ''}`);
   const cup = steps('cup'), crane = steps('crane'), wb = steps('waterbomb'), bird = steps('flapping-bird');
   assert.deepEqual(heads(cup[0]), ['valley']);
@@ -319,4 +319,27 @@ test('turning the model over or around draws its symbol on the table just in fro
     }
   }
   assert.equal(n, 18, 'sixteen steps turn a model over and two turn it around');
+});
+
+test('folds made together along one line share the line, and their arrows sit side by side', () => {
+  const steps = (id) => build(MODELS.find((m) => m.id === id)).steps;
+  const crane = steps('crane'), frog = steps('frog');
+  // Both wings at once: one valley line, the front wing's valley arrow and the back wing's mountain arrow apart.
+  for (const step of [crane[21], crane[22], frog[25], steps('flapping-bird')[18], steps('plane')[7]]) {
+    const m = marks(step);
+    assert.deepEqual(m.map((k) => [k.type, !!k.line]), [['valley', true], ['mountain', false]], step.say);
+    const along = (q) => (q[0] - m[0].line[0][0]) * (m[0].line[1][0] - m[0].line[0][0]) + (q[1] - m[0].line[0][1]) * (m[0].line[1][1] - m[0].line[0][1]);
+    assert.ok(Math.abs(along(m[0].arrow.from) - along(m[1].arrow.from)) > 0.02, `${step.say}: the arrows lie on top of each other`);
+  }
+  // Two layers turned together the same way: one line, one arrow.
+  for (const step of [frog[19], frog[22]]) assert.equal(marks(step).length, 1, step.say);
+  // Corners folded to the middle: the lines meet at their ends rather than crossing.
+  const ft = marks(steps('fortune-teller')[2]);
+  assert.equal(ft.length, 4);
+  for (const m of ft) {
+    for (const q of m.line) {
+      const meets = ft.filter((o) => o !== m && o.line.some((e) => closePt(e.slice(0, 2), q.slice(0, 2), 1e-9))).length;
+      assert.equal(meets, 1, 'a line runs on past the end of the next one');
+    }
+  }
 });
