@@ -70,6 +70,11 @@ await page.keyboard.press('ArrowLeft');
 assert.equal(await focused(), 'Indigo');
 assert.equal(await page.getAttribute('.swatch[aria-label="Indigo"]', 'aria-checked'), 'true');
 assert.equal(await page.locator('.swatch[tabindex="0"]').count(), 1, 'Tab should stop only at the chosen colour');
+// A swatch tapped with a finger doesn't stay tilted, the way it leans under a mouse.
+await page.tap('.swatch[aria-label="Violet"]');
+await page.waitForTimeout(300);
+assert.equal(await page.evaluate(() => getComputedStyle(document.querySelector('.swatch[aria-label="Violet"]')).transform), 'matrix(1, 0, 0, 1, 0, 0)', 'a tapped swatch stays tilted');
+await page.click('.swatch[aria-label="Indigo"]');
 
 // The cup opens on its first step.
 await page.click('.model:has(h3:text("Paper cup"))');

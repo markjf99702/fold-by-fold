@@ -534,6 +534,8 @@ document.addEventListener('keydown', (e) => {
   } else if (e.key === 'ArrowLeft' && !onSlider) go(P.i - 1);
 });
 window.addEventListener('hashchange', route);
+// Safari on an iPhone shows a button as pressed (:active) under a finger only once the page listens for touches.
+document.addEventListener('touchstart', () => {}, { passive: true });
 window.addEventListener('resize', () => { dirty = true; });
 
 // A hook for the tests and screenshot scripts.

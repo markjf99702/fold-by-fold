@@ -28,6 +28,7 @@
   --accent: #b8381f;
   --accent-ink: #fff8f0;
   --chip: rgba(35, 32, 27, .07);
+  --press: rgba(35, 32, 27, .15);
   --mat: #2f5a4e;
   --display: 'Shippori Mincho B1', 'Hiragino Mincho ProN', 'Yu Mincho', Georgia, serif;
   --ui: 'Zen Kaku Gothic New', 'Hiragino Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
@@ -45,6 +46,7 @@
     --accent: #e06a45;
     --accent-ink: #1b0d07;
     --chip: rgba(236, 230, 218, .08);
+    --press: rgba(236, 230, 218, .17);
     --mat: #264a40;
   }
 }
@@ -59,6 +61,7 @@
   --accent: #e06a45;
   --accent-ink: #1b0d07;
   --chip: rgba(236, 230, 218, .08);
+  --press: rgba(236, 230, 218, .17);
   --mat: #264a40;
 }
 
@@ -85,6 +88,7 @@ h1, h2, h3 { text-wrap: balance; }
   appearance: none; border: 0; background: var(--chip); width: 44px; height: 44px; border-radius: 50%;
   display: grid; place-items: center; cursor: pointer; flex: none;
 }
+.icon-btn:active { background: var(--press); }
 .icon-btn svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 
 /* ---------- Home ---------- */
@@ -128,7 +132,8 @@ h1 {
    ticks and the footer links. */
 .swatch::after { content: ''; position: absolute; inset: -4px; }
 .swatch[aria-checked="true"] { box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--ink); }
-.swatch:hover { transform: rotate(-4deg); }
+/* Only where there's a pointer to hover with: on a phone a tapped swatch or card would stay tilted or lifted. */
+@media (hover: hover) { .swatch:hover { transform: rotate(-4deg); } }
 
 .models {
   list-style: none; margin: 0; padding: 0;
@@ -144,7 +149,8 @@ h1 {
   box-shadow: 0 1px 0 var(--line), 0 6px 18px rgba(40, 30, 15, .07);
   transition: transform .15s;
 }
-.model:hover { transform: translateY(-2px); }
+@media (hover: hover) { .model:hover { transform: translateY(-2px); } }
+.model:active { transform: scale(.98); }
 .model .thumb {
   aspect-ratio: 1; border-radius: 9px; background: var(--mat); display: grid; place-items: center; overflow: hidden;
 }
@@ -265,12 +271,15 @@ h1 {
 }
 .ctl svg { width: 22px; height: 22px; fill: currentColor; stroke: currentColor; stroke-width: 1.5; stroke-linejoin: round; }
 .ctl.main { background: var(--accent); color: var(--accent-ink); min-width: 150px; font-size: 1.02rem; }
+.ctl:not(:disabled):active { background: var(--press); }
+.ctl.main:not(:disabled):active { background: color-mix(in srgb, var(--accent) 82%, #000); }
 .ctl:disabled { opacity: .35; cursor: default; }
 .speed {
   appearance: none; border: 1.5px solid var(--line); background: none; border-radius: 99px; height: 36px; padding: 0 12px;
   font-size: .85rem; font-weight: 700; cursor: pointer; color: var(--muted); position: relative;
 }
 .speed::before { content: ''; position: absolute; inset: -5.5px -4px; }
+.speed:active { background: var(--chip); }
 .speed[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
 /* Narrow phones, and the panel beside the paper on a phone held sideways (further down): the buttons draw in a
    little so the row fits, and Play keeps one width for every label. */
