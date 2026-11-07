@@ -258,12 +258,12 @@ function paint() {
   $('stepCount').textContent = `Step ${P.i + 1} of ${n}`;
   $('chip').innerHTML = chipFor(step);
   $('say').textContent = step.say;
+  paintControls();
   if (step !== shown) {
     shown = step;
     words.scrollTop = 0; // a new step's words start at the top
     fadeWords();
   }
-  $('prev').disabled = P.i === 0 && P.t === 0;
   $('next').disabled = P.i === n - 1;
   const last = P.i === n - 1;
   let label = 'Play', icon = '<path d="M7 4.5v15l12.5-7.5z"/>';
@@ -287,6 +287,15 @@ function paint() {
     if (k === P.i) { b.setAttribute('aria-current', 'step'); b.scrollIntoView({ block: 'nearest' }); } else b.removeAttribute('aria-current');
   });
   dirty = true;
+}
+
+// The back button takes a fold that has moved back to its start, and otherwise goes to the step before. Kept up to
+// date as a fold plays, too: on step 1 it comes on as soon as the paper moves.
+function paintControls() {
+  const prev = $('prev');
+  prev.disabled = P.i === 0 && P.t === 0;
+  const label = P.t > 0.02 ? 'Replay this fold' : 'Previous step';
+  if (prev.title !== label) { prev.title = label; prev.setAttribute('aria-label', label); }
 }
 
 // Words that run past their box on a short screen fade out at the bottom until they're scrolled to the end.
@@ -341,7 +350,7 @@ function loop(now) {
     } else {
       P.t = Math.min(1, P.t0 + (now - P.clock) / duration(step));
       $('scrub').value = Math.round(P.t * 1000);
-      if (P.t >= 1) { P.playing = false; paint(); }
+      if (P.t >= 1) { P.playing = false; paint(); } else paintControls();
     }
     dirty = true;
   }

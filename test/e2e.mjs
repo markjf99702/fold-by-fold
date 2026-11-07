@@ -114,6 +114,9 @@ await page.evaluate(() => fold.set(0, 0));
 // Play folds step 1, then offers the next fold, which plays step 2.
 await page.click('#play');
 assert.equal(await page.textContent('#playLabel'), 'Pause');
+// Once the paper moves, the back button takes the fold back to its start, even on step 1.
+await page.waitForFunction(() => fold.state.t > 0.3, null, { timeout: 10000 });
+assert.deepEqual(await page.evaluate(() => { const b = document.getElementById('prev'); return [b.disabled, b.getAttribute('aria-label')]; }), [false, 'Replay this fold'], 'the back button is off while step 1 plays');
 await page.waitForFunction(() => fold.state.t >= 1, null, { timeout: 10000 });
 assert.equal(await page.textContent('#playLabel'), 'Next fold');
 await page.click('#play');
