@@ -199,6 +199,31 @@ test('crane: each reverse-folded point ends up between the front and back of the
   }
 });
 
+// The mark drawn along the crease between paper points a and b, as the paper lies before the step.
+function markOn(step, a, b) {
+  const p = step.from.at(a), q = step.from.at(b);
+  const on = (m, x, y) => closePt(m.line[0].slice(0, 2), x, 1e-9) && closePt(m.line[1].slice(0, 2), y, 1e-9);
+  return (marks(step) || []).find((m) => on(m, p, q) || on(m, q, p));
+}
+
+test('a collapse is marked as it is seen from above, white side up, so the creases made as valleys show as valleys', () => {
+  const K1 = [0, 0], K2 = [1, 0], K3 = [1, 1], K4 = [0, 1], C = [0.5, 0.5];
+  const M12 = [0.5, 0], M23 = [1, 0.5], M34 = [0.5, 1], M41 = [0, 0.5];
+  const crane = build(MODELS.find((m) => m.id === 'crane')).steps;
+  // Steps 4 and 5 fold the book folds as valleys on the white side; steps 1 and 2 the diagonals on the colored side.
+  for (const q of [M12, M23, M34, M41]) assert.equal(markOn(crane[5], C, q)?.type, 'valley', `crane step 6: C to ${q}`);
+  for (const q of [K2, K4]) assert.equal(markOn(crane[5], C, q)?.type, 'mountain', `crane step 6: C to ${q}`);
+  // The waterbomb is the other way about: diagonals made as valleys, the middle as a mountain (steps 1 to 3).
+  const wb = build(MODELS.find((m) => m.id === 'waterbomb')).steps;
+  for (const q of [K1, K2, K3, K4]) assert.equal(markOn(wb[3], C, q)?.type, 'valley', `waterbomb step 4: C to ${q}`);
+  for (const q of [M41, M23]) assert.equal(markOn(wb[3], C, q)?.type, 'mountain', `waterbomb step 4: C to ${q}`);
+  // A petal fold lies colored side up, so its marks are as written: the valley across, mountains up the sides.
+  const P23 = [1 - (Math.SQRT2 - 1) / 2, 0.5], P34 = [0.5, 1 - (Math.SQRT2 - 1) / 2];
+  assert.equal(markOn(crane[9], P23, P34)?.type, 'valley');
+  assert.equal(markOn(crane[9], K3, P23)?.type, 'mountain');
+  assert.equal(markOn(crane[9], K3, P34)?.type, 'mountain');
+});
+
 function inside(poly, q) {
   let c = false;
   for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {

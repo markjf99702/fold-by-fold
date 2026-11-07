@@ -309,7 +309,11 @@ function mechMarks(step) {
   for (const s of motion.specs) {
     if (s.mark === false || (s.fold !== 'valley' && s.fold !== 'mountain')) continue;
     const a = from.at(s.a), b = from.at(s.b);
-    out.push({ type: s.fold, line: [[a[0], a[1], z], [b[0], b[1], z]] });
+    // A crease is named as seen from the colored side (mech.js), but a diagram draws what you see from
+    // above: where the paper lies white side up, as it does in every collapse, a valley shows as a mountain.
+    const up = det(from.facetAt([(s.a[0] + s.b[0]) / 2, (s.a[1] + s.b[1]) / 2]).m) > 0;
+    const type = up ? s.fold : s.fold === 'valley' ? 'mountain' : 'valley';
+    out.push({ type, line: [[a[0], a[1], z], [b[0], b[1], z]] });
   }
   if (motion.arrow && out.length) {
     const p = from.at(motion.arrow), q = to.at(motion.arrow);
