@@ -208,17 +208,25 @@ function go(i, { play = false, snap = false } = {}) {
   prefs.progress[P.id] = P.i;
   save();
   if (play) start();
-  else if (!P.b.steps[P.i].view) aimFor(P.b.steps[P.i]);
+  else keepAim();
   paint();
   frameCamera(snap);
 }
 
-// Some steps look best from a particular angle (a finished plane from the side, say).
+// Some steps look best from a particular angle once they move (a finished plane from the side, say), however the
+// fold gets going: Play, or the slider. Before that the paper still lies flat, so the usual view is the right one,
+// and a step's angle never carries over into another step or model. The camera turns only when the step changes
+// or its fold first moves, never while the slider is being dragged on from there.
 let aimedFor = null;
 function aimFor(step) {
   if (!view) return;
   if (step.view) { view.aim(step.view.yaw, step.view.pitch); aimedFor = step; frameCamera(false); }
   else if (aimedFor) { view.aim(-90, 58); aimedFor = null; frameCamera(false); }
+}
+function keepAim() {
+  const step = P.b.steps[P.i];
+  if (aimedFor && aimedFor !== step) { view.aim(-90, 58); aimedFor = null; }
+  if (P.t > 0 && step.view && aimedFor !== step) aimFor(step);
 }
 
 function start() {
@@ -350,6 +358,7 @@ function wireCamera() {
     const [x, y] = pts.get(e.pointerId);
     pts.set(e.pointerId, [e.clientX, e.clientY]);
     if (pts.size === 1) {
+      view.goal.yaw = view.goal.pitch = null; // a drag takes over from a turn on its way
       view.cam.yaw -= (e.clientX - x) * 0.35;
       view.cam.pitch = Math.max(-80, Math.min(89.9, view.cam.pitch + (e.clientY - y) * 0.3));
       hideHint();
@@ -371,10 +380,13 @@ function wireCamera() {
   }
 }
 
+// Back to the usual view, or to the step's own once its fold has moved.
 function resetView() {
   if (!view) return;
-  view.aim(-90, 58);
+  const step = P.b.steps[P.i];
   view.zoom = 1;
+  if (step.view && P.t > 0) aimFor(step);
+  else { view.aim(-90, 58); if (aimedFor) { aimedFor = null; frameCamera(false); } }
   dirty = true;
 }
 
@@ -436,6 +448,7 @@ $('speed').addEventListener('click', () => {
 $('scrub').addEventListener('input', (e) => {
   P.t = e.target.value / 1000;
   P.playing = false;
+  keepAim();
   paint();
 });
 $('ticks').addEventListener('pointerdown', (e) => {
@@ -478,7 +491,7 @@ window.addEventListener('resize', () => { dirty = true; });
 // A hook for the tests and screenshot scripts.
 window.fold = {
   get state() { return { id: P.id, i: P.i, t: P.t, playing: P.playing, steps: P.b ? P.b.steps.length : 0 }; },
-  set(i, t) { P.i = i; P.t = t; P.playing = false; paint(); frameCamera(true); },
+  set(i, t) { P.i = i; P.t = t; P.playing = false; keepAim(); paint(); frameCamera(true); },
   view: () => view,
   get built() { return [...builtCache.keys()]; }, // the models folded so far
 };

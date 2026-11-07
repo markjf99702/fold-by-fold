@@ -252,6 +252,26 @@ async function fresh(hash = '', { init, arg, ...opts } = {}) {
   await p.context().close();
 }
 
+// A step that stands the model up is seen from its own angle once its fold moves, by the slider as much as by Play.
+// The angle stays with that step: the next model opens seen from above, as usual.
+{
+  const p = await fresh('#crane-23', { viewport: { width: 1280, height: 800 }, deviceScaleFactor: 1, hasTouch: false });
+  await p.waitForFunction(() => fold.state.id === 'crane');
+  const cam = () => p.evaluate(() => { const v = fold.view(); return [Math.round(v.cam.yaw), Math.round(v.cam.pitch), v.goal.target[2]]; });
+  await p.locator('#scrub').evaluate((el) => { el.value = 1000; el.dispatchEvent(new Event('input', { bubbles: true })); });
+  await p.waitForFunction(() => Math.abs(fold.view().cam.pitch - 16) < 0.5, null, { timeout: 5000 }).catch(() => {});
+  assert.deepEqual(await cam(), [-120, 16, 0.22], 'the finished crane is not seen from its own angle after the slider');
+  await p.locator('#scrub').evaluate((el) => { el.value = 0; el.dispatchEvent(new Event('input', { bubbles: true })); });
+  await p.click('#play');
+  await p.waitForFunction(() => fold.state.t >= 1, null, { timeout: 20000 });
+  await p.click('#back');
+  await p.waitForSelector('#home:not([hidden])');
+  await p.evaluate(() => { location.hash = 'plane-8'; });
+  await p.waitForFunction(() => fold.state.id === 'plane');
+  assert.deepEqual(await cam(), [-90, 58, 0], 'the crane\'s angle carried over to the plane');
+  await p.context().close();
+}
+
 // The back arrow returns to the gallery the way the browser's Back would, so Back from the gallery leaves
 // instead of reopening the model. Opened straight from a link, it goes to the gallery without adding a page.
 {
