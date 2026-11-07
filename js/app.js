@@ -160,7 +160,10 @@ function openModel(id, i = null) {
   P.id = id;
   $('modelName').textContent = m.name;
   renderSteps();
-  go(i ?? Math.min(prefs.progress[id] || 0, P.b.steps.length - 1), { snap: true });
+  // A link's step becomes where you got to only in a model you haven't started. In one you have, your place stays
+  // until you move on from the link's step yourself.
+  const link = i !== null && prefs.progress[id] > 0;
+  go(i ?? Math.min(prefs.progress[id] || 0, P.b.steps.length - 1), { snap: true, keep: !link });
   document.title = `${m.name} · Fold by Fold`;
 }
 
@@ -202,12 +205,11 @@ function slideTo(x, first) {
   if ($('ticks').contains(document.activeElement)) ticks[i].firstChild.focus({ preventScroll: true });
 }
 
-function go(i, { play = false, snap = false } = {}) {
+function go(i, { play = false, snap = false, keep = true } = {}) {
   P.i = Math.max(0, Math.min(i, P.b.steps.length - 1));
   P.t = 0;
   P.playing = false;
-  prefs.progress[P.id] = P.i;
-  save();
+  if (keep) keepPlace();
   if (play) start();
   else keepAim();
   paint();
@@ -230,7 +232,15 @@ function keepAim() {
   if (P.t > 0 && step.view && aimedFor !== step) aimFor(step);
 }
 
+// Saves the step you're on as where you got to in this model.
+function keepPlace() {
+  if (prefs.progress[P.id] === P.i) return;
+  prefs.progress[P.id] = P.i;
+  save();
+}
+
 function start() {
+  keepPlace();
   if (P.t >= 1) P.t = 0;
   aimFor(P.b.steps[P.i]);
   P.playing = true;
@@ -472,6 +482,7 @@ $('speed').addEventListener('click', () => {
 $('scrub').addEventListener('input', (e) => {
   P.t = e.target.value / 1000;
   P.playing = false;
+  keepPlace();
   keepAim();
   paint();
 });

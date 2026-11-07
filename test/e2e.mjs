@@ -255,6 +255,24 @@ async function fresh(hash = '', { init, arg, ...opts } = {}) {
   await p.context().close();
 }
 
+// A link to a step in a model you've started shows that step without losing your place: that waits until you
+// fold on from there yourself.
+{
+  const p = await fresh('#crane-10', { init: () => { if (!sessionStorage.seeded) { sessionStorage.seeded = 1; localStorage.setItem('fold-by-fold.v1', '{"progress":{"crane":17}}'); } } });
+  await p.waitForFunction(() => fold.state.id === 'crane');
+  const saved = () => p.evaluate(() => JSON.parse(localStorage.getItem('fold-by-fold.v1')).progress.crane);
+  assert.equal(await p.evaluate(() => fold.state.i), 9, 'the link did not open its step');
+  assert.equal(await saved(), 17, 'a link to a step lost the place you had got to');
+  await p.reload();
+  await p.waitForFunction(() => fold.state.id === 'crane');
+  assert.equal(await p.evaluate(() => fold.state.i), 17, 'a reload after the link did not go back to your place');
+  await p.goto(base + '#crane-10');
+  await p.waitForFunction(() => fold.state.i === 9);
+  await p.click('#play');
+  assert.equal(await saved(), 9, 'playing the link\'s step did not make it your place');
+  await p.context().close();
+}
+
 // A step that stands the model up is seen from its own angle once its fold moves, by the slider as much as by Play.
 // The angle stays with that step: the next model opens seen from above, as usual.
 {
