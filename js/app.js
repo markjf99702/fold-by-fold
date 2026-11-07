@@ -131,12 +131,13 @@ function paintHome() {
 
 let view = null;
 const P = { b: null, id: null, i: 0, t: 0, playing: false, holding: false, clock: 0, t0: 0 };
-const HOLD = 850;
+const HOLD = 850; // how long the marks show on the paper before Play moves it
+const pace = () => (prefs.slow ? 2.2 : 1); // Slow gives the marks and the fold a little over twice as long
 
 function duration(step) {
   const k = step.motion.kind;
   const base = k === 'mech' ? 3400 : k === 'reverse' ? 2800 : k === 'foldUnfold' ? 2600 : k === 'turnOver' ? 1900 : k === 'turn' ? 1300 : 2100;
-  return base * (prefs.slow ? 2.2 : 1);
+  return base * pace();
 }
 
 function openModel(id, i = null) {
@@ -346,7 +347,7 @@ function loop(now) {
   const step = P.b.steps[P.i];
   if (P.playing) {
     if (P.holding) {
-      if (now - P.clock >= HOLD) { P.holding = false; P.clock = now; }
+      if (now - P.clock >= HOLD * pace()) { P.holding = false; P.clock = now; }
     } else {
       P.t = Math.min(1, P.t0 + (now - P.clock) / duration(step));
       $('scrub').value = Math.round(P.t * 1000);

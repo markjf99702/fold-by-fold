@@ -368,6 +368,21 @@ async function fresh(hash = '', { init, arg, ...opts } = {}) {
   await p.context().close();
 }
 
+// Slow gives the marks longer on the paper before a fold moves, as well as the fold itself.
+{
+  const p = await fresh('#cup');
+  await p.waitForFunction(() => fold.state.id === 'cup');
+  await p.click('#speed');
+  const held = await p.evaluate(() => new Promise((done) => {
+    document.getElementById('play').click();
+    const t0 = performance.now();
+    const tick = () => (fold.state.t > 0 ? done(performance.now() - t0) : requestAnimationFrame(tick));
+    requestAnimationFrame(tick);
+  }));
+  assert.ok(held > 850 * 2.2 - 50, `with Slow on, the marks show for only ${Math.round(held)} ms before the fold moves`);
+  await p.context().close();
+}
+
 // A damaged or hand-edited save can't break the player: whatever makes no sense is left out.
 for (const junk of ['{"progress":null}', '{"progress":"x"}', '{"progress":{"crane":4.5},"paper":"plaid","slow":"yes"}']) {
   const p = await fresh('#crane', { init: (v) => localStorage.setItem('fold-by-fold.v1', v), arg: junk });
