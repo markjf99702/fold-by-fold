@@ -259,7 +259,10 @@ export class View {
     const below = eye[2] < 0;
 
     gl.enable(gl.BLEND);
-    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+    // The canvas is clear where nothing is drawn, so the mat's far edge can fade into the page. A half-clear
+    // stroke over the mat (a shadow, an edge) mixes in its colour but leaves the canvas as solid as it was,
+    // or the page would show through it.
+    gl.blendFuncSeparate(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA, gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
 
     // The mat, and the paper's shadow on it. Seen from underneath, the mat is left out.
     if (!below) {

@@ -92,6 +92,23 @@ const steps = (await state()).steps;
 await page.evaluate((n) => fold.set(n - 1, 1), steps);
 const indigo = await pixels((r, g, b) => b > r + 40 && b > g + 20);
 assert.ok(indigo > 0.02, `hardly any indigo paper on screen (${(indigo * 100).toFixed(1)}%)`);
+// The shadow and the paper's edges are drawn on the mat, not through to the page: with the page magenta, none
+// of it shows anywhere but where the mat's far side fades out, at the top.
+{
+  const tag = await page.addStyleTag({ content: 'body, .player, .stage { background: #f0f !important; }' });
+  await page.waitForTimeout(200);
+  const img = UPNG.decode(await page.locator('#gl').screenshot());
+  const px = new Uint8Array(UPNG.toRGBA8(img)[0]);
+  let leaks = 0;
+  for (let y = Math.round(img.height * 0.3); y < img.height; y++) {
+    for (let x = 0; x < img.width; x++) {
+      const k = (y * img.width + x) * 4;
+      if (px[k] > px[k + 1] + 60 && px[k + 2] > px[k + 1] + 60) leaks++;
+    }
+  }
+  assert.equal(leaks, 0, `the page shows through the mat in ${leaks} pixels`);
+  await tag.evaluate((el) => el.remove());
+}
 await page.evaluate(() => fold.set(0, 0));
 
 // Play folds step 1, then offers the next fold, which plays step 2.
