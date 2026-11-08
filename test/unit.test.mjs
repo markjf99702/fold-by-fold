@@ -213,6 +213,67 @@ test('each step starts with the paper just where the last one left it, however t
   assert.deepEqual(jumps, []);
 });
 
+// Which way up the uppermost layer at (x, y) faces, seen from straight above (true for the front of the paper), or null
+// where there's no paper. Layers standing on edge are left out, and so are the strips bending across a crease.
+function topFace(items, x, y) {
+  let best = null;
+  for (const it of items) {
+    if (it.bridge) continue;
+    const n = [it.pose.r[2], it.pose.r[5], it.pose.r[8]];
+    if (Math.abs(n[2]) < 0.05) continue;
+    const c = corners(it);
+    let inside = false;
+    for (let i = 0, j = c.length - 1; i < c.length; j = i++) {
+      const [xi, yi] = c[i], [xj, yj] = c[j];
+      if ((yi > y) !== (yj > y) && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) inside = !inside;
+    }
+    if (!inside) continue;
+    const z = c[0][2] - (n[0] * (x - c[0][0]) + n[1] * (y - c[0][1])) / n[2];
+    if (!best || z > best.z) best = { z, up: n[2] > 0 };
+  }
+  return best && best.up;
+}
+
+// The share of the paper, seen from above at moment a of a step, that shows the other side or none at moment b: on a
+// 24 x 24 grid over the paper as the step starts, a little off the middle of each square so no ray runs along a fold.
+function recoloured(step, a, b) {
+  const box = step.from.bounds(), A = poses(step, a), B = poses(step, b);
+  let n = 0, changed = 0;
+  for (let j = 0; j < 24; j++) {
+    for (let i = 0; i < 24; i++) {
+      const x = box.x0 + (box.x1 - box.x0) * (i + 0.5 + 0.0731) / 24, y = box.y0 + (box.y1 - box.y0) * (j + 0.5 + 0.0379) / 24;
+      const was = topFace(A, x, y);
+      if (was === null) continue;
+      n++;
+      if (topFace(B, x, y) !== was) changed++;
+    }
+  }
+  return n ? changed / n : 0;
+}
+
+// A fold eases in and out: in its first tenth and its last, hardly anything moves, so hardly any of the paper seen from
+// above changes colour. (The frog's petal folds flashed white as Play began, and frog 21 again as it landed, from a
+// layer whose thickness ran ahead of its hinges and rose through the layer over it.) What's left stays under 2%: rays
+// that fall right by a crease, and a fold and unfold, which moves at twice the pace. Turning the model over changes
+// everything at once, and the flapping bird stands up in the first third of its step, keeping its own time.
+test('as a fold begins and as it lands, the paper seen from above keeps its colours', () => {
+  // The frog's squash folds still dip the front layer into the stack under it as they open (15-18% of the face turns
+  // white by a tenth of the way): that is the question put to Mark of paper passing through a thick stack mid-fold.
+  const thick = new Set(['frog 7', 'frog 9', 'frog 11', 'frog 14']);
+  const flashes = [];
+  for (const model of MODELS) {
+    for (const [i, step] of once(model).steps.entries()) {
+      const own = step.motion.roll?.schedule || step.motion.parts?.some((p) => p.schedule);
+      if (step.motion.kind === 'turnOver' || own || thick.has(`${model.id} ${i + 1}`)) continue;
+      for (const [a, b, when] of [[0, 0.1, 'begins'], [0.9, 1, 'lands']]) {
+        const share = recoloured(step, a, b);
+        if (share > 0.02) flashes.push(`${model.id} ${i + 1} as it ${when}: ${(share * 100).toFixed(1)}%`);
+      }
+    }
+  }
+  assert.deepEqual(flashes, []);
+});
+
 test('js/finished.js has a picture for every model and nothing else', () => {
   assert.deepEqual(Object.keys(FINISHED), MODELS.map((m) => m.id), 'run node tools/make-thumbs.mjs');
 });

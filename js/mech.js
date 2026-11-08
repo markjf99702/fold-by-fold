@@ -567,7 +567,9 @@ function run(from, known, plan, { root, samples, turnsPage = false }) {
     const lm = open.levels();
     liftMid = (id) => lm.get(id) * LAYER * Math.sign(midPose.get(id).r[8]);
   }
-  const lift = (id, u) => (!liftMid ? lift0(id) + (lift1(id) - lift0(id)) * u
+  // Otherwise the thickness keeps pace with the hinges, which ease in and out: blended straight in time, a layer
+  // bound higher up rose through the layer over it before the flap had lifted, and showed through it as Play began.
+  const lift = (id, u) => (!liftMid ? lift0(id) + (lift1(id) - lift0(id)) * ease(u)
     : u < 0.5 ? lift0(id) + (liftMid(id) - lift0(id)) * (u / 0.5) : liftMid(id) + (lift1(id) - liftMid(id)) * ((u - 0.5) / 0.5));
 
   const motion = {
