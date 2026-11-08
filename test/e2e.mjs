@@ -580,6 +580,33 @@ for (const [width, height, list] of [
   await p.context().close();
 }
 
+// Each model opens seen from the usual angle and zoom, not from where the last one was left: from underneath and zoomed
+// in, the paper airplane's first step ('white side up') showed only the back of the paper, filling the view.
+{
+  const p = await fresh('', { viewport: { width: 1280, height: 800 }, deviceScaleFactor: 1, hasTouch: false });
+  await p.click('.model:has(h3:text("Crane"))');
+  await p.waitForFunction(() => fold.state.id === 'crane');
+  const cam = () => p.evaluate(() => { const v = fold.view(); return [Math.round(v.cam.yaw), Math.round(v.cam.pitch), +v.zoom.toFixed(2)]; });
+  const box = await p.locator('#gl').boundingBox();
+  await p.mouse.move(box.x + 300, box.y + 620);
+  await p.mouse.down();
+  for (let k = 1; k <= 10; k++) await p.mouse.move(box.x + 300 + k * 12, box.y + 620 - k * 44);
+  await p.mouse.up();
+  for (let k = 0; k < 5; k++) await p.mouse.wheel(0, -175);
+  await p.waitForFunction(() => fold.view().zoom < 0.4, null, { timeout: 3000 }).catch(() => {});
+  assert.deepEqual(await cam(), [-132, -74, 0.35], 'the crane was not turned and zoomed');
+  await p.click('#back');
+  await p.waitForSelector('#home:not([hidden])');
+  await p.click('.model:has(h3:text("Paper airplane"))');
+  await p.waitForFunction(() => fold.state.id === 'plane');
+  assert.deepEqual(await cam(), [-90, 58, 1], 'the plane opened at the angle and zoom the crane was left at');
+  // Within a model the view holds from step to step.
+  await p.evaluate(() => { fold.view().cam.yaw = -60; });
+  await p.click('#next');
+  assert.equal((await cam())[0], -60, 'the view did not hold between steps');
+  await p.context().close();
+}
+
 // The back arrow returns to the gallery the way the browser's Back would, so Back from the gallery leaves
 // instead of reopening the model. Opened straight from a link, it goes to the gallery without adding a page.
 {

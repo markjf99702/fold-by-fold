@@ -171,7 +171,16 @@ function openModel(id, i = null, { landed = false } = {}) {
       for (const id of ['hint', 'topView', 'resetView']) $(id).hidden = true;
     }
   }
-  if (view) view.setPaper(paperColor(), BACK);
+  if (view) {
+    view.setPaper(paperColor(), BACK);
+    // Each model starts seen from the usual angle, not from wherever the last one was turned and zoomed to (from
+    // underneath, the first step of the next showed only the back of the paper). Within a model the view holds from
+    // step to step.
+    Object.assign(view.cam, { yaw: -90, pitch: 58 });
+    view.goal.yaw = view.goal.pitch = null;
+    view.zoom = 1;
+  }
+  aimedFor = null;
   P.b = built(id);
   P.id = id;
   $('modelName').textContent = m.name;
