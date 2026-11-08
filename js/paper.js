@@ -311,7 +311,7 @@ export function fold(sheet, L, opts = {}) {
     const problems = crossings(to);
     if (problems.length) throw new Error(`The flap can't tuck there: ${problems[0]}`);
   }
-  return result(from, to, { kind: 'fold', line: L, moving, sign: type === 'valley' ? 1 : -1, type });
+  return result(from, to, { kind: 'fold', line: L, moving, sign: type === 'valley' ? 1 : -1, type, tuck: typeof into === 'object' });
 }
 
 // Folds and unfolds again, leaving a crease.
@@ -370,6 +370,7 @@ export function together(sheet, makers) {
     : {
       line: r.motion.line, moving: r.motion.moving, sign: r.motion.sign, type: r.motion.type,
       angle: r.motion.kind === 'bend' ? r.motion.angle : 180, bend: r.motion.kind === 'bend', schedule: r.motion.schedule || null,
+      tuck: r.motion.tuck === true,
     }));
   // Folds made together turn at the same pace. Two that go the same way about different lines and land on each other
   // (a letter fold made as one step) would meet in the air, and one would pass through the other. Layers turned about

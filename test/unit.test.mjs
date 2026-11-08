@@ -341,8 +341,9 @@ function recoloured(step, a, b) {
 // that fall right by a crease, and a fold and unfold, which moves at twice the pace. Turning the model over changes
 // everything at once, and the flapping bird stands up in the first third of its step, keeping its own time.
 test('as a fold begins and as it lands, the paper seen from above keeps its colours', () => {
-  // The frog's squash folds still dip the front layer into the stack under it as they open (15-18% of the face turns
-  // white by a tenth of the way): that is the question put to Mark of paper passing through a thick stack mid-fold.
+  // In the frog's squash folds the back layer of the flap lifts ahead of the front one and shows through it as they open
+  // (31-45% of the face turns white by a tenth of the way). Of the paper passing through paper mid-fold, Mark had the
+  // waterbomb's tucks mended and the squash and petal folds left as they are.
   const thick = new Set(['frog 7', 'frog 9', 'frog 11', 'frog 14']);
   const flashes = [];
   for (const model of MODELS) {
@@ -850,6 +851,25 @@ test('random folds move smoothly, with no layer passing through another on the w
   assert.deepEqual(problems, []);
 });
 
+// A point tucked into a pocket turns over about the pocket's mouth and goes in under the layers over it, which rise to make
+// room and settle again. The waterbomb's points passed through the side triangles on their way in.
+test('a point tucked into a pocket goes in without passing through the layers over it', () => {
+  let tucks = 0;
+  const problems = [];
+  for (const model of MODELS) {
+    for (const [i, step] of once(model).steps.entries()) {
+      if (![step.motion, ...(step.motion.parts || [])].some((p) => p.tuck)) continue;
+      tucks++;
+      const x = passingThrough(step);
+      if (x) problems.push(`${model.id} step ${i + 1}: ${x}`);
+      // And they're back where the fold says once it lands, as every layer is.
+      for (const it of poses(step, 1)) assert.ok(close(corners(it)[0][2], step.to.levels().get(it.facet.id) * LAYER, 1e-9), `${model.id} step ${i + 1}`);
+    }
+  }
+  assert.ok(tucks >= 2, `only ${tucks} tucks`);
+  assert.deepEqual(problems, []);
+});
+
 // Where two layers pass through each other in the air, at moments a twentieth of the step apart: each one's edge
 // pierces the other more than 4 layers deep on both sides, along more than 0.02 of paper.
 function passingThrough(step) {
@@ -925,7 +945,7 @@ function segmentIn(p, q, poly) {
 // ---------- Flat moments in the middle of a step ----------
 test('wherever the paper lies flat partway through a step, it could be real paper', () => {
   // Halfway through the frog's leg reverse folds, where the page lies turned open, a fold passes through the layers
-  // under it: that is the question put to Mark of paper passing through a thick stack mid-fold.
+  // under it: paper passing through a thick stack mid-fold, which Mark had left as it is but for the waterbomb's tucks.
   const thick = new Set(['frog 27', 'frog 28', 'frog 30', 'frog 31']);
   const problems = [];
   let checked = 0;

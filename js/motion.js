@@ -124,7 +124,7 @@ export function poses(step, t) {
       const part = partOf.get(id);
       let pose;
       if (reversed.has(id)) pose = reversed.get(id);
-      else if (!part) pose = flatPose(f.m, zFrom(id) + (zTo(id) - zFrom(id)) * e);
+      else if (!part) pose = flatPose(f.m, zFrom(id) + (zTo(id) - zFrom(id)) * e + roomFor(step, id, t));
       else {
         const zs = zFrom(id), H = part.h;
         const L = part.line;
@@ -164,7 +164,7 @@ export function poses(step, t) {
       // folded behind them) and settle back as it opens.
       const z = motion.kind === 'foldUnfold'
         ? zFrom(id) + (zLand(id) - zFrom(id)) * through
-        : zFrom(id) + (zTo(id) - zFrom(id)) * e;
+        : zFrom(id) + (zTo(id) - zFrom(id)) * e + roomFor(step, id, t);
       out.push({ facet: f, pose: flatPose(f.m, z) });
       continue;
     }
@@ -174,6 +174,44 @@ export function poses(step, t) {
     out.push({ facet: f, pose });
   }
   return lifted(out);
+}
+
+// A point tucked into a pocket turns over about the pocket's mouth and goes in under the layers over the pocket. Stiff
+// paper can't slip under them as real paper does, and turning in, the point passed through them. So, the way the layers
+// that stay put make room for a flap folded behind them in a fold and unfold, the layers over the pocket rise to make
+// room: as high as the point is above its crease, and they settle as it goes in. They are the layers that stay put and
+// end up over the tucked paper, and whatever lies on them. Worked out once for each step: { id: [part, reach] }.
+const pockets = new WeakMap();
+function roomFor(step, id, t) {
+  const { motion } = step;
+  if (!pockets.has(motion)) pockets.set(motion, overPockets(step));
+  const it = pockets.get(motion).get(id);
+  if (!it) return 0;
+  const [part, reach] = it;
+  const k = part.schedule ? part.schedule(Math.min(1, Math.max(0, t))) : ease(Math.min(1, Math.max(0, t)));
+  return reach * Math.abs(Math.sin((part.angle ?? 180) * Math.PI / 180 * k));
+}
+function overPockets(step) {
+  const { from, to, motion } = step;
+  const out = new Map();
+  const parts = motion.kind === 'multi' ? motion.parts : [motion];
+  if (!parts.some((p) => p.tuck)) return out;
+  const moving = new Set(motion.moving || []);
+  const pos = new Map(to.order.map((id, k) => [id, k]));
+  for (const part of parts) {
+    if (!part.tuck) continue;
+    // How far the point reaches from its crease.
+    let reach = 0;
+    for (const id of part.moving) for (const q of from.world(id)) reach = Math.max(reach, Math.abs(side(part.line, q)));
+    const over = [];
+    for (const id of to.order) { // from the table up, so whatever lies on a layer over the pocket comes after it
+      if (moving.has(id) || out.has(id)) continue;
+      const under = [...part.moving, ...over];
+      if (under.some((u) => pos.get(u) < pos.get(id) && overlapArea(to.world(u), to.world(id)) > 1e-7)) over.push(id);
+    }
+    for (const id of over) out.set(id, [part, reach]);
+  }
+  return out;
 }
 
 // An inside reverse fold can't be made with stiff paper: real paper gives a little near the crease so the
