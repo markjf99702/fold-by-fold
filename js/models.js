@@ -143,6 +143,9 @@ const PIN_UP = 'mountain';
 // little out from its face; its top point folds behind DOG_TOP down, and its chin DOG_CHIN up.
 const EAR = 30, DOG_TOP = 0.1, DOG_CHIN = 0.16;
 
+// Where the paper hat's sheet folds in half, on the paper: its top corners fold in from the middle of the fold.
+const HAT_TOP = Math.SQRT2 / 2;
+
 // The jumping frog's index card: 3 by 5, so 1 wide and 5/3 tall. The top square collapses into a
 // waterbomb base around X, the middle of the square; the body below it is BODY tall.
 const CARD = 5 / 3, BODY = CARD - 1;
@@ -722,6 +725,46 @@ export const MODELS = [
         say: 'Fold the bottom point up behind too, between the ears. That’s the dog: draw on its eyes and nose.',
         // Both layers of the point, which are joined only at the top.
         do: (h) => h.mountain(h.level(h.at([1, 0])[1] + DOG_CHIN), { flap: [[0.03, 0.97], [0.97, 0.03]] }),
+      },
+    ],
+  },
+  {
+    // The traditional paper hat, as Origami-Instructions.com shows it: a sheet folded in half, its top corners folded in
+    // to the middle, and the strip under them folded up on each side for the brim.
+    id: 'hat',
+    name: 'Paper hat',
+    level: 'Easy',
+    blurb: 'The newspaper hat. Fold it from a big sheet of newspaper, open it, and wear it.',
+    paper: { kind: 'Printer paper', colorUp: false, size: [1, Math.SQRT2] },
+    steps: [
+      {
+        say: 'White side up, standing tall. Fold the top edge down to the bottom edge.',
+        do: (h) => h.valley(h.onto([0.5, Math.SQRT2], [0.5, 0]), { move: [0.5, Math.SQRT2] }),
+      },
+      {
+        say: 'Fold in half side to side, and unfold, to crease the middle.',
+        do: (h) => h.crease(h.onto([0, 0.3], [1, 0.3]), { move: [0, 0.3] }),
+      },
+      {
+        say: 'Fold the top corners down to the middle crease, so their edges meet along it.',
+        name: 'Valley folds',
+        do: (h) => h.together(
+          (k) => k.valley(k.through([0.5, HAT_TOP], [0, HAT_TOP - 0.5]), { move: [0, HAT_TOP] }),
+          (k) => k.valley(k.through([0.5, HAT_TOP], [1, HAT_TOP - 0.5]), { move: [1, HAT_TOP] }),
+        ),
+      },
+      {
+        say: 'Fold the front layer of the strip at the bottom up, over the bottom of the triangle. This is the brim.',
+        // The front layer is the top of the sheet, folded down in the first step.
+        do: (h) => h.valley(h.level(h.at([0.5, HAT_TOP - 0.5])[1]), { flap: [0.5, Math.SQRT2 - 0.05] }),
+      },
+      {
+        say: 'Turn it over from side to side.',
+        do: (h) => h.turnOver(),
+      },
+      {
+        say: 'Fold the strip on this side up the same way. That’s the hat: open it out from the bottom and put it on.',
+        do: (h) => h.valley(h.level(h.at([0.5, HAT_TOP - 0.5])[1]), { flap: [0.5, 0.05] }),
       },
     ],
   },

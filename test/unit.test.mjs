@@ -614,6 +614,23 @@ test('dog face: its ears hang out past the sides of its face, below its chin, an
   assert.ok(Math.max(...highest.map((q) => q[0])) - Math.min(...highest.map((q) => q[0])) > 0.1, 'the top of the head is not flat');
 });
 
+// The paper hat as Origami-Instructions.com shows it: a sheet folded in half, its top corners folded in to meet at the
+// middle in a triangle, and the strip under the triangle folded up on each side, one in front and one behind.
+test('paper hat: a triangle on top, with a brim folded up on each side, one in front and one behind', () => {
+  const hat = MODELS.find((m) => m.id === 'hat');
+  assert.ok(hat, 'there is no paper hat');
+  const b = once(hat), end = b.end;
+  const top = end.at([0.5, Math.SQRT2 / 2]), base = b.steps[2].to.at([0, Math.SQRT2 / 2 - 0.5]);
+  assert.ok(close(top[1], end.bounds().y1), 'the point of the triangle is not the top of the hat');
+  // The sheet's two short edges: each folded up over the bottom of the triangle, the same height.
+  const front = end.at([0.5, Math.SQRT2]), back = end.at([0.5, 0]);
+  assert.ok(close(front[1], back[1]) && front[1] > base[1] + 0.1, 'the brims are not both folded up');
+  const level = (q) => end.order.indexOf(end.facetAt(q).id);
+  const all = end.order.length;
+  assert.ok(Math.min(level([0.5, Math.SQRT2 - 0.01]), level([0.5, 0.01])) === 0 || Math.max(level([0.5, Math.SQRT2 - 0.01]), level([0.5, 0.01])) === all - 1, 'the brims are not outside, one in front and one behind');
+  assert.ok(close(end.bounds().x1 - end.bounds().x0, 1), 'the hat is not as wide as the sheet');
+});
+
 // The pinwheel as origami.me draws it: the windmill base, a flat hexagon as wide as the paper and half as tall, and then
 // its four points, the paper's corners, sticking out the four ways round the middle, a quarter turn apart.
 test('pinwheel: the windmill base folds flat, and its four points end a quarter turn apart round the middle', () => {
@@ -883,7 +900,7 @@ test('turning the model over or around draws its symbol on the table just in fro
       n++;
     }
   }
-  assert.equal(n, 23, 'twenty-one steps turn a model over and two turn it around');
+  assert.equal(n, 24, 'twenty-two steps turn a model over and two turn it around');
 });
 
 test('folds made together along one line share the line, and their arrows sit side by side', () => {
