@@ -209,6 +209,8 @@ function outline(m, i) {
   playButton('Play', PLAY);
   scrubAt(0);
   $('speed').setAttribute('aria-pressed', prefs.slow);
+  $('allModels').hidden = true; // whatever the model before ended on
+  $('next').hidden = $('speed').hidden = false;
   $('glWait').hidden = false;
   document.title = `${m.name} · Fold by Fold`;
 }
@@ -261,12 +263,12 @@ function ready(m, i, landed) {
     // Each model starts seen from the usual angle, not from wherever the last one was turned and zoomed to (from
     // underneath, the first step of the next showed only the back of the paper). Within a model the view holds from
     // step to step.
-    Object.assign(view.cam, { yaw: -90, pitch: 58 });
+    Object.assign(view.cam, USUAL);
     view.goal.yaw = view.goal.pitch = null;
     view.zoom = 1;
     view.pan = [0, 0];
   }
-  aimedFor = null;
+  aimedFor = aimedAt = null;
   P.b = built(id);
   P.id = id;
   $('modelName').textContent = m.name;
@@ -347,19 +349,28 @@ function go(i, { snap = false, keep = true } = {}) {
 // vanished (only the crane's shadow showed halfway through its first turn over). So as it starts, the camera turns 20
 // degrees to the front left, the side the light comes from, and the standing paper shows its lit face. At rest, every
 // step is seen straight on, square to the table, like the sheet in front of you.
+//
+// Once the last fold lands, the model is finished, and the camera eases round to see it at an angle, the way you'd hold
+// it up to look at it: from the step's own angle, for a model that stands up (where it's turned already), and otherwise
+// from 30 degrees round to the front left and lower down, so the layers show.
+const USUAL = { yaw: -90, pitch: 58 };
 const SIDEWAYS = 20;
-const angleOf = (step) => step.view || (edgeOn(step) ? { yaw: -90 - SIDEWAYS, pitch: 58 } : null);
-let aimedFor = null;
-function aimFor(step) {
+const ENDING = { yaw: -120, pitch: 34 };
+const angleOf = (step) => step.view || (edgeOn(step) ? { yaw: USUAL.yaw - SIDEWAYS, pitch: USUAL.pitch } : null);
+const finished = () => P.i === P.b.steps.length - 1 && P.t >= 1;
+// The angle for the step as it is now, or null for the usual one.
+const angleNow = (step) => (finished() && !step.view ? ENDING : P.t > 0 ? angleOf(step) : null);
+let aimedFor = null, aimedAt = null; // the step the camera is turned for, and the angle it's turned to
+function aimFor(step, own = angleOf(step)) {
   if (!view) return;
-  const own = angleOf(step);
-  if (own) { view.aim(own.yaw, own.pitch); aimedFor = step; frameCamera(false); }
-  else if (aimedFor) { view.aim(-90, 58); aimedFor = null; frameCamera(false); }
+  if (own) { view.aim(own.yaw, own.pitch); aimedFor = step; aimedAt = own; frameCamera(false); }
+  else if (aimedFor) { view.aim(USUAL.yaw, USUAL.pitch); aimedFor = aimedAt = null; frameCamera(false); }
 }
 function keepAim() {
   const step = P.b.steps[P.i];
-  if (aimedFor && aimedFor !== step) { view.aim(-90, 58); aimedFor = null; }
-  if (P.t > 0 && angleOf(step) && aimedFor !== step) aimFor(step);
+  if (aimedFor && aimedFor !== step) { view.aim(USUAL.yaw, USUAL.pitch); aimedFor = aimedAt = null; }
+  const own = angleNow(step);
+  if (own && (aimedFor !== step || (own === ENDING && aimedAt !== ENDING))) aimFor(step, own);
 }
 
 // Saves where you got to in this model. Folding a step makes it your place (Play, or the slider), and once its fold
@@ -415,7 +426,6 @@ function paint() {
   if (step !== shown) {
     shown = step;
     P.shownAt = performance.now(); // its marks fade in from now
-    $('stepCount').textContent = `Step ${P.i + 1} of ${n}`;
     $('chip').innerHTML = chipFor(step);
     $('say').textContent = step.say;
     tell();
@@ -444,6 +454,12 @@ function paint() {
   }
   const last = P.i === n - 1;
   unavailable($('next'), last);
+  // Once the last fold has landed, the model is finished: the bar says so, and the buttons offer to start again or go
+  // back to all the models. Next and Slow make way, having nothing more to do.
+  const end = finished();
+  const count = end ? `Finished · ${n} steps` : `Step ${P.i + 1} of ${n}`;
+  if ($('stepCount').textContent !== count) $('stepCount').textContent = count;
+  if ($('allModels').hidden === end) { $('allModels').hidden = !end; $('next').hidden = $('speed').hidden = end; }
   let label = 'Play', icon = PLAY;
   if (P.playing) { label = 'Pause'; icon = '<path d="M7 5h3.5v14H7zM13.5 5H17v14h-3.5z"/>'; }
   else if (P.t >= 1) {
@@ -672,14 +688,14 @@ function frameCamera(snap) {
   lastFramed = s;
   if (s.view) view.frame((x0 + x1) / 2, (y0 + y1) / 2, size, v?.lift || 0, { box });
   else if (close) {
-    const at = aimedFor === s ? angleOf(s) : { yaw: -90, pitch: 58 };
+    const at = aimedFor === s ? aimedAt : USUAL;
     view.frame(close.cx, close.cy, close.size, close.cz, { box, room: size, fit: { pts: close.pts, yaw: at.yaw, pitch: at.pitch } });
   } else {
     const pts = reachOf(s);
     let top = 0;
     for (let k = 2; k < pts.length; k += 3) top = Math.max(top, pts[k]);
     // Turned to the side for a fold that would stand edge-on, it fits the paper as seen from there.
-    const at = aimedFor === s ? angleOf(s) : { yaw: -90, pitch: 58 };
+    const at = aimedFor === s ? aimedAt : USUAL;
     view.frame((x0 + x1) / 2, (y0 + y1) / 2, size, top / 2, { box, fit: { pts, yaw: at.yaw, pitch: at.pitch } });
   }
   if (snap) view.settle(1);
@@ -699,7 +715,12 @@ function loop(now) {
     } else {
       P.t = Math.min(1, P.t0 + (now - P.clock) / duration(step));
       scrubAt(P.t);
-      if (P.t >= 1) { P.playing = false; keepPlace(placeNow()); paint(); } else paintControls();
+      if (P.t >= 1) {
+        P.playing = false;
+        keepPlace(placeNow());
+        if (finished()) { keepAim(); $('tell').textContent = `Finished. ${P.b.steps.length} steps.`; }
+        paint();
+      } else paintControls();
     }
     dirty = true;
     if (P.playing) more();
@@ -825,14 +846,16 @@ function wireCamera() {
   }
 }
 
-// Back to the usual view, or to the step's own once its fold has moved, unzoomed and with the model in the middle.
+// Back to the usual view, or to the step's own once its fold has moved (the finished model's, once the last has
+// landed), unzoomed and with the model in the middle.
 function resetView() {
   if (!view || P.waiting) return;
   const step = P.b.steps[P.i];
   view.zoom = 1;
   view.pan = [0, 0];
-  if (angleOf(step) && P.t > 0) aimFor(step);
-  else { view.aim(-90, 58); if (aimedFor) { aimedFor = null; frameCamera(false); } }
+  const own = angleNow(step);
+  if (own) aimFor(step, own);
+  else { view.aim(USUAL.yaw, USUAL.pitch); if (aimedFor) { aimedFor = aimedAt = null; frameCamera(false); } }
   redraw();
 }
 
@@ -956,6 +979,7 @@ $('toKey').addEventListener('click', () => {
   key.focus({ preventScroll: true });
 });
 $('play').addEventListener('click', primary);
+$('allModels').addEventListener('click', () => $('back').click());
 // The back button, and the ← key: a fold that has moved plays again from its start (Replay this fold), and one that
 // hasn't goes to the step before. On step 1 there's no step before, so a fold that has only just moved goes back to its
 // start.

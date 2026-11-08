@@ -248,7 +248,7 @@ for (const [width, height] of [[360, 780], [320, 568], [280, 653]]) {
   await page.setViewportSize({ width, height });
   await page.waitForTimeout(100);
   assert.equal(await sideways(), false, `the player scrolls sideways at ${width} px`);
-  const cut = await page.evaluate(() => ['#back', '#topView', '#resetView', '#prev', '#play', '#next', '#speed'].filter((q) => {
+  const cut = await page.evaluate(() => ['#back', '#topView', '#resetView', '#prev', '#play', '#next', '#allModels', '#speed'].filter((q) => {
     const r = document.querySelector(q).getBoundingClientRect();
     return r.left < 0 || r.right > innerWidth;
   }));
@@ -1117,6 +1117,38 @@ for (const reduce of [false, true]) {
   await p.waitForFunction(() => fold.state.t > 0, null, { timeout: 3000 });
   const waited = await p.evaluate((pressed) => performance.now() - pressed, pressed);
   assert.ok(waited < 600, `Play, with the marks up for a while, held the paper still for ${Math.round(waited)} ms`);
+  await p.context().close();
+}
+
+// When the last fold lands the model is finished: the bar says so, the last tick fills in, and the buttons offer to
+// start again or go back to all the models, Next and Slow making way. The camera eases round to see the model at an
+// angle, its own for a model that stands up, and a double tap comes back to it. Starting again puts it all back.
+{
+  const p = await fresh('#cup-5');
+  await p.waitForFunction(() => fold.state.id === 'cup');
+  const end = () => p.evaluate(() => [document.getElementById('stepCount').textContent, document.getElementById('playLabel').textContent,
+    ...['allModels', 'next', 'speed'].map((id) => document.getElementById(id).offsetParent !== null), document.querySelector('#ticks li:last-child button').classList.contains('done')]);
+  const aim = () => p.evaluate(() => { const v = fold.view(); return [Math.round(v.goal.yaw ?? v.cam.yaw), Math.round(v.goal.pitch ?? v.cam.pitch)]; });
+  assert.deepEqual(await end(), ['Step 5 of 5', 'Play', false, true, true, false]);
+  await p.click('#play');
+  await p.waitForFunction(() => fold.state.t >= 1, null, { timeout: 15000 });
+  assert.deepEqual(await end(), ['Finished · 5 steps', 'Start again', true, false, false, true], 'the finished cup does not say so, or offer to go back to all the models');
+  assert.deepEqual(await aim(), [-120, 34], 'the camera did not turn to see the finished cup at an angle');
+  assert.equal(await p.textContent('#tell'), 'Finished. 5 steps.', 'a screen reader is not told the cup is finished');
+  await p.evaluate(() => { const v = fold.view(); v.goal.yaw = v.goal.pitch = null; v.cam.yaw = -40; v.cam.pitch = 70; });
+  await p.click('#resetView');
+  assert.deepEqual(await aim(), [-120, 34], 'putting the view back did not come back to the finished cup\'s angle');
+  await p.click('#play');
+  assert.deepEqual(await end(), ['Step 1 of 5', 'Play', false, true, true, false], 'starting again left the cup finished');
+  assert.deepEqual(await aim(), [-90, 58], 'starting again left the camera turned');
+  // The crane stands up at the end, already seen from its own angle, and keeps it.
+  await p.evaluate(() => { location.hash = 'crane-23'; });
+  await p.waitForFunction(() => fold.state.id === 'crane');
+  await p.locator('#scrub').evaluate((el) => { el.value = 1000; el.dispatchEvent(new Event('input', { bubbles: true })); });
+  assert.equal(await p.textContent('#stepCount'), 'Finished · 23 steps');
+  assert.deepEqual(await aim(), [-120, 16], 'the finished crane is not seen from its own angle');
+  await p.click('#allModels');
+  await p.waitForSelector('#home:not([hidden])', { timeout: 3000 }).catch(() => assert.fail('All models did not go back to the gallery'));
   await p.context().close();
 }
 
