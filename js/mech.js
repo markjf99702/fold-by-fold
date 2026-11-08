@@ -314,10 +314,9 @@ function angleIn(sheet, j) {
 // is the finished state; otherwise it is worked out from where the hinges end up. turnsPage: the motion turns a
 // page over and back, lying open and flat halfway (see between()).
 function run(from, known, plan, { root, samples, turnsPage = false }) {
-  const levels = from.levels();
   // The hinges turn as if the paper had no thickness, so creases that meet at a point really do meet
   // there. Each layer's thickness is added back afterward, along its own face.
-  const lift0 = (id) => levels.get(id) * LAYER * (det(from.facets.get(id).m) > 0 ? 1 : -1);
+  const lift0 = (id) => from.levels().get(id) * LAYER * (det(from.facets.get(id).m) > 0 ? 1 : -1);
 
   // Hinges and rigid joins.
   const all = joins(from);

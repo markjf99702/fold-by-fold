@@ -21,6 +21,10 @@ export function build(model) {
       e.message = `${model.id} step ${i + 1}: ${e.message}`;
       throw e;
     }
+    // The step starts with the paper as the last one left it, however it cuts it (see Sheet.levels()), and one
+    // that leaves the paper as it was (a fold and unfold, a bend) ends that way too.
+    if (r.from !== sheet) { r.from.before = sheet; r.from._levels = null; }
+    if (r.to !== sheet && unchanged(r.from, r.to)) { r.to.before = sheet; r.to._levels = null; }
     steps.push({
       ...r, say: step.say, name: step.name || nameOf(r.motion), note: step.note || null, view: step.view || null,
       unfold: step.unfold === true, // it opens a fold made before, rather than making a new one
@@ -29,6 +33,10 @@ export function build(model) {
   }
   return { model, start, steps, end: sheet };
 }
+
+// Whether a step leaves every piece of the paper where it was.
+const unchanged = (a, b) => a.order.length === b.order.length
+  && a.order.every((id, k) => id === b.order[k] && a.facets.get(id).m === b.facets.get(id).m);
 
 function nameOf(m) {
   if (m.kind === 'fold') return m.type === 'valley' ? 'Valley fold' : 'Mountain fold';

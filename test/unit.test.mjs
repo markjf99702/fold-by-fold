@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { Sheet, fold, turnOver, together, creases, isFlipped } from '../js/paper.js';
 import { apply, area, bisector, side, centroid, overlapArea, line, ccw, inside as covers } from '../js/geom.js';
 import { build } from '../js/build.js';
-import { poses, marks, symbol, corners, LAYER } from '../js/motion.js';
+import { poses, marks, symbol, corners, transformPoint, LAYER } from '../js/motion.js';
 import { MODELS } from '../js/models.js';
 import { outline, picture } from '../js/thumbs.js';
 import { FINISHED } from '../js/finished.js';
@@ -188,6 +188,30 @@ function snaps(step) {
   });
   return out;
 }
+
+test('each step starts with the paper just where the last one left it, however the new step cuts it', () => {
+  const jumps = [];
+  for (const model of MODELS) {
+    const steps = once(model).steps;
+    for (let i = 0; i + 1 < steps.length; i++) {
+      if (steps[i].motion.kind === 'bend' || steps[i].motion.parts?.some((p) => p.bend)) continue; // it ends part way
+      const end = new Map(poses(steps[i], 1).filter((it) => !it.bridge).map((it) => [it.facet.id, it]));
+      let worst = 0;
+      for (const it of poses(steps[i + 1], 0)) {
+        if (it.bridge) continue;
+        // A few points of the paper: the middle of each piece, and just inside each of its corners.
+        const c = centroid(it.facet.poly);
+        for (const q of [c, ...it.facet.poly.map((p) => [p[0] + (c[0] - p[0]) * 0.02, p[1] + (c[1] - p[1]) * 0.02])]) {
+          const was = end.get(it.facet.id) || [...end.values()].find((e) => covers(e.facet.poly, q, 1e-9));
+          const a = transformPoint(was.pose, ...q), b = transformPoint(it.pose, ...q);
+          worst = Math.max(worst, Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]));
+        }
+      }
+      if (worst > 1e-6) jumps.push(`${model.id} ${i + 1} to ${i + 2}: ${(worst / LAYER).toFixed(1)} layers`);
+    }
+  }
+  assert.deepEqual(jumps, []);
+});
 
 test('js/finished.js has a picture for every model and nothing else', () => {
   assert.deepEqual(Object.keys(FINISHED), MODELS.map((m) => m.id), 'run node tools/make-thumbs.mjs');

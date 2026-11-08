@@ -13,13 +13,17 @@ import { crossings } from './check.js';
 
 let nextId = 1;
 const newId = () => nextId++;
-// Which pieces each cut facet became, for as long as the page runs.
+// Which pieces each cut facet became, and which facet each piece was cut from, for as long as the page runs.
 const cutInto = new Map();
+const cutFrom = new Map();
 
 export class Sheet {
   constructor(facets, order) {
     this.facets = facets; // Map id -> { id, poly: paper corners (ccw), m: iso paper -> table }
     this.order = order; // ids from the table up
+    // The state the paper was in before a step cut it, for the sheet a step starts from (see levels()). A
+    // clone leaves it behind, so the state a step folds to settles.
+    this.before = null;
     this._world = new Map();
     this._levels = null;
   }
@@ -88,14 +92,22 @@ export class Sheet {
   }
 
   // How many layers lie under each facet: a facet sits one layer above the highest facet below it that
-  // it overlaps.
+  // it overlaps. A facet that overlaps a stack anywhere sits that high all over, so as a step starts, the
+  // pieces it cuts that facet into, away from the stack, would drop to their own height at once. Instead
+  // every piece starts as high as the paper it was cut from lay (in `before`), and drops while the step plays.
   levels() {
     if (this._levels) return this._levels;
     const lv = new Map();
     const done = [];
+    const was = this.before && this.before.levels();
     for (const id of this.order) {
       const w = this.world(id);
       let l = 0;
+      if (was) {
+        let a = id;
+        while (!was.has(a) && cutFrom.has(a)) a = cutFrom.get(a);
+        l = was.get(a) ?? 0;
+      }
       for (const g of done) {
         if (lv.get(g) + 1 > l && overlapArea(w, this.world(g)) > 1e-7) l = lv.get(g) + 1;
       }
@@ -139,6 +151,8 @@ function splitFacet(sheet, id, L) {
   const lp = toPaper(clip(w, L, true)), rp = toPaper(clip(w, L, false));
   const lf = { id: newId(), poly: lp, m: f.m }, rf = { id: newId(), poly: rp, m: f.m };
   cutInto.set(id, [rf.id, lf.id]);
+  cutFrom.set(rf.id, id);
+  cutFrom.set(lf.id, id);
   sheet.facets.delete(id);
   sheet.facets.set(lf.id, lf);
   sheet.facets.set(rf.id, rf);
@@ -156,6 +170,8 @@ export function splitPaper(sheet, id, Lp) {
   const lf = { id: newId(), poly: ccw(clip(f.poly, Lp, true)), m: f.m };
   const rf = { id: newId(), poly: ccw(clip(f.poly, Lp, false)), m: f.m };
   cutInto.set(id, [rf.id, lf.id]);
+  cutFrom.set(rf.id, id);
+  cutFrom.set(lf.id, id);
   sheet.facets.delete(id);
   sheet.facets.set(lf.id, lf);
   sheet.facets.set(rf.id, rf);
