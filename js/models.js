@@ -1141,7 +1141,7 @@ export const MODELS = [
         do: (h) => h.together(...lilyEdges(FACE.K1, 'valley'), ...lilyEdges(FACE.K3, 'mountain')),
       },
       {
-        say: 'Stand it up on the closed end, the stem, so the petals are at the top. Fold the front petal down and out, across its widest part, and the back one down behind. With real paper, fold the two petals between them out to the sides too, and curl each one round a pencil. That’s the lily.',
+        say: 'Stand it up on its closed end, the stem. Fold the front petal down and out across its widest part, and the back one down behind. With real paper, open the other two petals the same way, and curl each one round a pencil. That’s the lily.',
         name: 'Shape',
         view: { yaw: -150, pitch: 12, size: 0.8, lift: 0.36 },
         do: (h) => {

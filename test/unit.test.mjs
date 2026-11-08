@@ -1335,3 +1335,10 @@ test('the README names the models there are, in the gallery\'s order, and how lo
   const lengths = MODELS.map((model) => model.steps.length);
   assert.deepEqual([shortest, longest], [say(Math.min(...lengths)), say(Math.max(...lengths))]);
 });
+
+// The browser tests try the words' box with the crane's step 19 as the longest words of any step: held sideways, zoomed
+// to 200% and on a tablet. A step with longer words would go untried there, as the lily's last step did.
+test('the crane\'s step 19 has the longest words of any step, which the browser tests lay out', () => {
+  const longest = MODELS.flatMap((m) => m.steps.map((st, i) => [st.say.length, `${m.id}-${i + 1}`])).reduce((a, b) => (b[0] > a[0] ? b : a));
+  assert.equal(longest[1], 'crane-19', `${longest[1]} has longer words than crane-19, which test/e2e.mjs lays out as the longest`);
+});
