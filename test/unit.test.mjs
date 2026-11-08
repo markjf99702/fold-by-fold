@@ -421,6 +421,29 @@ test('the gallery runs from Easy through Medium to Tricky, with the crane just b
   assert.deepEqual(['crane', 'flapping-bird', 'frog'].map((id) => MODELS[at(id)].level), ['Medium', 'Medium', 'Tricky']);
 });
 
+// A base is the standard shape many models start from. Its last step names it, for the list of steps and the bar of ticks,
+// and a model offers on step 1 to skip a base it folds the same way as another model, for someone who knows it already.
+test('a base is named at its last step, where its words say so, and a model offers to skip only a base it shares', () => {
+  const ends = (m) => m.steps.flatMap((st, i) => (st.base ? [[st.base, i]] : []));
+  for (const m of MODELS) {
+    m.steps.forEach((st, i) => {
+      const said = /this is the (\w+ base)/i.exec(st.say)?.[1];
+      assert.equal(st.base?.toLowerCase(), said?.toLowerCase(), `${m.id}'s step ${i + 1} names the ${said || 'no base'}, but is marked as the end of the ${st.base || 'none'}`);
+      assert.equal(once(m).steps[i].base, st.base || null, `${m.id}'s step ${i + 1} loses its base once folded`);
+    });
+    for (const base of m.skip || []) {
+      const end = ends(m).find(([b]) => b === base);
+      assert.ok(end, `${m.id} offers to skip the ${base.toLowerCase()}, which it doesn't fold`);
+      const same = MODELS.filter((o) => o !== m && m.steps.slice(0, end[1] + 1).every((st, k) => o.steps[k] === st));
+      assert.ok(same.length, `${m.id} offers to skip the ${base.toLowerCase()}, which no other model folds the same way`);
+    }
+  }
+  assert.deepEqual(Object.fromEntries(MODELS.filter((m) => m.skip).map((m) => [m.id, m.skip])),
+    { crane: ['Bird base'], 'flapping-bird': ['Bird base'], lily: ['Square base', 'Frog base'], frog: ['Square base', 'Frog base'] });
+  assert.deepEqual(MODELS.flatMap((m) => ends(m).map(([b, i]) => `${m.id} ${b} ${i + 1}`)).filter((e) => /^(crane|frog|pinwheel|waterbomb) /.test(e)),
+    ['pinwheel Windmill base 5', 'waterbomb Waterbomb base 4', 'crane Square base 6', 'crane Bird base 15', 'frog Square base 6', 'frog Frog base 28']);
+});
+
 test('js/finished.js has a picture for every model and nothing else', () => {
   assert.deepEqual(Object.keys(FINISHED), MODELS.map((m) => m.id), 'run node tools/make-thumbs.mjs');
 });

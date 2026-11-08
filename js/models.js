@@ -210,7 +210,8 @@ function flapping(t) {
 }
 
 // The square base: crease both ways, turn over, crease again, and collapse. Shared by the crane, the
-// flapping bird and the frog.
+// flapping bird, the lily and the frog. A base's last step names it (base), for the list of steps and the bar of ticks,
+// and a model whose `skip` names a base it shares offers someone who knows it to skip to the step after, on step 1.
 const SQUARE_BASE = [
     {
       say: 'Colored side up, turned like a diamond. Fold the bottom corner up to the top corner, and unfold.',
@@ -235,6 +236,7 @@ const SQUARE_BASE = [
     {
       say: 'Bring the other three corners down to the bottom one. The left and right corners fold in between the layers along the creases, and it all flattens into a small square, colored on the outside. This is the square base.',
       name: 'Collapse',
+      base: 'Square base',
       do: (h) => h.mech({
         root: [0.2, 0.2], arrow: K3,
         creases: [
@@ -310,6 +312,7 @@ const BIRD_BASE = [
     {
       say: 'Petal fold this side too: lift the bottom corner of the top layer up, let the sides fold in to the middle, and press it flat. This is the bird base.',
       name: 'Petal fold',
+      base: 'Bird base',
       do: (h) => h.mech({
         root: [0.55, 0.55], arrow: K1,
         creases: [
@@ -428,6 +431,7 @@ const FROG_BASE = [
     {
       say: 'Petal fold the last face. This is the frog base: four long points at the top, four short ones at the bottom.',
       name: 'Petal fold',
+      base: 'Frog base',
       do: (h) => h.mech(petal(FACE.K2, [0.2, 0.8])),
     },
 ];
@@ -876,6 +880,7 @@ export const MODELS = [
       {
         say: 'Do the same at the top: pull the corners out and fold the top edge down, and press it flat. This is the windmill base.',
         name: 'Collapse',
+        base: 'Windmill base',
         do: (h) => h.mech(windmillHalf(1, PIN_UP)),
       },
       {
@@ -963,6 +968,7 @@ export const MODELS = [
       {
         say: 'Push the middles of the left and right edges in. The sides fold in along the diagonals, the top comes down, and it all flattens into a triangle. This is the waterbomb base.',
         name: 'Collapse',
+        base: 'Waterbomb base',
         do: (h) => h.mech({
           root: [0.5, 0.15], arrow: M34,
           // Mountain and valley as seen from the colored side, which is underneath here.
@@ -988,6 +994,7 @@ export const MODELS = [
     level: 'Medium',
     blurb: 'The traditional orizuru. The collapse, petal folds and reverse folds are the steps drawings make hardest.',
     paper: { kind: 'Square', colorUp: true, turn: 45 },
+    skip: ['Bird base'],
     steps: [
       ...BIRD_BASE,
       {
@@ -1050,6 +1057,7 @@ export const MODELS = [
     level: 'Medium',
     blurb: 'The crane’s cousin. Hold it by the neck, pull the tail, and the wings flap.',
     paper: { kind: 'Square', colorUp: true, turn: 45 },
+    skip: ['Bird base'],
     steps: [
       ...BIRD_BASE,
       {
@@ -1097,6 +1105,7 @@ export const MODELS = [
     level: 'Tricky',
     blurb: 'The traditional flower from the frog base. Four petals open round a long stem.',
     paper: { kind: 'Square', colorUp: true, turn: 45 },
+    skip: ['Square base', 'Frog base'],
     steps: [
       ...FROG_BASE,
       {
@@ -1164,6 +1173,7 @@ export const MODELS = [
     level: 'Tricky',
     blurb: 'The traditional frog with four legs. Squash folds, petal folds and a lot of reverse folds.',
     paper: { kind: 'Square', colorUp: true, turn: 45 },
+    skip: ['Square base', 'Frog base'],
     steps: [
       ...FROG_BASE,
       {

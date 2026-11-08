@@ -205,8 +205,9 @@ function outline(m, i) {
   $('chip').textContent = ''; // the step's symbol and name come with the fold; till then, its number keeps the line
   $('say').textContent = m.steps[k].say;
   words.scrollTop = 0;
+  renderSteps(m, m.steps);
+  $('skip').hidden = k !== 0 || !$('skip').childElementCount;
   fadeWords();
-  renderSteps(m.steps);
   showGoal(m);
   $('ticks').children[k].firstChild.setAttribute('aria-current', 'step');
   $('steps').children[k].firstChild.setAttribute('aria-current', 'step');
@@ -281,7 +282,7 @@ function ready(m, i, landed) {
   P.b = built(id);
   P.id = id;
   $('modelName').textContent = m.name;
-  renderSteps(P.b.steps);
+  renderSteps(m, P.b.steps);
   showGoal(m);
   // A link's step becomes where you got to only in a model you haven't started. In one you have, your place stays
   // until you move on from the link's step yourself.
@@ -294,21 +295,38 @@ function ready(m, i, landed) {
   document.title = `${m.name} · Fold by Fold`;
 }
 
-// The ticks and the list of steps. Before the model is folded a step's name may not be known yet (it can come from its
-// fold), so its tick is called by its number alone.
-function renderSteps(steps) {
+// The ticks and the list of steps, and step 1's offer to skip a base you know. Before the model is folded a step's name
+// may not be known yet (it can come from its fold), so its tick is called by its number alone.
+//
+// A base is the standard shape many models start from (the crane, flapping bird, lily and frog all start with the same
+// six-step square base). Its last step ends a part you may know already: in the list of steps a small heading under it
+// names the base and its steps, and on the bar of ticks a wider gap follows its tick. On step 1, a model that shares a
+// base with another offers to skip it, the way books say 'start with a bird base'.
+function renderSteps(m, steps) {
   shown = null; // new lists, so the step is marked in them afresh
   const ticks = $('ticks'), list = $('steps');
   ticks.innerHTML = '';
   list.innerHTML = '';
+  const ends = new Map(m.steps.map((s, i) => [s.base, i]).filter(([base]) => base));
+  $('skip').replaceChildren(...(m.skip || []).filter((base) => ends.has(base)).map((base) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    const to = document.createElement('span');
+    to.textContent = `Skip to step ${ends.get(base) + 2}`;
+    b.append(`Know the ${base.toLowerCase()}? `, to);
+    b.addEventListener('click', () => go(ends.get(base) + 1));
+    return b;
+  }));
   steps.forEach((s, i) => {
+    const base = m.steps[i].base;
     const li = document.createElement('li');
     const b = document.createElement('button');
     b.type = 'button';
     b.tabIndex = -1; // Tab stops only at the step's own tick (see paint)
-    b.setAttribute('aria-label', s.name ? `Step ${i + 1}: ${s.name}` : `Step ${i + 1}`);
+    b.setAttribute('aria-label', (s.name ? `Step ${i + 1}: ${s.name}` : `Step ${i + 1}`) + (base ? `, the end of the ${base.toLowerCase()}` : ''));
     b.addEventListener('click', () => go(i));
     li.append(b);
+    if (base) li.className = 'base-end';
     ticks.append(li);
     const li2 = document.createElement('li');
     const b2 = document.createElement('button');
@@ -320,6 +338,12 @@ function renderSteps(steps) {
     b2.append(n, s.say);
     b2.addEventListener('click', () => go(i));
     li2.append(b2);
+    if (base) {
+      const end = document.createElement('p');
+      end.className = 'base-end';
+      end.textContent = `${base} · steps 1–${i + 1}`;
+      li2.append(end);
+    }
     list.append(li2);
   });
   roomForWords(steps);
@@ -443,6 +467,7 @@ function paint() {
     $('stepNum').textContent = P.i + 1;
     $('chip').innerHTML = chipFor(step);
     $('say').textContent = step.say;
+    $('skip').hidden = P.i !== 0 || !$('skip').childElementCount;
     tell();
     words.scrollTop = 0; // a new step's words start at the top
     fadeWords();
@@ -542,7 +567,7 @@ const isOff = (b) => b.getAttribute('aria-disabled') === 'true';
 const words = document.querySelector('.step-now');
 const wordsEnd = document.createRange();
 function fadeWords() {
-  wordsEnd.selectNodeContents($('say'));
+  wordsEnd.selectNodeContents($('skip').hidden ? $('say') : $('skip'));
   words.classList.toggle('more', wordsEnd.getBoundingClientRect().bottom > words.getBoundingClientRect().bottom + 2);
 }
 words.addEventListener('scroll', fadeWords, { passive: true });
@@ -563,11 +588,15 @@ function roomForWords(steps = gaugeFor) {
   if (!steps || !width) return; // out of sight: measured once it shows
   gaugeWidth = width;
   gauge.style.width = `${width}px`;
-  gauge.replaceChildren(...steps.map((s) => {
+  // Step 1's words with the offer to skip a base under them, if there is one.
+  gauge.replaceChildren(...steps.map((s, i) => {
+    const box = document.createElement('div');
     const p = document.createElement('p');
     p.className = 'say';
     p.textContent = s.say;
-    return p;
+    box.append(p);
+    if (i === 0 && $('skip').childElementCount) box.append(Object.assign($('skip').cloneNode(true), { id: '', hidden: false }));
+    return box;
   }));
   const longest = Math.max(...[...gauge.children].map((p) => p.getBoundingClientRect().height));
   gauge.replaceChildren();

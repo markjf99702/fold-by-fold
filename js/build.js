@@ -28,6 +28,7 @@ export function build(model) {
     steps.push({
       ...r, say: step.say, name: step.name || nameOf(r.motion), note: step.note || null, view: step.view || null,
       unfold: step.unfold === true, // it opens a fold made before, rather than making a new one
+      base: step.base || null, // the base this step finishes, if it's the last step of one (the square base, say)
     });
     sheet = r.to;
   }

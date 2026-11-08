@@ -1482,6 +1482,39 @@ for (const hash of ['#%', '#crane-3%', '#%F0%9F']) {
   await p.context().close();
 }
 
+// A base, the standard shape many models start from, is named where it ends: on a phone a wider gap follows its tick, and
+// beside the paper a small heading under its last step names it and its steps. On step 1, a model that shares a base with
+// another offers to skip it, quietly, under the words: the frog the square base and the frog base it shares with the lily,
+// the crane the bird base it shares with the flapping bird. The offer goes once the step does.
+{
+  const p = await fresh('#frog');
+  await p.waitForFunction(() => fold.state.id === 'frog');
+  const look = () => p.evaluate(() => {
+    const ticks = [...document.querySelectorAll('#ticks li')].map((li) => li.getBoundingClientRect());
+    const gaps = ticks.slice(1).map((b, k) => Math.round(b.left - ticks[k].right));
+    return {
+      skip: document.getElementById('skip').hidden ? [] : [...document.querySelectorAll('#skip button')].map((b) => b.textContent),
+      wide: gaps.flatMap((g, k) => (g > gaps[0] + 3 ? [k + 1] : [])),
+      named: document.querySelector('#ticks li:nth-child(6) button').getAttribute('aria-label'),
+    };
+  });
+  assert.deepEqual(await look(), { skip: ['Know the square base? Skip to step 7', 'Know the frog base? Skip to step 29'], wide: [6, 28], named: 'Step 6: Collapse, the end of the square base' }, 'the frog\'s bases aren\'t named on its ticks, or step 1 doesn\'t offer to skip them');
+  await p.tap('#skip button:nth-child(2)');
+  await p.waitForFunction(() => fold.state.i === 28, null, { timeout: 3000 }).catch(() => assert.fail('skipping the frog base didn\'t go to step 29'));
+  assert.deepEqual((await look()).skip, [], 'the offer to skip the bases stays past step 1');
+  await p.context().close();
+}
+{
+  const p = await fresh('#crane', { viewport: { width: 1280, height: 800 }, deviceScaleFactor: 1, hasTouch: false });
+  await p.waitForFunction(() => fold.state.id === 'crane');
+  assert.deepEqual(await p.evaluate(() => [...document.querySelectorAll('#steps li')].flatMap((li, k) => (li.querySelector('.base-end') ? [`${k + 1}: ${li.querySelector('.base-end').textContent}`] : []))),
+    ['6: Square base · steps 1–6', '15: Bird base · steps 1–15'], 'the list of steps doesn\'t name the crane\'s bases where they end');
+  assert.deepEqual(await p.evaluate(() => [...document.querySelectorAll('#skip button')].map((b) => b.textContent)), ['Know the bird base? Skip to step 16']);
+  await p.click('#skip button');
+  assert.equal(await p.evaluate(() => fold.state.i), 15, 'skipping the bird base didn\'t go to step 16');
+  await p.context().close();
+}
+
 // The paper turns and zooms from the keyboard too: with it in focus, the arrow keys turn it the way a drag does and
 // + and - zoom, and they don't step through the model meanwhile. A mouse pressed on the paper doesn't leave the focus
 // there, so after a drag the arrow keys step again. Escape goes back to the gallery, as the back arrow does.

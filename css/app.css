@@ -297,6 +297,7 @@ html:has(#player:not([hidden])) { overscroll-behavior-y: none; }
    but they're shown above them. */
 .ticks { list-style: none; margin: -10px 0; padding: 0; display: flex; gap: 4px; touch-action: pan-y; order: -1; } /* a finger slides along it */
 .ticks li { flex: 1; }
+.ticks li.base-end { margin-right: 6px; } /* a wider gap after the last step of a base */
 .ticks button {
   appearance: none; border: 0; padding: 20px 0; width: 100%; background: none; cursor: pointer; display: block;
 }
@@ -338,6 +339,15 @@ html:has(#player:not([hidden])) { overscroll-behavior-y: none; }
 .chip svg { width: 34px; height: 12px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .chip .hollow { stroke-width: 1.6; }
 .say { margin: 0; font-size: 1.05rem; line-height: 1.45; min-height: 4.35em; } /* three lines at least */
+/* On step 1 of a model that shares a base with others, a quiet offer under the words to skip the base, a line for each,
+   with the step to skip to in the accent colour. The words above keep no room of their own under them then. */
+.say:has(+ .skip:not([hidden])) { min-height: 0; }
+.skip { margin: 2px 0 0; display: grid; justify-items: start; }
+.skip button {
+  appearance: none; border: 0; background: none; cursor: pointer; text-align: left; padding: 6px 0; margin: 0;
+  font-size: .9rem; line-height: 1.4; color: var(--muted);
+}
+.skip button span { color: var(--accent); text-decoration: underline; text-underline-offset: 3px; font-weight: 700; }
 /* The key of marks, over the player (app.js opens it from the fold's name): a sheet up from the bottom of a phone, and
    a box in the middle of a wider screen, with the step's entry ringed in the accent colour. Its entries are the
    gallery's own, copied in, so the hollow arrowheads take the colour under them. */
@@ -372,6 +382,7 @@ html:has(#player:not([hidden])) { overscroll-behavior-y: none; }
 
 /* A hidden copy of the words' box, holding every step's words at once, to find the longest (see app.js). */
 .say-gauge { position: absolute; top: 0; left: 0; height: 0; overflow: hidden; visibility: hidden; pointer-events: none; }
+.say-gauge > div { display: grid; gap: 4px; }
 
 /* The slider, in the page's own style rather than the browser's: a thin track in faint ink, filled in the accent
    colour up to the thumb (--p, which the page sets), and a round thumb ringed in the page's colour. It reaches 8 px
@@ -500,6 +511,12 @@ html:has(#player:not([hidden])) { overscroll-behavior-y: none; }
   .step-list li button::before { counter-increment: s; content: counter(s); font-weight: 700; font-variant-numeric: tabular-nums; }
   .step-list li button[aria-current="step"] { background: var(--chip); color: var(--ink); }
   .step-list li button:focus-visible { outline-offset: -3px; } /* inside the button: the list's edges cut off the sides of a ring outside it */
+  /* Under the last step of a base, a small heading naming it and its steps, with a rule to the edge. */
+  .step-list .base-end {
+    display: flex; align-items: center; gap: 10px; margin: 2px 0 8px; padding: 0 6px;
+    font-size: .74rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--accent);
+  }
+  .step-list .base-end::after { content: ''; flex: 1; border-top: 1px solid color-mix(in srgb, var(--accent) 35%, transparent); }
   .step-now { flex: none; overflow: visible; }
   .say { min-height: 0; }
 }
