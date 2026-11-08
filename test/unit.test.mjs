@@ -625,9 +625,12 @@ test('paper hat: a triangle on top, with a brim folded up on each side, one in f
   // The sheet's two short edges: each folded up over the bottom of the triangle, the same height.
   const front = end.at([0.5, Math.SQRT2]), back = end.at([0.5, 0]);
   assert.ok(close(front[1], back[1]) && front[1] > base[1] + 0.1, 'the brims are not both folded up');
-  const level = (q) => end.order.indexOf(end.facetAt(q).id);
-  const all = end.order.length;
-  assert.ok(Math.min(level([0.5, Math.SQRT2 - 0.01]), level([0.5, 0.01])) === 0 || Math.max(level([0.5, Math.SQRT2 - 0.01]), level([0.5, 0.01])) === all - 1, 'the brims are not outside, one in front and one behind');
+  // Off the middle crease, where each side's layers are whole, the two brims are the bottom and top of the stack.
+  for (const x of [0.3, 0.7]) {
+    const brims = [end.facetAt([x, Math.SQRT2 - 0.01]).id, end.facetAt([x, 0.01]).id];
+    const stack = end.order.filter((id) => covers(end.world(id), end.at([x, 0.01]), -1e-9));
+    assert.deepEqual([stack[0], stack.at(-1)].sort(), brims.sort(), `the brims are not outside, one in front and one behind, ${x} across`);
+  }
   assert.ok(close(end.bounds().x1 - end.bounds().x0, 1), 'the hat is not as wide as the sheet');
 });
 
