@@ -1719,6 +1719,44 @@ for (const [width, height] of [[320, 200], [427, 267]]) {
   await p.context().close();
 }
 
+// A phone's page zoomed to 200% lays out narrower than any phone (a 390 px iPhone at 195 px, at 150% 260 px). There the
+// player scrolls as one page, rather than squeezing the paper, words and buttons into the screen's height: at 195 px no
+// words showed and Play was cut off, with no way to reach it (WCAG 2.2, 1.4.4 Resize Text). The longest words can all be
+// scrolled into view, and Play, Next and Slow stay at the bottom of the screen meanwhile. The key of marks under the
+// gallery fits the width too: it scrolled sideways.
+for (const [width, height] of [[195, 422], [260, 563]]) {
+  const p = await fresh('', { viewport: { width, height } });
+  await p.waitForSelector('#home:not([hidden])');
+  await p.evaluate(() => document.fonts.ready);
+  assert.equal(await p.evaluate(() => document.documentElement.scrollWidth > innerWidth), false, `the gallery scrolls sideways at ${width}x${height}`);
+  await p.evaluate(() => { location.hash = 'crane-19'; }); // the longest words of any step
+  await p.waitForFunction(() => fold.state.id === 'crane');
+  const r = await p.evaluate(async () => {
+    const box = (q) => document.querySelector(q).getBoundingClientRect();
+    const frame = () => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)));
+    const shown = (q) => { const b = box(q), at = document.elementFromPoint((b.left + b.right) / 2, (b.top + b.bottom) / 2); return !!at && document.querySelector(q).contains(at) && b.bottom <= innerHeight; };
+    const buttons = ['#play', '#next', '#speed'];
+    scrollTo(0, (document.documentElement.scrollHeight - innerHeight) / 2);
+    await frame();
+    const half = buttons.filter((q) => !shown(q));
+    scrollTo(0, document.documentElement.scrollHeight);
+    await frame();
+    const [say, controls] = [box('#say'), box('.controls')], w = document.querySelector('.step-now');
+    const name = document.getElementById('modelName'), count = document.getElementById('stepCount');
+    return {
+      scrolls: document.documentElement.scrollHeight > innerHeight, wordsEnd: say.bottom <= controls.top + 0.5, cut: w.scrollHeight > w.clientHeight + 1,
+      hidden: [...half, ...buttons.filter((q) => !shown(q))], sideways: document.documentElement.scrollWidth > innerWidth,
+      // In the bar, the view buttons go under the name rather than squeezing it to a letter and the step to a word a line.
+      bar: name.scrollWidth <= name.clientWidth && count.getBoundingClientRect().height < 1.5 * parseFloat(getComputedStyle(count).lineHeight),
+    };
+  });
+  assert.deepEqual(r, { scrolls: true, wordsEnd: true, cut: false, hidden: [], sideways: false, bar: true }, `at ${width}x${height} the words can't all be read, the buttons can't be reached, the bar is squeezed, or the player scrolls sideways`);
+  await p.tap('#play');
+  await p.waitForFunction(() => fold.state.playing, null, { timeout: 3000 }).catch(() => {});
+  assert.equal(await p.evaluate(() => fold.state.playing), true, `Play did nothing at ${width}x${height}`);
+  await p.context().close();
+}
+
 // On a short phone held upright (an iPhone SE in Safari, or smaller), long words don't squeeze the paper to a strip
 // or push Play off the screen: at every step of the crane and the frog the paper keeps over a third of the height.
 for (const [width, height] of [[375, 553], [320, 460]]) {
