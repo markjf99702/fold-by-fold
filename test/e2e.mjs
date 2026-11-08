@@ -369,6 +369,48 @@ async function fresh(hash = '', { init, arg, ...opts } = {}) {
   await p.context().close();
 }
 
+// Once a fold lands, where you got to moves on to the next step, so coming back starts from the paper as it now is
+// rather than asking for the fold you've just made. Looking back at an earlier step keeps your place, by a tick or the
+// back button; folding there makes it your place again.
+{
+  const p = await fresh('#crane-15');
+  await p.waitForFunction(() => fold.state.id === 'crane');
+  const saved = () => p.evaluate(() => JSON.parse(localStorage.getItem('fold-by-fold.v1')).progress.crane);
+  assert.equal(await saved(), 14);
+  const tick = await p.evaluate(() => { const r = document.querySelector('#ticks li:nth-child(6)').getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; });
+  const cdp = await p.context().newCDPSession(p);
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [tick] });
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  await p.waitForFunction(() => fold.state.i === 5, null, { timeout: 2000 }).catch(() => assert.fail('a tap on tick 6 did not go to step 6'));
+  assert.equal(await saved(), 14, 'looking back at a step by its tick lost your place');
+  await p.click('#prev');
+  assert.equal(await p.evaluate(() => fold.state.i), 4);
+  assert.equal(await saved(), 14, 'looking back a step with the back button lost your place');
+  await p.click('#play');
+  assert.equal(await saved(), 4, 'folding an earlier step did not make it your place');
+  await p.waitForFunction(() => fold.state.t >= 1, null, { timeout: 15000 });
+  assert.equal(await saved(), 5, 'the fold landing did not move your place on to the next step');
+  await p.click('#back');
+  await p.waitForSelector('#home:not([hidden])');
+  assert.equal(await p.textContent('.model[data-model="crane"] .count'), 'Step 6 of 23', 'the crane\'s card doesn\'t say the next step');
+  await p.click('.model[data-model="crane"]');
+  await p.waitForFunction(() => fold.state.id === 'crane');
+  assert.deepEqual(await p.evaluate(() => [fold.state.i, fold.state.t]), [5, 0], 'coming back did not open the next step from its start');
+  assert.equal(await p.textContent('#playLabel'), 'Play');
+  // The slider does the same: at its end your place is the next step, and back from there it's this one again.
+  const scrub = (v) => p.locator('#scrub').evaluate((el, v) => { el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); }, v);
+  await scrub(1000);
+  assert.equal(await saved(), 6, 'the slider at its end did not move your place on');
+  await scrub(500);
+  assert.equal(await saved(), 5, 'the slider back from its end left your place on the next step');
+  // The last step is where you got to once you're on it, folded or not.
+  await p.evaluate(() => { location.hash = 'crane-23'; });
+  await p.waitForFunction(() => fold.state.i === 22);
+  await scrub(1000);
+  assert.equal(await saved(), 22, 'the last step folded saved a step past the end');
+  await p.context().close();
+}
+
 // On a narrow phone a long model name takes two lines in the bar rather than losing its end.
 {
   const p = await fresh('', { viewport: { width: 320, height: 568 } });

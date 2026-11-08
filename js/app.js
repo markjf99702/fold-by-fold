@@ -224,7 +224,7 @@ function go(i, { play = false, snap = false, keep = true } = {}) {
   P.i = Math.max(0, Math.min(i, P.b.steps.length - 1));
   P.t = 0;
   P.playing = false;
-  if (keep) keepPlace();
+  if (keep) keepPlace(P.i, { further: true });
   if (play) start();
   else keepAim();
   paint();
@@ -247,12 +247,17 @@ function keepAim() {
   if (P.t > 0 && step.view && aimedFor !== step) aimFor(step);
 }
 
-// Saves the step you're on as where you got to in this model.
-function keepPlace() {
-  if (prefs.progress[P.id] === P.i) return;
-  prefs.progress[P.id] = P.i;
+// Saves where you got to in this model. Folding a step makes it your place (Play, or the slider), and once its fold
+// lands, the step after, so coming back starts from the paper as it now is. Just going to a step saves it only if it's
+// further on: looking back at an earlier one keeps your place.
+function keepPlace(i = P.i, { further = false } = {}) {
+  const was = prefs.progress[P.id];
+  if (was === i || (further && was > i)) return;
+  prefs.progress[P.id] = i;
   save();
 }
+// The place for the fold as it is: the step after once this one's fold has landed, except on the last step.
+const placeNow = () => (P.t >= 1 && P.i < P.b.steps.length - 1 ? P.i + 1 : P.i);
 
 function start() {
   keepPlace();
@@ -386,7 +391,7 @@ function loop(now) {
     } else {
       P.t = Math.min(1, P.t0 + (now - P.clock) / duration(step));
       $('scrub').value = Math.round(P.t * 1000);
-      if (P.t >= 1) { P.playing = false; paint(); } else paintControls();
+      if (P.t >= 1) { P.playing = false; keepPlace(placeNow()); paint(); } else paintControls();
     }
     dirty = true;
   }
@@ -540,7 +545,7 @@ $('speed').addEventListener('click', () => {
 $('scrub').addEventListener('input', (e) => {
   P.t = e.target.value / 1000;
   P.playing = false;
-  keepPlace();
+  keepPlace(placeNow());
   keepAim();
   paint();
 });
