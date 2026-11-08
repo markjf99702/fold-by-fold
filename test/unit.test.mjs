@@ -7,7 +7,7 @@ import { apply, area, bisector, side, centroid, overlapArea, line, ccw, clip, in
 import { build } from '../js/build.js';
 import { poses, marks, symbol, corners, transformPoint, LAYER } from '../js/motion.js';
 import { MODELS } from '../js/models.js';
-import { outline, picture } from '../js/thumbs.js';
+import { finished, outline, standing, picture } from '../js/thumbs.js';
 import { FINISHED } from '../js/finished.js';
 import { crossings } from '../js/check.js';
 
@@ -187,8 +187,9 @@ for (const model of MODELS) {
       }
     }
     // The gallery's picture of the finished model, worked out ahead of time, is still this model's.
-    assert.deepEqual(FINISHED[model.id], outline(b.end), `${model.id}'s picture in js/finished.js is out of date: run node tools/make-thumbs.mjs`);
-    assert.equal(picture(FINISHED[model.id]).match(/<polygon/g).length, b.end.facets.size);
+    assert.deepEqual(FINISHED[model.id], finished(b), `${model.id}'s picture in js/finished.js is out of date: run node tools/make-thumbs.mjs`);
+    const last = b.steps[b.steps.length - 1];
+    assert.equal(picture(FINISHED[model.id]).match(/<polygon/g).length, last.view ? poses(last, 1).length : b.end.facets.size);
   });
 
   test(`${model.name}: every folded state could be real paper, with nothing passing through anything`, () => {
@@ -316,6 +317,36 @@ test('as a fold begins and as it lands, the paper seen from above keeps its colo
 
 test('js/finished.js has a picture for every model and nothing else', () => {
   assert.deepEqual(Object.keys(FINISHED), MODELS.map((m) => m.id), 'run node tools/make-thumbs.mjs');
+});
+
+test('a model that ends standing up is pictured standing, seen from where the player ends it', () => {
+  const standers = MODELS.filter((m) => once(m).steps.at(-1).view).map((m) => m.id);
+  assert.deepEqual(standers, ['plane', 'crane', 'flapping-bird']);
+  for (const id of standers) {
+    const b = once(MODELS.find((m) => m.id === id));
+    const last = b.steps.at(-1);
+    assert.deepEqual(finished(b), standing(poses(last, 1), last.view), id);
+    assert.notDeepEqual(finished(b), outline(b.end), `${id} is pictured flat`);
+    // In 3D the light falls on the facets unevenly, as it does in the player; flat, every facet is as bright.
+    assert.ok(finished(b).some((s) => s[2] > 0.05), `${id}'s picture has no shading`);
+  }
+  for (const m of MODELS.filter((x) => !standers.includes(x.id))) assert.deepEqual(finished(once(m)), outline(once(m).end), m.id);
+});
+
+test('a standing picture draws what is nearer the camera over what is further, and the side the camera sees', () => {
+  // Two squares, one above the other, given in either order: from above, the upper one is drawn last, with its front
+  // showing; from below, the lower one is drawn last, and the camera sees their backs.
+  const square = (z) => ({ facet: { poly: [[0, 0], [1, 0], [1, 1], [0, 1]] }, pose: { r: [1, 0, 0, 0, 1, 0, 0, 0, 1], t: [z * 0.3, 0, z] } });
+  for (const items of [[square(0), square(1)], [square(1), square(0)]]) {
+    const above = standing(items, { yaw: -90, pitch: 60 }), below = standing(items, { yaw: -90, pitch: -60 });
+    assert.deepEqual(above.map((s) => s[0]), [1, 1]);
+    assert.deepEqual(below.map((s) => s[0]), [0, 0]);
+    // The upper square sits further right (+x is to the right, seen from yaw -90), so it's the one whose left edge
+    // is further right.
+    const xs = (shape) => shape[1].split(' ').map((p) => +p.split(',')[0]);
+    assert.ok(Math.min(...xs(above[1])) > Math.min(...xs(above[0])), 'from above, the upper square is not drawn last');
+    assert.ok(Math.min(...xs(below[1])) < Math.min(...xs(below[0])), 'from below, the lower square is not drawn last');
+  }
 });
 
 test('a step that names a corner to fold names the one that moves, as the paper lies', () => {
