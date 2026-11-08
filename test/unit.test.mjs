@@ -542,6 +542,22 @@ test('frog: each petal fold comes after a step that creases the face along the s
   }
 });
 
+test('jumping frog: its front legs stick out past the sides of its head, where they can be seen', () => {
+  const b = once(MODELS.find((m) => m.id === 'jumping-frog'));
+  const [, tall] = b.model.paper.size;
+  // The body, folded in from both sides, and the head on top of it.
+  const body = b.end.world(b.end.facetAt([0.5, 0.2]).id), xs = body.map((q) => q[0]);
+  const [left, right, top] = [Math.min(...xs), Math.max(...xs), Math.max(...body.map((q) => q[1]))];
+  // Each leg's point is the card's top corner, folded up to the top of the head and then out to its side.
+  for (const q of [[0, tall], [1, tall]]) {
+    const [x, y] = b.end.at(q);
+    assert.ok(x < left - 0.02 || x > right + 0.02, `the leg from corner ${q} ends at x ${x.toFixed(3)}, within the body's ${left.toFixed(3)} to ${right.toFixed(3)}`);
+    assert.ok(y > top, `the leg from corner ${q} ends level with the body, not beside the head`);
+  }
+  const legs = b.steps.findIndex((st) => /front legs/.test(st.say));
+  assert.equal(legs, 5, 'the front legs are not folded out straight after the flaps go up');
+});
+
 test('crane: each reverse-folded point ends up between the front and back of the model', () => {
   const b = build(MODELS.find((m) => m.id === 'crane'));
   const split = line([1, 0], [0, 1]);

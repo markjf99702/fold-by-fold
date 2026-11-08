@@ -80,7 +80,7 @@ assert.deepEqual(await page.evaluate(() => fold.built), [], 'the gallery folded 
 assert.equal(await sideways(), false, 'the gallery scrolls sideways on a phone');
 // Each card says what paper to have ready, between how hard it is and its steps.
 assert.deepEqual(await page.evaluate(() => ['cup', 'plane', 'jumping-frog'].map((id) => [...document.querySelectorAll(`.model[data-model="${id}"] .meta > *`)].map((s) => s.className + ' ' + s.textContent))),
-  [['level Easy', 'kind Square', 'count 5 steps'], ['level Easy', 'kind Printer paper', 'count 8 steps'], ['level Easy', 'kind Index card', 'count 9 steps']], 'a card doesn\'t say what paper to use');
+  [['level Easy', 'kind Square', 'count 5 steps'], ['level Easy', 'kind Printer paper', 'count 8 steps'], ['level Easy', 'kind Index card', 'count 10 steps']], 'a card doesn\'t say what paper to use');
 // A screen reader names each card by its model; the picture on it is left out.
 assert.equal(await page.getByRole('button', { name: /^Paper cup\b/ }).count(), 1, 'the paper cup card is not named for its model');
 

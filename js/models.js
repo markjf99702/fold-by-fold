@@ -477,11 +477,21 @@ export const MODELS = [
         }),
       },
       {
-        say: 'Fold the two bottom corners of the top layer of the triangle up to its top point. These are the front legs.',
+        say: 'Fold the two bottom corners of the top layer of the triangle up to its top point.',
         name: 'Valley folds',
         do: (h) => h.together(
           (k) => k.valley(k.onto([1, CARD], X), { flap: [0.95, CARD - 0.02] }),
           (k) => k.valley(k.onto([0, CARD], X), { flap: [0.05, CARD - 0.02] }),
+        ),
+      },
+      {
+        say: 'Fold the top point of each of those flaps out to its side, folding from the bottom of the flap to halfway up its outer edge. These are the front legs, sticking out past the sides of the triangle.',
+        name: 'Valley folds',
+        // From the middle of the triangle's bottom edge, where each flap's fold ends, to halfway along the flap's outer
+        // edge, which lies on the triangle's side (the crease from X to the card's top corner).
+        do: (h) => h.together(
+          (k) => k.valley(k.through([1, CARD - 0.5], [0.875, CARD - 0.125]), { flap: [0.95, CARD - 0.02] }),
+          (k) => k.valley(k.through([0, CARD - 0.5], [0.125, CARD - 0.125]), { flap: [0.05, CARD - 0.02] }),
         ),
       },
       {
