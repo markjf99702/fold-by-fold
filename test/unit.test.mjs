@@ -10,6 +10,9 @@ import { outline, picture } from '../js/thumbs.js';
 import { FINISHED } from '../js/finished.js';
 import { crossings } from '../js/check.js';
 
+// Each model folded once, for the checks that only look at the steps.
+const builds = new Map();
+const once = (model) => builds.get(model.id) || builds.set(model.id, build(model)).get(model.id);
 const close = (a, b, tol = 1e-9) => Math.abs(a - b) < tol;
 const closePt = (p, q, tol = 1e-9) => p.every((x, i) => close(x, q[i], tol));
 const paperArea = (s) => [...s.facets.values()].reduce((t, f) => t + Math.abs(area(f.poly)), 0);
@@ -117,6 +120,34 @@ for (const model of MODELS) {
       assert.deepEqual(crossings(step.to), [], `${model.id} step ${i + 1}`);
     }
   });
+
+  test(`${model.name}: the paper moves smoothly, with nothing snapping over from one moment to the next`, () => {
+    for (const [i, step] of once(model).steps.entries()) assert.deepEqual(snaps(step), [], `${model.id} step ${i + 1}`);
+  });
+}
+
+// Where the paper moves much faster than just before and after, as a flap does that snaps over: the speed is how far
+// any corner goes per unit of the step's time, over steps of 1/200, and a snap is over 3 times the middle speed of
+// the moments around it (leaving out the two on either side, which a snap can spill into).
+function snaps(step) {
+  const N = 200, speed = [];
+  let prev = null;
+  for (let k = 0; k <= N; k++) {
+    const now = poses(step, k / N).map((it) => corners(it));
+    if (prev) {
+      let m = 0;
+      now.forEach((c, a) => c.forEach((p, j) => { m = Math.max(m, Math.hypot(p[0] - prev[a][j][0], p[1] - prev[a][j][1], p[2] - prev[a][j][2])); }));
+      speed.push(m * N);
+    }
+    prev = now;
+  }
+  const out = [];
+  speed.forEach((v, k) => {
+    const around = speed.slice(Math.max(0, k - 10), Math.max(0, k - 2)).concat(speed.slice(k + 3, k + 11)).sort((p, q) => p - q);
+    const middle = around[Math.floor(around.length / 2)];
+    if (v > 4 && v > 3 * Math.max(middle, 0.5)) out.push(`t ${(k / N).toFixed(3)}: ${v.toFixed(1)} against ${middle.toFixed(1)} around it`);
+  });
+  return out;
 }
 
 test('js/finished.js has a picture for every model and nothing else', () => {

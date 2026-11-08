@@ -19,6 +19,8 @@ import { LAYER, ease } from './motion.js';
 const FOLDS = { valley: Math.PI, mountain: -Math.PI, flat: 0 };
 // How much more keeping the paper joined counts than keeping each crease on its schedule.
 const CLOSE = 400;
+// The most a hinge may turn from one sample of a motion to the next by jumping to another way of folding.
+const STEP = 6 * Math.PI / 180;
 
 // ---------- 3D rigid transforms: { r: row-major 3x3, t: [x, y, z] } ----------
 
@@ -446,16 +448,29 @@ function run(from, known, plan, { root, samples }) {
   // keeps the paper joined and heads the right way wins: where two ways of folding meet, that is what picks
   // the right one.
   const cost = (x, tgt, prev) => residual(x, tgt, prev).reduce((s, r) => s + r * r, 0);
+  const carryOn = (x, prevTgt, tgt) => x.map((v, i) => (tgt[i] === null ? v : order[i].weight >= 1 ? tgt[i] : v + (tgt[i] - prevTgt[i])));
+  // But the other way can find another way the paper could lie altogether, not where it is heading: with the
+  // petal fold's sides half in, sides already shut flat keep closer to their schedule, and the sides would snap
+  // shut between two samples. So where the other way wins by turning a hinge more than STEP, the paper is
+  // followed there instead, in smaller steps that each carry on from the last.
+  const far = (a, b) => a.some((v, i) => Math.abs(v - b[i]) > STEP);
+  const follow = (x0, t0, t1, x1 = solve(carryOn(x0, targetAt(t0), targetAt(t1)), targetAt(t1)), depth = 0) => {
+    if (depth >= 5 || !far(x0, x1)) return x1;
+    const tm = (t0 + t1) / 2;
+    return follow(follow(x0, t0, tm, undefined, depth + 1), tm, t1, undefined, depth + 1);
+  };
   const xs = [];
   let x = new Array(n).fill(0);
   let prevTgt = targetAt(0);
   for (let k = 0; k <= samples; k++) {
     const t = k / samples;
     const tgt = targetAt(t);
-    const carry = x.map((v, i) => (tgt[i] === null ? v : order[i].weight >= 1 ? tgt[i] : v + (tgt[i] - prevTgt[i])));
+    const carry = carryOn(x, prevTgt, tgt);
     const aim = x.map((v, i) => (tgt[i] === null ? v : tgt[i]));
     const a = solve(carry, tgt), b = solve(aim, tgt);
-    x = cost(b, tgt, x) < cost(a, tgt, x) - 1e-12 ? b : a;
+    let next = cost(b, tgt, x) < cost(a, tgt, x) - 1e-12 ? b : a;
+    if (k && next !== a && far(x, next)) next = follow(x, (k - 1) / samples, t, a);
+    x = next;
     xs.push(x.slice());
     prevTgt = tgt;
   }
