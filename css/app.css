@@ -281,11 +281,12 @@ html:has(#player:not([hidden])) { overscroll-behavior-y: none; }
 .ticks button[aria-current="step"]::before { background: var(--accent); height: 6px; margin-top: -1px; }
 
 /* Words too long for the room left scroll in their own box, fading at the bottom while there's more, so the
-   slider and buttons stay where they are. The box keeps about three lines, so the paper doesn't jump about
-   between steps with a line or two of words. */
+   slider and buttons stay where they are. Under the paper, the box keeps one height through a model, that of its
+   longest words (measured by the page into --words), so the paper doesn't grow and shrink from step to step; on a
+   short screen the paper's own room (above) still comes first. */
 .step-now {
   display: grid; align-content: start; gap: 4px;
-  flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
+  flex: 1 1 var(--words, auto); min-height: 0; overflow-y: auto; overscroll-behavior: contain;
 }
 .step-now.more {
   -webkit-mask-image: linear-gradient(#000 calc(100% - 1.3em), transparent);
@@ -297,7 +298,9 @@ html:has(#player:not([hidden])) { overscroll-behavior-y: none; }
 }
 .chip svg { width: 34px; height: 12px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .chip .hollow { stroke-width: 1.6; }
-.say { margin: 0; font-size: 1.05rem; line-height: 1.45; min-height: 3.95em; } /* with the chip, 5.6em */
+.say { margin: 0; font-size: 1.05rem; line-height: 1.45; min-height: 4.35em; } /* three lines at least */
+/* A hidden copy of the words' box, holding every step's words at once, to find the longest (see app.js). */
+.say-gauge { position: absolute; top: 0; left: 0; height: 0; overflow: hidden; visibility: hidden; pointer-events: none; }
 
 /* The slider reaches 8 px above and below the room it takes, and sits 8 px lower on its line to make up for it, so
    the track stays where it always was. */
@@ -394,6 +397,11 @@ html:has(#player:not([hidden])) { overscroll-behavior-y: none; }
   }
   .panel { border-top: 0; border-left: 1px solid var(--line); padding-left: var(--gutter); }
   .say { min-height: 0; }
+}
+/* Held sideways, the words' box doesn't keep the height of a model's longest words: beside the paper it doesn't
+   change the paper's size, and under it (below) the page scrolls. */
+@media (orientation: landscape) and (max-height: 500px) {
+  .step-now { flex-basis: auto; }
 }
 
 /* Narrower and short as well, as a window zoomed in to 300% or 400% is, there's no room beside the paper: the words

@@ -1741,6 +1741,29 @@ for (const [width, height] of [[375, 553], [320, 460]]) {
   await p.context().close();
 }
 
+// Held upright, the paper keeps one size through a model: the words' box under it keeps the height of the model's
+// longest words, rather than growing and shrinking with each step's, which moved the paper by up to 80 px between steps
+// (it jumped, then settled back as the camera eased). The longest words still show whole, and the shortest don't fade
+// as if there were more.
+for (const [width, height, id] of [[390, 844, 'crane'], [360, 780, 'crane'], [390, 844, 'frog']]) {
+  const p = await fresh('#' + id, { viewport: { width, height } });
+  await p.waitForFunction((id) => fold.state.id === id, id);
+  await p.evaluate(() => document.fonts.ready);
+  const seen = await p.evaluate(() => {
+    const out = { stage: new Set(), cut: [], faded: [] };
+    const w = document.querySelector('.step-now');
+    for (let i = 0; i < fold.state.steps; i++) {
+      fold.set(i, 0);
+      out.stage.add(Math.round(document.getElementById('stage').getBoundingClientRect().height * 10) / 10);
+      if (w.scrollHeight > w.clientHeight + 1) out.cut.push(i + 1);
+      if (w.classList.contains('more')) out.faded.push(i + 1);
+    }
+    return { stage: [...out.stage], cut: out.cut, faded: out.faded };
+  });
+  assert.deepEqual(seen, { stage: [seen.stage[0]], cut: [], faded: [] }, `at ${width}x${height} the ${id}'s paper changes size from step to step, or its words don't fit`);
+  await p.context().close();
+}
+
 // On a tablet held upright, the words keep to a column in the middle, a little bigger, so a line runs about 60
 // characters rather than 80 to 100 across the whole width; the ticks, slider and buttons keep to it too. The paper
 // still has most of the screen at every step of the crane and the frog, the longest words included.

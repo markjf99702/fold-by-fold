@@ -297,6 +297,7 @@ function renderSteps(steps) {
     li2.append(b2);
     list.append(li2);
   });
+  roomForWords(steps);
 }
 
 // On a phone the bar of ticks is the way to jump to a step, but they're narrow (the frog's 34 share about 360 px),
@@ -480,13 +481,47 @@ function unavailable(b, off) {
 }
 const isOff = (b) => b.getAttribute('aria-disabled') === 'true';
 
-// Words that run past their box on a short screen fade out at the bottom until they're scrolled to the end.
+// Words that run past their box on a short screen fade out at the bottom until they're scrolled to the end. Only words
+// count, not the empty lines kept under a step of few words.
 const words = document.querySelector('.step-now');
+const wordsEnd = document.createRange();
 function fadeWords() {
-  words.classList.toggle('more', words.scrollTop + words.clientHeight < words.scrollHeight - 2);
+  wordsEnd.selectNodeContents($('say'));
+  words.classList.toggle('more', wordsEnd.getBoundingClientRect().bottom > words.getBoundingClientRect().bottom + 2);
 }
 words.addEventListener('scroll', fadeWords, { passive: true });
-if ('ResizeObserver' in window) new ResizeObserver(fadeWords).observe(words);
+
+// Under the paper, the words' box keeps one height through a model: that of its longest words, so the paper above
+// doesn't grow and shrink from step to step (by up to 80 px on the crane), jumping and then settling as the camera
+// eased to its new size. Every step's words are measured at once, in a hidden copy of the box at its width, again
+// when that width changes or the fonts arrive, and the box's height is set from the longest (css/app.css uses it
+// only where the words are under the paper).
+const gauge = document.createElement('div');
+gauge.className = 'say-gauge';
+gauge.setAttribute('aria-hidden', 'true');
+words.parentElement.append(gauge);
+let gaugeFor = null, gaugeWidth = 0; // the steps measured, and the box's width then
+function roomForWords(steps = gaugeFor) {
+  gaugeFor = steps;
+  const say = $('say'), width = say.clientWidth;
+  if (!steps || !width) return; // out of sight: measured once it shows
+  gaugeWidth = width;
+  gauge.style.width = `${width}px`;
+  gauge.replaceChildren(...steps.map((s) => {
+    const p = document.createElement('p');
+    p.className = 'say';
+    p.textContent = s.say;
+    return p;
+  }));
+  const longest = Math.max(...[...gauge.children].map((p) => p.getBoundingClientRect().height));
+  gauge.replaceChildren();
+  const above = say.getBoundingClientRect().top - words.getBoundingClientRect().top + words.scrollTop; // the chip, and the gap under it
+  words.style.setProperty('--words', `${Math.ceil(above + longest)}px`);
+}
+if ('ResizeObserver' in window) {
+  new ResizeObserver(() => { fadeWords(); if ($('say').clientWidth !== gaugeWidth) roomForWords(); }).observe(words);
+}
+document.fonts?.addEventListener?.('loadingdone', () => roomForWords());
 
 // The step's symbol beside its name, drawn as the key under the gallery draws it. Screen readers hear the name only.
 const CHIP = {
