@@ -311,6 +311,7 @@ function paint() {
     $('stepCount').textContent = `Step ${P.i + 1} of ${n}`;
     $('chip').innerHTML = chipFor(step);
     $('say').textContent = step.say;
+    tell();
     words.scrollTop = 0; // a new step's words start at the top
     fadeWords();
     // Tab stops at the step's tick only, the way it does at the chosen paper colour, rather than at every one of the
@@ -355,6 +356,18 @@ function paint() {
   nameInAddress();
   document.querySelectorAll('#ticks button').forEach((b, k) => b.classList.toggle('done', k < P.i || (k === P.i && P.t >= 1)));
   redraw();
+}
+
+// A screen reader is told the step you land on, with its number, once the step has stayed put for a moment: a finger
+// sliding along the ticks passes many steps a second, and each one's words would be queued up to be read. The slider
+// and a fold playing say nothing; the slider says how far the fold has gone itself.
+let tellTimer = 0;
+function tell() {
+  clearTimeout(tellTimer);
+  tellTimer = setTimeout(() => {
+    if ($('player').hidden) return;
+    $('tell').textContent = `Step ${P.i + 1} of ${P.b.steps.length}. ${P.b.steps[P.i].say}`;
+  }, 400);
 }
 
 // The back button takes a fold that has moved back to its start, and otherwise goes to the step before. Kept up to

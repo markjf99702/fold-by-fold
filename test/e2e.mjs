@@ -1270,6 +1270,35 @@ for (const hash of ['#%', '#crane-3%', '#%F0%9F']) {
   await p.context().close();
 }
 
+// A screen reader is told the step you land on, with its number, once you stop on it: a finger sliding along the ticks
+// past fourteen steps queued fourteen sets of words, and "Step 17 of 34" was never said. Moving the slider, or a fold
+// playing, says nothing.
+{
+  const p = await fresh('#frog');
+  await p.waitForFunction(() => fold.state.id === 'frog');
+  await p.waitForTimeout(600); // the first step is told
+  assert.equal(await p.textContent('#tell'), `Step 1 of 34. ${await p.textContent('#say')}`, 'opening a model did not tell the first step');
+  assert.equal(await p.getAttribute('#say', 'aria-live'), null, 'the words on screen are read out as well');
+  await p.evaluate(() => { window.told = []; new MutationObserver(() => told.push(document.getElementById('tell').textContent)).observe(document.getElementById('tell'), { childList: true, characterData: true, subtree: true }); });
+  const at = await p.evaluate(() => [...document.querySelectorAll('#ticks li')].map((li) => { const r = li.getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; }));
+  const cdp = await p.context().newCDPSession(p);
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: at[2][0], y: at[2][1] }] });
+  for (let k = 1; k <= 14; k++) await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: at[2][0] + (at[16][0] - at[2][0]) * k / 14, y: at[2][1] }] });
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  await p.waitForFunction(() => fold.state.i === 16, null, { timeout: 2000 }).catch(() => {});
+  await p.waitForTimeout(800);
+  const say = await p.textContent('#say');
+  assert.deepEqual(await p.evaluate(() => told), [`Step 17 of 34. ${say}`], 'a slide along the ticks was not told once, as the step it stopped on');
+  await p.evaluate(() => {
+    told.length = 0;
+    const s = document.getElementById('scrub');
+    for (let k = 1; k <= 20; k++) { s.value = String(k * 50); s.dispatchEvent(new Event('input', { bubbles: true })); }
+  });
+  await p.waitForTimeout(800);
+  assert.deepEqual(await p.evaluate(() => told), [], 'moving the slider told the step again');
+  await p.context().close();
+}
+
 // The cards in a row line up: names, step counts and words at the same height across the row. On a wide screen,
 // and on a phone too, where a name on two lines (Paper airplane) sits beside one on one line (Paper cup), and with
 // a card saying which step you got to.
