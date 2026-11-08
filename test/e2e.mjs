@@ -573,12 +573,39 @@ async function fresh(hash = '', { init, arg, ...opts } = {}) {
   assert.ok(Math.abs(after - before) < before * 0.05, `the paper didn't come back (${after} paper pixels, ${before} before)`);
   assert.equal(await p.isVisible('#glError'), false, 'a word that the 3D stopped, though it came back at once');
   // If it doesn't come back within a few seconds, the page says so, rather than leaving a blank box, and the word
-  // goes again once it does come back.
+  // goes again once it does come back. A fold that was playing stops where it was, rather than running on unseen.
+  await p.click('#play');
+  await p.waitForFunction(() => fold.state.t > 0.05, null, { timeout: 5000 });
   await p.evaluate(() => { window.lose = document.getElementById('gl').getContext('webgl').getExtension('WEBGL_lose_context'); lose.loseContext(); });
   await p.waitForSelector('#glError:not([hidden])', { timeout: 6000 }).catch(() => assert.fail('no word that the 3D stopped'));
+  const stopped = await p.evaluate(() => [fold.state.playing, fold.state.t < 1]);
+  assert.deepEqual(stopped, [false, true], 'the fold ran on while the 3D was gone');
+  assert.equal(await p.textContent('#playLabel'), 'Carry on');
   assert.equal(await p.textContent('#glError'), 'The 3D view stopped. Reload the page to bring the paper back.');
   await p.evaluate(() => lose.restoreContext());
   await p.waitForSelector('#glError', { state: 'hidden', timeout: 4000 }).catch(() => assert.fail('the word that the 3D stopped stayed after it came back'));
+  await p.context().close();
+}
+
+// Locking the phone or switching to another app mid-fold pauses it, since nothing is drawn out of sight: coming back,
+// it carries on from where it was. A fold whose marks were still up comes back to Play.
+{
+  const p = await fresh('#cup-2');
+  await p.waitForFunction(() => fold.state.id === 'cup');
+  const hide = () => p.evaluate(() => { Object.defineProperty(document, 'visibilityState', { value: 'hidden', configurable: true }); document.dispatchEvent(new Event('visibilitychange')); });
+  const show = () => p.evaluate(() => { delete document.visibilityState; document.dispatchEvent(new Event('visibilitychange')); });
+  await p.click('#play');
+  await p.waitForFunction(() => fold.state.t > 0.05, null, { timeout: 5000 });
+  await hide();
+  await p.waitForTimeout(2500);
+  assert.deepEqual(await p.evaluate(() => [fold.state.playing, fold.state.t < 1]), [false, true], 'the fold ran on out of sight');
+  assert.equal(await p.textContent('#playLabel'), 'Carry on');
+  await show();
+  await p.click('#prev');
+  await p.click('#play');
+  await hide();
+  assert.deepEqual(await p.evaluate(() => [fold.state.playing, fold.state.t]), [false, 0], 'the fold went on out of sight from the marks');
+  assert.equal(await p.textContent('#playLabel'), 'Play');
   await p.context().close();
 }
 

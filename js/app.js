@@ -156,9 +156,11 @@ function openModel(id, i = null) {
       view = new View($('gl'));
       wireCamera();
       // A phone can take the 3D away from a page and give it back a moment later. If it doesn't come back, the
-      // stage would be a blank box, so say what to do.
+      // stage would be a blank box, so say what to do. A fold playing stops where it is rather than running on out
+      // of sight.
       let lost = 0;
       $('gl').addEventListener('webglcontextlost', () => {
+        if (P.playing) pause();
         clearTimeout(lost);
         lost = setTimeout(() => { $('glError').textContent = 'The 3D view stopped. Reload the page to bring the paper back.'; $('glError').hidden = false; }, 3000);
       });
@@ -592,6 +594,11 @@ document.addEventListener('keydown', (e) => {
   } else if (e.key === 'ArrowLeft' && !onSlider) go(P.i - 1);
 });
 window.addEventListener('hashchange', route);
+// A fold runs by the clock, and nothing is drawn while the page is out of sight, so locking the phone or switching to
+// another app mid-fold brought you back to it already over. It pauses instead, to carry on from where it was.
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden' && P.playing) pause();
+});
 // Safari on an iPhone shows a button as pressed (:active) under a finger only once the page listens for touches.
 document.addEventListener('touchstart', () => {}, { passive: true });
 window.addEventListener('resize', () => { dirty = true; });
