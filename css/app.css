@@ -181,8 +181,9 @@ h1 {
 .model .level { font-weight: 700; color: var(--accent); }
 .model .blurb { display: block; font-size: .88rem; line-height: 1.45; }
 @media (min-width: 700px) { .models { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; } }
-/* Wide enough for five across: the ten models make two full rows, rather than 4, 4 and 2. */
-@media (min-width: 960px) { .models { grid-template-columns: repeat(5, minmax(0, 1fr)); } }
+/* Wide enough for four to six across, as many as make full rows of the models (app.js sets it): ten make two rows of
+   five, rather than 4, 4 and 2. */
+@media (min-width: 960px) { .models { grid-template-columns: repeat(var(--across, 5), minmax(0, 1fr)); } }
 /* A phone held sideways: a smaller title and wider pictures, so the first cards show on the first screen and a
    card's picture and its name fit on the screen together. */
 @media (orientation: landscape) and (max-height: 500px) {

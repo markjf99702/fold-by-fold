@@ -98,6 +98,7 @@ function renderHome() {
   }
   const list = $('models');
   if (!list.childElementCount) {
+    list.style.setProperty('--across', across(MODELS.length));
     for (const m of MODELS) {
       const li = document.createElement('li');
       const btn = document.createElement('button');
@@ -116,6 +117,13 @@ function renderHome() {
     }
   }
   paintHome();
+}
+
+// On a wide screen the gallery is 4, 5 or 6 cards across, whichever leaves the fewest gaps in its last row (5 on a
+// tie), so the models make full rows where their number allows, rather than ending on a card or two alone.
+function across(n) {
+  const gaps = (c) => (c - (n % c)) % c;
+  return [5, 4, 6].reduce((best, c) => (gaps(c) < gaps(best) ? c : best));
 }
 
 function pickPaper(id) {

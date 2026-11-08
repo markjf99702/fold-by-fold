@@ -1750,8 +1750,13 @@ for (const [width, height] of [[1280, 800], [390, 844], [360, 780]]) {
   });
   assert.ok(rows.length >= 2 && rows[0].length >= 2, `the cards aren't in rows at ${width} px: ${JSON.stringify(rows)}`);
   for (const row of rows) assert.ok(row.every((card) => card.every((y, k) => y === row[0][k])), `the cards in a row don't line up at ${width} px: ${JSON.stringify(row)}`);
-  // On a wide screen the ten models make two full rows of five, not 4, 4 and 2.
-  if (width >= 960) assert.deepEqual(rows.map((row) => row.length), [5, 5], `the gallery doesn't end on a full row at ${width} px`);
+  // On a wide screen the models make full rows, 4 to 6 across, or as near full as their number allows: ten make two rows
+  // of five, not 4, 4 and 2, and eleven don't leave one card alone.
+  if (width >= 960) {
+    const lengths = rows.map((row) => row.length), n = lengths.reduce((a, b) => a + b), gaps = (c) => (c - (n % c)) % c;
+    assert.ok([4, 5, 6].includes(lengths[0]) && lengths.slice(0, -1).every((l) => l === lengths[0]) && gaps(lengths[0]) === Math.min(...[4, 5, 6].map(gaps)),
+      `the gallery doesn't end on as full a row as it could at ${width} px: ${JSON.stringify(lengths)}`);
+  }
   if (wide) {
     // With a mouse, the hint under the paper says to scroll to zoom.
     await p.click('.model:has(.title:text("Paper cup"))');
