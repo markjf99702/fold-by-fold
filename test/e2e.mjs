@@ -17,7 +17,9 @@ const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/cs
 // The server answers the way GitHub Pages does: a browser may keep each file for ten minutes, and asks again by its
 // ETag. `net` is the connection: 'up', 'down' (the server drops every connection) or 'stalled' (a train, a captive
 // wifi: it takes each request and holds on to it). With `release` set it serves the next release (see the offline
-// checks).
+// checks). The site lives at junkdrawer.works/fold-by-fold/, a path on an address other tools share, so it's served at
+// that path here too: an address written from the top (/css/app.css) finds nothing, as it would find nothing of
+// this site there, and the offline copy's worker looks after that path alone, as it does there.
 let net = 'up', release = false;
 const held = [];
 const server = createServer((req, res) => {
@@ -25,20 +27,25 @@ const server = createServer((req, res) => {
   if (net === 'stalled') { held.push([req, res]); return; }
   serve(req, res);
 }).listen(0);
+const HOME = '/fold-by-fold/';
 async function serve(req, res) {
   let path = decodeURIComponent(new URL(req.url, 'http://x').pathname);
-  if (path.endsWith('/')) path += 'index.html';
+  if (path === HOME.slice(0, -1)) { res.writeHead(301, { location: HOME }); res.end(); return; }
+  if (!path.startsWith(HOME)) { res.writeHead(404); res.end(); return; }
+  path = path.slice(HOME.length);
+  if (path === '' || path.endsWith('/')) path += 'index.html';
   let body;
   try { body = await readFile(join(root, path)); } catch { res.writeHead(404); res.end(); return; }
-  if (release && path === '/sw.js') body = Buffer.from(String(body).replace(/const FILES = '[0-9a-f]*'/, "const FILES = 'next'"));
-  if (release && path === '/index.html') body = Buffer.concat([body, Buffer.from('<!-- the next release -->\n')]);
+  if (release && path === 'sw.js') body = Buffer.from(String(body).replace(/const FILES = '[0-9a-f]*'/, "const FILES = 'next'"));
+  if (release && path === 'index.html') body = Buffer.concat([body, Buffer.from('<!-- the next release -->\n')]);
   const etag = `"${createHash('sha1').update(body).digest('hex').slice(0, 16)}"`;
   const head = { etag, 'cache-control': 'max-age=600', 'content-type': TYPES[extname(path)] || 'text/html' };
   if (req.headers['if-none-match'] === etag) { res.writeHead(304, head); res.end(); return; }
   res.writeHead(200, head);
   res.end(body);
 }
-const base = `http://localhost:${server.address().port}/`;
+const origin = `http://localhost:${server.address().port}`;
+const base = origin + HOME;
 // Waits for ok() to come true, for up to ms, or fails saying what didn't happen.
 const until = async (ok, ms, what) => {
   for (const end = Date.now() + ms; !(await ok());) { assert.ok(Date.now() < end, what); await new Promise((r) => setTimeout(r, 100)); }
@@ -51,8 +58,13 @@ const page = await ctx.newPage();
 const problems = [];
 page.on('pageerror', e => problems.push(e.message));
 page.on('console', m => { if (m.type() === 'error') problems.push(m.text()); });
-page.on('requestfailed', r => problems.push('failed: ' + r.url()));
-page.on('request', r => { if (!r.url().startsWith(base)) problems.push('left the site: ' + r.url()); });
+page.on('requestfailed', r => problems.push(`failed: ${r.url()} (${r.failure()?.errorText})`));
+// Every file of the site the page asks for, to check the offline copy keeps it (at the end).
+const loaded = new Set();
+page.on('request', r => {
+  if (!r.url().startsWith(base)) problems.push('left the site: ' + r.url());
+  else loaded.add(r.url().slice(base.length).replace(/[?#].*/, '') || './');
+});
 // A file that's missing or renamed answers with an error rather than failing outright (a font would quietly fall back).
 const answered = (r) => { if (r.status() >= 400) problems.push(`${r.status()}: ${r.url()}`); };
 page.on('response', answered);
@@ -235,12 +247,13 @@ for (const [width, height] of [[360, 780], [320, 568], [280, 653]]) {
 await page.evaluate(() => fold.set(2, 0));
 await page.setViewportSize({ width: 390, height: 844 });
 
-// The offline copy lists every file the page needs.
+// The offline copy lists every file the page needs (and, at the end, every file the page asked for on the way).
 const sw = await readFile(join(root, 'sw.js'), 'utf8');
+const shell = [...sw.match(/SHELL = \[([^\]]*)\]/)[1].replace(/\/\/.*/g, '').matchAll(/'([^']*)'/g)].map(m => m[1]);
 for (const dir of ['js', 'css', 'fonts']) {
-  for (const f of await readdir(join(root, dir))) assert.ok(sw.includes(`'${dir}/${f}'`), `sw.js doesn't list ${dir}/${f}`);
+  for (const f of await readdir(join(root, dir))) assert.ok(shell.includes(`${dir}/${f}`), `sw.js doesn't list ${dir}/${f}`);
 }
-for (const f of ['index.html', 'icon.svg', 'manifest.webmanifest', 'icon-192.png']) assert.ok(sw.includes(`'${f}'`), `sw.js doesn't list ${f}`);
+for (const f of ['./', 'index.html', 'icon.svg', 'manifest.webmanifest', 'icon-192.png']) assert.ok(shell.includes(f), `sw.js doesn't list ${f}`);
 
 // Other tools on junkdrawer.works share this address and its caches, so the offline copy clears out only
 // its own old caches, never theirs, even one whose name starts the same way.
@@ -1979,14 +1992,16 @@ for (const [width, height, id] of [[390, 844, 'crane'], [360, 780, 'crane'], [39
   await c.close();
 }
 
-assert.deepEqual(problems.filter(p => !p.startsWith('failed:')), [], 'problems while using it');
+assert.deepEqual(problems, [], 'problems while using it');
+// Everything the page asked for while it showed the gallery and the models is in the offline copy, or is the worker
+// that keeps it: a file loaded from anywhere else would be missing with no connection.
+assert.deepEqual([...loaded].filter((f) => !shell.includes(f) && f !== 'sw.js'), [], 'the page loaded files the offline copy doesn\'t keep');
 await browser.close();
 server.close();
 
 // sw.js changes whenever a file it keeps does, so a release replaces the whole offline copy at once: FILES in sw.js is
 // a fingerprint of every file in SHELL (sha1 of each, in the list's order, an address like './' read as its
 // index.html; the first 8 hex of the sha1 of those).
-const shell = [...sw.match(/SHELL = \[([^\]]*)\]/)[1].replace(/\/\/.*/g, '').matchAll(/'([^']*)'/g)].map(m => m[1]);
 const all = createHash('sha1');
 for (const f of shell) all.update(createHash('sha1').update(await readFile(join(root, f.endsWith('/') ? f + 'index.html' : f))).digest());
 const files = all.digest('hex').slice(0, 8);
