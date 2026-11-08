@@ -1452,7 +1452,8 @@ for (const hash of ['#%', '#crane-3%', '#%F0%9F']) {
 }
 
 // A double tap on the paper puts the view back, found from the taps themselves: phones don't all report a double tap
-// as a double click (Safari on an iPhone hasn't always), so here the page never hears of one.
+// as a double click (Safari on an iPhone hasn't always), so here the page never hears of one. A single tap does what
+// Play does, once no second tap has followed, and a finger dragging the paper round plays nothing.
 {
   const p = await fresh('#cup');
   await p.waitForFunction(() => fold.state.id === 'cup');
@@ -1465,6 +1466,23 @@ for (const hash of ['#%', '#crane-3%', '#%F0%9F']) {
   }
   await p.waitForFunction(() => fold.view().goal.yaw === null && fold.view().cam.yaw !== -150, null, { timeout: 3000 }).catch(() => {});
   assert.deepEqual(await p.evaluate(() => [Math.round(fold.view().cam.yaw), Math.round(fold.view().cam.pitch)]), [-90, 58], 'a double tap did not put the view back');
+  await p.waitForTimeout(500);
+  assert.deepEqual(await p.evaluate(() => [fold.state.playing, fold.state.t]), [false, 0], 'a double tap on the paper played the fold');
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] });
+  for (let k = 1; k <= 5; k++) await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: x + k * 8, y }] });
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  await p.waitForTimeout(500);
+  assert.equal(await p.evaluate(() => fold.state.playing), false, 'a finger turning the paper played the fold');
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] });
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  assert.equal(await p.evaluate(() => fold.state.playing), false, 'a tap played before it could be told from a double tap');
+  await p.waitForFunction(() => fold.state.playing, null, { timeout: 2000 }).catch(() => assert.fail('a tap on the paper did not play the fold'));
+  await p.waitForFunction(() => fold.state.t > 0.1, null, { timeout: 5000 });
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] });
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  await p.waitForFunction(() => !fold.state.playing, null, { timeout: 2000 }).catch(() => assert.fail('a tap on the paper did not pause the fold'));
+  assert.equal(await p.textContent('#playLabel'), 'Carry on');
+  await p.waitForTimeout(400);
   // Two fingers spreading apart on the paper zoom in.
   await p.waitForTimeout(400);
   await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: x - 30, y, id: 1 }, { x: x + 30, y, id: 2 }] });
@@ -1807,6 +1825,10 @@ for (const [width, height] of [[1280, 800], [390, 844], [360, 780]]) {
     await p.mouse.dblclick(box.x + box.width / 2, box.y + box.height / 2);
     await p.waitForFunction(() => fold.view().goal.pitch === null && fold.view().cam.pitch < 60, null, { timeout: 5000 }).catch(() => {});
     assert.deepEqual(await cam(), [-90, 58, 1], 'a double click did not put the view back');
+    assert.equal(await p.evaluate(() => fold.state.playing), false, 'a double click on the paper played the fold');
+    // A single click on the paper plays, as a tap does.
+    await p.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+    await p.waitForFunction(() => fold.state.playing, null, { timeout: 2000 }).catch(() => assert.fail('a click on the paper did not play the fold'));
   }
   await p.context().close();
 }

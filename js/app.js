@@ -724,9 +724,12 @@ function wireCamera() {
   const hint = $('hint');
   const hideHint = () => hint.classList.add('gone');
   setTimeout(hideHint, 7000);
-  // A double tap puts the view back. It's picked out here from the taps themselves, since phones don't all report
-  // a double tap to the page; a double click is left to the mouse. A tap is one finger that hardly moves.
-  let tap = null, lastTap = null, pointer = 'mouse';
+  // A tap on the paper does what Play does (the paper is the biggest thing to hit with a knuckle or a busy finger), and a
+  // double tap puts the view back. A tap is one finger, or a click, that hardly moves. Double taps are picked out here
+  // from the taps themselves, since phones don't all report them to the page, so a tap plays only once 300 ms have gone
+  // by without a second one begun near it. A double click at the mouse's own speed puts the view back too.
+  const DOUBLE = 300;
+  let tap = null, pending = null, pointer = 'mouse'; // pending: a tap waiting to play, { x, y, t, timer }
   // One finger turns the paper once it has moved 8 px, and from there on, so a finger that only rests or taps leaves it
   // where it is (a mouse turns it at once). After a pinch, the finger still down as the other lifts doesn't turn it at
   // all, however it drifts, until both are off: each pinch ended with the view a little twisted.
@@ -737,14 +740,20 @@ function wireCamera() {
     pts.set(e.pointerId, [e.clientX, e.clientY]);
     if (pts.size === 2) { pinch = spread(); multi = true; }
     pointer = e.pointerType;
-    tap = pointer !== 'mouse' && pts.size === 1 ? { id: e.pointerId, x: e.clientX, y: e.clientY } : null;
+    tap = pts.size === 1 && e.button === 0 ? { id: e.pointerId, x: e.clientX, y: e.clientY } : null;
+    // Anything begun meanwhile calls off a tap waiting to play: a second tap near it in time makes the two a double tap.
+    if (pending) {
+      clearTimeout(pending.timer);
+      if (tap && e.timeStamp - pending.t < DOUBLE && Math.hypot(tap.x - pending.x, tap.y - pending.y) < 24) tap.second = true;
+      pending = null;
+    }
     from = pointer !== 'mouse' && pts.size === 1 ? [e.clientX, e.clientY] : null;
   });
   c.addEventListener('pointermove', (e) => {
     if (!pts.has(e.pointerId)) return;
     const [x, y] = pts.get(e.pointerId);
     pts.set(e.pointerId, [e.clientX, e.clientY]);
-    if (tap && Math.hypot(e.clientX - tap.x, e.clientY - tap.y) >= 10) tap = null;
+    if (tap && Math.hypot(e.clientX - tap.x, e.clientY - tap.y) >= (pointer === 'mouse' ? 5 : 10)) tap = null;
     if (pts.size === 1 && from) {
       if (Math.hypot(e.clientX - from[0], e.clientY - from[1]) >= 8) from = null; // far enough: it turns from here on
     } else if (pts.size === 1 && !multi) {
@@ -768,14 +777,20 @@ function wireCamera() {
   const up = (e) => { pts.delete(e.pointerId); pinch = pts.size === 2 ? spread() : 0; if (!pts.size) multi = false; };
   c.addEventListener('pointerup', (e) => {
     up(e);
-    if (tap?.id !== e.pointerId) { if (pointer !== 'mouse') lastTap = null; return; }
-    if (lastTap && e.timeStamp - lastTap.t < 300 && Math.hypot(tap.x - lastTap.x, tap.y - lastTap.y) < 24) {
-      resetView();
-      lastTap = null;
-    } else lastTap = { t: e.timeStamp, x: tap.x, y: tap.y };
+    if (tap?.id !== e.pointerId) return;
+    if (tap.second) resetView();
+    else {
+      const it = pending = { x: tap.x, y: tap.y, t: e.timeStamp };
+      it.timer = setTimeout(() => {
+        if (pending !== it) return;
+        pending = null;
+        if (!$('player').hidden) { hideHint(); primary(); }
+      }, DOUBLE);
+    }
     tap = null;
   });
-  c.addEventListener('pointercancel', (e) => { up(e); tap = lastTap = null; });
+  const callOff = () => { if (pending) { clearTimeout(pending.timer); pending = null; } };
+  c.addEventListener('pointercancel', (e) => { up(e); tap = null; callOff(); });
   // The wheel zooms toward the point under the cursor.
   c.addEventListener('wheel', (e) => {
     e.preventDefault();
@@ -783,7 +798,7 @@ function wireCamera() {
     view.zoomAt(Math.exp(e.deltaY * 0.0012), e.clientX - r.left, e.clientY - r.top);
     redraw();
   }, { passive: false });
-  c.addEventListener('dblclick', () => { if (pointer === 'mouse') resetView(); });
+  c.addEventListener('dblclick', () => { if (pointer === 'mouse') { callOff(); resetView(); } });
   // From the keyboard, with the paper in focus: the arrow keys turn it the way a drag does, a little at a time, and +
   // and - zoom. Meanwhile they don't step through the model (see the page's keys).
   c.addEventListener('keydown', (e) => {
