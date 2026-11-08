@@ -239,12 +239,14 @@ html:has(#player:not([hidden])) { overscroll-behavior-y: none; }
 .hint {
   position: absolute; left: 50%; bottom: 10px; transform: translateX(-50%); margin: 0;
   font-size: .8rem; padding: 4px 12px; border-radius: 99px; background: rgba(20, 30, 26, .55); color: #eef3ef;
-  pointer-events: none; white-space: nowrap; transition: opacity .6s;
+  pointer-events: none; transition: opacity .6s;
+  width: max-content; max-width: calc(100% - 20px); text-align: center; text-wrap: balance; /* one line, but two on a page zoomed in */
 }
+.hint span span { white-space: nowrap; } /* where it wraps, after a dot */
 .hint.gone { opacity: 0; }
 /* On a stage only a few fingers tall the hint would cover the paper. */
 @container (max-height: 240px) { .hint { display: none; } }
-/* With a mouse you zoom by scrolling, not pinching, so the hint says that instead. */
+/* With a mouse you click rather than tap, so the hint says that instead. */
 .hint .mouse { display: none; }
 @media (hover: hover) and (pointer: fine) {
   .hint .touch { display: none; }

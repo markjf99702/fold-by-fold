@@ -120,8 +120,9 @@ assert.equal(await page.evaluate(() => location.hash), '#cup');
 assert.match(await page.textContent('#stepCount'), /^Step 1 of \d+$/);
 assert.ok((await page.textContent('#say')).length > 10, 'no words for the step');
 assert.equal(await page.isVisible('#glError'), false, 'no 3D in this browser');
-// The hint says how to zoom with what you have: pinch on a phone, scroll with a mouse (further down).
-assert.equal(await page.innerText('#hint'), 'Drag to turn the paper · pinch to zoom');
+// The hint says what a tap, a drag and a double tap on the paper do, in words for what you have: taps on a phone, clicks
+// with a mouse (further down). It stays on one line, inside the paper, on a 320 px phone too (below).
+assert.equal(await page.innerText('#hint'), 'Tap to play · drag to turn · double-tap to reset');
 // Nothing reads the picture back, so the browser needn't keep a copy of every frame (costly on phones).
 assert.equal(await page.evaluate(() => fold.view().gl.getContextAttributes().preserveDrawingBuffer), false, 'every frame is kept');
 assert.equal(await sideways(), false, 'the player scrolls sideways on a phone');
@@ -254,6 +255,8 @@ for (const [width, height] of [[360, 780], [320, 568], [280, 653]]) {
   assert.deepEqual(cut, [], `buttons cut off at ${width} px`);
   const [label, button] = await page.evaluate(() => ['#playLabel', '#play'].map((q) => document.querySelector(q).getBoundingClientRect().toJSON()));
   assert.ok(label.left >= button.left + 4 && label.right <= button.right - 4, `the label spills out of its button at ${width} px`);
+  const [hint, stage, lines] = await page.evaluate(() => [...['#hint', '#stage'].map((q) => document.querySelector(q).getBoundingClientRect().toJSON()), (document.getElementById('hint').getClientRects().length ? Math.round(document.getElementById('hint').getBoundingClientRect().height / parseFloat(getComputedStyle(document.getElementById('hint')).lineHeight)) : 1)]);
+  assert.ok(hint.left >= stage.left && hint.right <= stage.right && (width < 300 || lines === 1), `the hint is cut off, or wraps, at ${width} px`);
 }
 await page.evaluate(() => fold.set(2, 0));
 await page.setViewportSize({ width: 390, height: 844 });
@@ -1807,10 +1810,10 @@ for (const [width, height] of [[1280, 800], [390, 844], [360, 780]]) {
       `the gallery doesn't end on as full a row as it could at ${width} px: ${JSON.stringify(lengths)}`);
   }
   if (wide) {
-    // With a mouse, the hint under the paper says to scroll to zoom.
+    // With a mouse, the hint under the paper says to click.
     await p.click('.model:has(.title:text("Paper cup"))');
     await p.waitForFunction(() => fold.state.id === 'cup');
-    assert.equal(await p.innerText('#hint'), 'Drag to turn the paper · scroll to zoom');
+    assert.equal(await p.innerText('#hint'), 'Click to play · drag to turn · double-click to reset');
     // And scrolling on the paper zooms in, the square button looks straight down the way a diagram does, and a
     // double click puts the view back.
     const cam = () => p.evaluate(() => { const v = fold.view(); return [Math.round(v.cam.yaw), +v.cam.pitch.toFixed(1), +v.zoom.toFixed(2)]; });
