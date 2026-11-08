@@ -7,7 +7,7 @@
 
 import {
   apply, compose, det, invert, reflection, rotation, clip, cuts, ccw, area, inside, overlapArea,
-  sharedSegment, side, sub, near, flip, centroid, IDENTITY,
+  sharedSegment, side, sub, near, flip, centroid, cross, norm, IDENTITY,
 } from './geom.js';
 import { crossings } from './check.js';
 
@@ -410,6 +410,12 @@ export function reverse(sheet, L, { seed, split }) {
   // The spine: where the tip's front and back halves meet, on the table.
   const spine = spineOf(from, tipF, tipB);
   if (!spine) throw new Error('Could not find the fold joining the two halves of the tip');
+  // The tip swings round the point where the crease meets that fold, so the crease has to cross it.
+  if (Math.abs(cross(L.d, norm(sub(spine[1], spine[0])))) < 1e-6) throw new Error("The crease of an inside reverse fold has to cross the flap's folded edge");
+  // The tip goes up between layers that stay put, as a tuck goes into a pocket, so check that it lands where real
+  // paper could: no fold it makes may pass through another.
+  const problems = crossings(to);
+  if (problems.length) throw new Error(`The point can't reverse there: ${problems[0]}`);
   // Where each moving piece is joined to one that stays, along the crease, on the paper.
   const hinges = [];
   for (const id of moving) {

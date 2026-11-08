@@ -89,6 +89,29 @@ test('folds made together that would move the same paper are refused, rather tha
   assert.throws(() => build(model), /twice step 1: Folds made together must move different flaps$/);
 });
 
+// The paper folded in half along a diagonal, and the line between its front and back halves.
+const diagonal = { say: 'Fold in half along the diagonal.', do: (h) => h.valley(h.through([0, 0], [1, 1]), { move: [0.9, 0.1] }) };
+const halves = (h) => h.paperLine([0, 0], [1, 1]);
+
+test('an inside reverse fold along the flap\'s own folded edge is refused, rather than breaking the animation', () => {
+  // The crease runs parallel to the fold joining the flap's two halves, so there is no point for the tip to swing round.
+  const model = { id: 'parallel', steps: [diagonal, {
+    say: 'Inside reverse fold along a line beside the folded edge.',
+    do: (h) => h.reverse(h.through([0.9375, 0.75], [0.125, 0.3125]), { flap: [0.3225, 0.2075], split: halves(h) }),
+  }] };
+  assert.throws(() => build(model), /parallel step 2: The crease of an inside reverse fold has to cross the flap's folded edge$/);
+});
+
+test('an inside reverse fold that would push paper through paper is refused', () => {
+  // A strip folded in first, then the point reversed across it: the strip's fold and the point's would interleave.
+  const model = { id: 'interleave', steps: [
+    { say: 'Fold the right edge in to the three-quarter line.', do: (h) => h.valley(h.onto([1, 0], [0.5, 0]), { flap: [0.99, 0.01] }) },
+    diagonal,
+    { say: 'Inside reverse fold the point.', do: (h) => h.reverse(h.through([0.75, 0.5625], [0.125, 0.25]), { flap: [0.0725, 0.645], split: halves(h) }) },
+  ] };
+  assert.throws(() => build(model), /interleave step 3: The point can't reverse there: folds \d+\/\d+ and \d+\/\d+ interleave/);
+});
+
 test('four corners folded in together all meet at the center', () => {
   const s = Sheet.square();
   const corner = (q) => (sh) => fold(sh, bisector(sh.at(q), [0, 0]), { type: 'valley', layers: 'flap', seed: q });
