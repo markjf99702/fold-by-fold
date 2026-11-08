@@ -687,6 +687,38 @@ for (const reduce of [false, true]) {
   await p.context().close();
 }
 
+// The folds hardest to see are tiny with the whole model in view: the crane's head was about 20 px across on a phone. On a
+// step whose fold is small, the camera moves in on the part that folds as the step opens, so it fills about half the view.
+// A double click (a double tap, on a phone) comes back to that view, a pinch or the wheel out goes as far as the whole
+// model, and the next step frames the whole model again.
+{
+  const p = await fresh('#crane-20', { viewport: { width: 1280, height: 800 }, deviceScaleFactor: 1, hasTouch: false });
+  await p.waitForFunction(() => fold.state.id === 'crane' && document.getElementById('glWait').hidden);
+  const settled = () => p.waitForFunction(() => { const v = fold.view(); return Math.abs(v.cam.dist - v.place().dist * v.zoom) < 1e-3; }, null, { timeout: 5000 }).catch(() => {});
+  const dist = () => p.evaluate(() => fold.view().cam.dist);
+  await settled();
+  const whole = await dist();
+  await p.click('#stepList li:nth-child(21) button');
+  await settled();
+  const close = await dist();
+  assert.ok(close < whole / 2, `the crane's head was not seen close up: the camera ${close.toFixed(2)} away, against ${whole.toFixed(2)} for the whole crane`);
+  // The head is in the middle of the view.
+  const head = await p.evaluate(() => { const v = fold.view(); return [v.cam.target[0], v.cam.target[1]]; });
+  assert.ok(head[0] > 0.1 && head[1] > 0.05, `the close view is not on the crane's head, but at ${head}`);
+  const box = await p.locator('#gl').boundingBox();
+  await p.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  for (let k = 0; k < 30; k++) await p.mouse.wheel(0, 300);
+  await settled();
+  assert.ok(await dist() > whole, 'the wheel did not go out far enough to see the whole crane');
+  await p.mouse.dblclick(box.x + box.width / 2, box.y + box.height / 2);
+  await settled();
+  assert.ok(Math.abs(await dist() - close) < 0.01, 'a double click did not come back to the close view');
+  await p.click('#stepList li:nth-child(22) button');
+  await settled();
+  assert.ok(await dist() > close * 1.5, 'the step after the head did not frame the whole crane again');
+  await p.context().close();
+}
+
 // Each model opens seen from the usual angle and zoom, not from where the last one was left: from underneath and zoomed
 // in, the paper airplane's first step ('white side up') showed only the back of the paper, filling the view.
 {
@@ -1395,7 +1427,8 @@ for (const hash of ['#%', '#crane-3%', '#%F0%9F']) {
 
 // Zooming goes toward the point under the cursor or the fingers, so a small fold at a tip stays in sight as it grows:
 // the crane's head, about 20 px across on a phone, used to leave the screen as you zoomed in to see it. Two fingers
-// moving together slide the view along the table, and a double tap puts it back in the middle.
+// moving together slide the view along the table, and a double tap puts it back in the middle. (On the step before the
+// head is made, with the whole crane in view: the head's own step moves in close by itself.)
 {
   // Where the tip of the crane's neck is on the screen, in CSS pixels on the canvas, and how big it looks.
   const tip = (p) => p.evaluate(async () => {
@@ -1412,7 +1445,7 @@ for (const hash of ['#%', '#crane-3%', '#%F0%9F']) {
   const near = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
   // The wheel, with the cursor over the tip.
   {
-    const p = await fresh('#crane-21', { viewport: { width: 1280, height: 800 }, deviceScaleFactor: 1, hasTouch: false });
+    const p = await fresh('#crane-20', { viewport: { width: 1280, height: 800 }, deviceScaleFactor: 1, hasTouch: false });
     await p.waitForFunction(() => fold.state.id === 'crane');
     const box = await p.locator('#gl').boundingBox();
     const was = await tip(p);
@@ -1427,7 +1460,7 @@ for (const hash of ['#%', '#crane-3%', '#%F0%9F']) {
   }
   // Two fingers spreading over the tip, on a phone.
   {
-    const p = await fresh('#crane-21');
+    const p = await fresh('#crane-20');
     await p.waitForFunction(() => fold.state.id === 'crane');
     const box = await p.locator('#gl').boundingBox();
     const was = await tip(p);

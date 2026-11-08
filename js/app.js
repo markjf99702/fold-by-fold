@@ -604,6 +604,34 @@ function reachOf(step) {
   return reach.get(step);
 }
 
+// The folds hardest to see are tiny with the whole model in view: the crane's head is about 20 px across on a phone. So a
+// step whose moving paper and marks keep to a small part of the model is framed on that part, so it fills about half the
+// view, when that's at least half as close again as the whole model would be; the next step frames the whole model
+// again. A pinch out goes far enough to see the whole model. Worked out once for each step: { cx, cy, cz, size, pts }.
+const closeUps = new WeakMap();
+function closeUp(step) {
+  if (!closeUps.has(step)) {
+    const m = step.motion;
+    const moving = new Set([...(m.moving || []), ...(m.parts || []).flatMap((q) => q.reverse?.moving || q.moving || [])]);
+    const pts = [];
+    for (let k = 0; k <= 12; k++) for (const it of poses(step, k / 12)) if (it.bridge || moving.has(it.facet.id)) pts.push(...corners(it));
+    for (const mk of marksOf(step) || []) {
+      for (const q of [...(mk.line || []), ...(mk.arrow?.from ? [mk.arrow.from, mk.arrow.to] : [])]) pts.push(q);
+    }
+    let it = null;
+    if (pts.length && !['turnOver', 'turn'].includes(m.kind)) {
+      const lo = [0, 1, 2].map((k) => Math.min(...pts.map((q) => q[k]))), hi = [0, 1, 2].map((k) => Math.max(...pts.map((q) => q[k])));
+      const c = lo.map((v, k) => (v + hi[k]) / 2), part = Math.max(hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]);
+      const a = step.from.bounds(), b = step.to.bounds();
+      const whole = Math.max(Math.max(a.x1, b.x1) - Math.min(a.x0, b.x0), Math.max(a.y1, b.y1) - Math.min(a.y0, b.y0), 0.55);
+      // Fitted with every point twice as far from the part's middle, the part fills about half the view.
+      if (2 * part * 1.5 <= whole) it = { cx: c[0], cy: c[1], cz: c[2], size: 2 * part, whole, pts: Float32Array.from(pts.flatMap((q) => q.map((v, k) => c[k] + (v - c[k]) * 2))) };
+    }
+    closeUps.set(step, it);
+  }
+  return closeUps.get(step);
+}
+
 function frameCamera(snap) {
   if (!view) return;
   const s = P.b.steps[P.i];
@@ -620,8 +648,14 @@ function frameCamera(snap) {
   const v = aimedFor === s ? s.view : null;
   const size = Math.max(x1 - x0, y1 - y0, v?.size || 0, 0.55);
   const box = [x0, y0, x1, y1];
+  const close = s.view ? null : closeUp(s);
+  view.widest = close ? Math.max(3, (2.5 * close.whole) / close.size) : 3;
+  view.zoom = Math.min(view.zoom, view.widest); // zoomed out on a close-up, the next step comes back in
   if (s.view) view.frame((x0 + x1) / 2, (y0 + y1) / 2, size, v?.lift || 0, { box });
-  else {
+  else if (close) {
+    const at = aimedFor === s ? angleOf(s) : { yaw: -90, pitch: 58 };
+    view.frame(close.cx, close.cy, close.size, close.cz, { box, room: size, fit: { pts: close.pts, yaw: at.yaw, pitch: at.pitch } });
+  } else {
     const pts = reachOf(s);
     let top = 0;
     for (let k = 2; k < pts.length; k += 3) top = Math.max(top, pts[k]);
