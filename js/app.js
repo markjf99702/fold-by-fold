@@ -627,22 +627,25 @@ const chipFor = (step) => `${CHIP[symbol(step, marksOf(step))]}<span>${step.name
 const sheet = $('keySheet');
 $('keyBody').append(document.querySelector('.symbols .symbol-list').cloneNode(true));
 // A step's entry is the one for the symbol beside its name, the marks it draws, but for a fold and unfold and an inside
-// reverse fold, which have entries of their own.
+// reverse fold, which have entries of their own. Plain folds made together, one toward you and one behind (the crane's
+// wings, the frog's two pages), draw a valley line and a mountain line, as a collapse does, but they're a valley fold
+// and a mountain fold, so they open at both of those.
 function keyFor(step) {
   const m = step.motion;
-  if (m.kind === 'reverse' || (m.kind === 'mech' && m.parts) || m.parts?.some((q) => q.reverse)) return 'reverse';
-  if (m.kind === 'foldUnfold' || (m.kind === 'multi' && m.folded)) return 'foldUnfold';
-  return symbol(step, marksOf(step));
+  if (m.kind === 'reverse' || (m.kind === 'mech' && m.parts) || m.parts?.some((q) => q.reverse)) return ['reverse'];
+  if (m.kind === 'foldUnfold' || (m.kind === 'multi' && m.folded)) return ['foldUnfold'];
+  if (m.kind === 'multi' && !step.unfold && m.parts.every((q) => !q.bend && !q.back) && new Set(m.parts.map((q) => q.type)).size > 1) return ['valley', 'mountain'];
+  return [symbol(step, marksOf(step))];
 }
 function openKey() {
   if (P.waiting || sheet.open) return;
   if (P.playing) pause();
-  const key = keyFor(P.b.steps[P.i]), body = $('keyBody');
+  const keys = keyFor(P.b.steps[P.i]), body = $('keyBody');
   let here = null;
   for (const d of body.querySelectorAll('.symbol-list > div')) {
-    const on = d.dataset.key === key;
+    const on = keys.includes(d.dataset.key);
     d.classList.toggle('here', on);
-    if (on) { d.setAttribute('aria-current', 'true'); here = d; } else d.removeAttribute('aria-current');
+    if (on) { d.setAttribute('aria-current', 'true'); here ||= d; } else d.removeAttribute('aria-current');
   }
   sheet.showModal();
   // The key itself takes the focus, as a page to read would, rather than its × button, ringed as if from the keyboard.

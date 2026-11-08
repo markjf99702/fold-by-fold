@@ -1437,7 +1437,8 @@ for (const hash of ['#%', '#crane-3%', '#%F0%9F']) {
 // view, without leaving the model, and a fold playing pauses under it. It closes with its × button, Escape (which
 // otherwise goes back to the gallery) or a tap outside it, and the tap that closes it doesn't play the fold. Every step
 // of every model opens one entry, the one for the marks it draws: an inside reverse fold and a fold and unfold have
-// their own.
+// their own. Plain folds made together toward you and behind (the crane's wings, the frog's two pages) open at the
+// valley fold and the mountain fold, not the collapse whose two lines they draw.
 {
   const p = await fresh('#crane-19');
   await p.waitForFunction(() => fold.state.id === 'crane');
@@ -1471,8 +1472,9 @@ for (const hash of ['#%', '#crane-3%', '#%F0%9F']) {
         document.getElementById('chip').click();
         const here = [...document.querySelectorAll('#keySheet .here dt')].map((d) => d.textContent);
         const name = document.querySelector('#chip span').textContent;
-        const want = { 'Fold and unfold': 'Fold and unfold', 'Unfold': 'Unfold', 'Turn over': 'Turn over', 'Rotate': 'Rotate', 'Collapse': 'Collapse and petal fold', 'Petal fold': 'Collapse and petal fold', 'Inside reverse fold': 'Inside reverse fold', 'Inside reverse folds': 'Inside reverse fold', 'Valley fold': 'Valley fold', 'Mountain fold': 'Mountain fold' }[name];
-        if (!document.getElementById('keySheet').open || here.length !== 1 || (want && here[0] !== want)) out.push(`${id}-${i + 1} ${name}: ${here.join(', ') || 'nothing'}`);
+        const both = 'Valley fold, Mountain fold';
+        const want = { 'Fold and unfold': 'Fold and unfold', 'Unfold': 'Unfold', 'Turn over': 'Turn over', 'Rotate': 'Rotate', 'Collapse': 'Collapse and petal fold', 'Petal fold': 'Collapse and petal fold', 'Inside reverse fold': 'Inside reverse fold', 'Inside reverse folds': 'Inside reverse fold', 'Valley fold': 'Valley fold', 'Mountain fold': 'Mountain fold', 'Valley and mountain': both, 'Turn pages': both, 'Turn two pages': both }[name];
+        if (!document.getElementById('keySheet').open || (want ? here.join(', ') !== want : here.length !== 1)) out.push(`${id}-${i + 1} ${name}: ${here.join(', ') || 'nothing'}`);
         document.getElementById('keySheet').close();
       }
     }
