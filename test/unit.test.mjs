@@ -369,6 +369,20 @@ test('every model says what paper to fold it from, and it is the paper the model
   }
 });
 
+test('the gallery runs from Easy through Medium to Tricky, with the crane just before its cousin the flapping bird', () => {
+  const levels = ['Easy', 'Medium', 'Tricky'];
+  const rank = MODELS.map((m) => levels.indexOf(m.level));
+  MODELS.forEach((m, k) => assert.ok(rank[k] >= 0, `${m.id} is rated ${m.level}`));
+  for (let k = 1; k < MODELS.length; k++) {
+    const [a, b] = [MODELS[k - 1], MODELS[k]];
+    assert.ok(rank[k] >= rank[k - 1], `the ${b.name.toLowerCase()} (${b.level}) comes after the ${a.name.toLowerCase()} (${a.level})`);
+  }
+  const at = (id) => MODELS.findIndex((m) => m.id === id);
+  assert.equal(at('flapping-bird'), at('crane') + 1);
+  // Mark rates the crane and the flapping bird Medium: neither is really tricky. The frog is.
+  assert.deepEqual(['crane', 'flapping-bird', 'frog'].map((id) => MODELS[at(id)].level), ['Medium', 'Medium', 'Tricky']);
+});
+
 test('js/finished.js has a picture for every model and nothing else', () => {
   assert.deepEqual(Object.keys(FINISHED), MODELS.map((m) => m.id), 'run node tools/make-thumbs.mjs');
 });

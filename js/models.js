@@ -589,7 +589,7 @@ export const MODELS = [
   {
     id: 'crane',
     name: 'Crane',
-    level: 'Tricky',
+    level: 'Medium',
     blurb: 'The traditional orizuru. The collapse, petal folds and reverse folds are the steps drawings make hardest.',
     paper: { kind: 'Square', colorUp: true, turn: 45 },
     steps: [
