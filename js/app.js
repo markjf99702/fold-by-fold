@@ -2,7 +2,7 @@
 
 import { MODELS } from './models.js';
 import { build } from './build.js';
-import { poses, marks, symbol } from './motion.js';
+import { poses, marks, symbol, corners } from './motion.js';
 import { View } from './render.js';
 import { picture } from './thumbs.js';
 import { FINISHED } from './finished.js';
@@ -367,6 +367,22 @@ const chipFor = (step) => `${CHIP[symbol(step)]}<span>${step.name}</span>`;
 let dirty = true;
 let lastFrame = 0;
 
+// Everywhere the paper goes during a step, for framing it: every corner at thirteen moments of the fold (among them a
+// quarter, half and three quarters of the way, where a fold stands up, a fold and unfold stands up and a turn over is
+// at its highest), and the symbol beside the model. Points a two-hundredth of the sheet apart count once. Worked out
+// for a step when it's first shown, so opening a model doesn't fold through all its steps first.
+const reach = new WeakMap();
+function reachOf(step) {
+  if (!reach.has(step)) {
+    const seen = new Map();
+    const add = (q) => { const k = q.map((x) => Math.round(x * 200)).join(); if (!seen.has(k)) seen.set(k, q); };
+    for (let k = 0; k <= 12; k++) for (const it of poses(step, k / 12)) corners(it).forEach(add);
+    for (const m of marks(step) || []) (m.path || []).forEach(add);
+    reach.set(step, Float32Array.from([...seen.values()].flat()));
+  }
+  return reach.get(step);
+}
+
 function frameCamera(snap) {
   if (!view) return;
   const s = P.b.steps[P.i];
@@ -376,9 +392,19 @@ function frameCamera(snap) {
   for (const m of marks(s) || []) {
     for (const [x, y] of m.path || []) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
   }
-  // A step that stands the model up says how big it gets and how high to look.
+  // A step that stands the model up says how big it gets and how high to look, once its fold moves; until then the
+  // paper lies flat. Any other step is framed for the whole of its fold, not just how it starts and ends: turning
+  // over stands the paper on its edge, and a fold behind lifts the model to make room under it. The camera looks at
+  // half the height the paper reaches, from the usual angle, so turning the paper round doesn't change its size.
   const v = aimedFor === s ? s.view : null;
-  view.frame((x0 + x1) / 2, (y0 + y1) / 2, Math.max(x1 - x0, y1 - y0, v?.size || 0, 0.55), v?.lift || 0);
+  const size = Math.max(x1 - x0, y1 - y0, v?.size || 0, 0.55);
+  if (s.view) view.frame((x0 + x1) / 2, (y0 + y1) / 2, size, v?.lift || 0);
+  else {
+    const pts = reachOf(s);
+    let top = 0;
+    for (let k = 2; k < pts.length; k += 3) top = Math.max(top, pts[k]);
+    view.frame((x0 + x1) / 2, (y0 + y1) / 2, size, top / 2, { pts, yaw: -90, pitch: 58 });
+  }
   if (snap) view.settle(1);
   dirty = true;
 }

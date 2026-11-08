@@ -521,6 +521,45 @@ async function fresh(hash = '', { init, arg, ...opts } = {}) {
   await p.context().close();
 }
 
+// The camera frames a step's whole fold, not just where it starts and ends: turning the model over stands the paper on
+// its edge, and a fold behind lifts the model to make room under it, and neither runs off the stage part way. On a
+// wide screen, a phone held sideways and a phone held upright, a quarter, half and three quarters of the way through.
+for (const [width, height, list] of [
+  [1280, 800, ['crane-3', 'crane-22', 'fortune-teller-8', 'waterbomb-9', 'helmet-10', 'frog-32']],
+  [844, 390, ['crane-3', 'crane-22', 'fortune-teller-8', 'waterbomb-9', 'helmet-10', 'frog-32']],
+  [390, 844, ['fortune-teller-8', 'crane-22']],
+]) {
+  const p = await fresh('#cup', { viewport: { width, height }, deviceScaleFactor: 1 });
+  await p.waitForFunction(() => fold.state.id === 'cup');
+  const off = await p.evaluate(async (list) => {
+    const { MODELS } = await import('./js/models.js');
+    const { build } = await import('./js/build.js');
+    const { poses, corners } = await import('./js/motion.js');
+    const frame = () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+    const out = [];
+    for (const name of list) {
+      const [, id, n] = /^(.*)-(\d+)$/.exec(name);
+      location.hash = name;
+      await new Promise((r) => { const k = () => (fold.state.id === id ? r() : setTimeout(k, 30)); k(); });
+      const step = build(MODELS.find((m) => m.id === id)).steps[n - 1];
+      for (const t of [0.25, 0.5, 0.75]) {
+        fold.set(n - 1, t);
+        await frame();
+        const c = document.getElementById('gl'), v = fold.view();
+        let worst = 0;
+        for (const it of poses(step, t)) for (const q of corners(it)) {
+          const [x, y] = v.project(q);
+          worst = Math.max(worst, -x, x - c.clientWidth, -y, y - c.clientHeight);
+        }
+        if (worst > 2) out.push(`${name} at t=${t}: ${Math.round(worst)} px off`);
+      }
+    }
+    return out;
+  }, list);
+  assert.deepEqual(off, [], `the paper runs off the stage mid-fold at ${width}x${height}`);
+  await p.context().close();
+}
+
 // A step that stands the model up is seen from its own angle once its fold moves, by the slider as much as by Play.
 // The angle stays with that step: the next model opens seen from above, as usual.
 {
