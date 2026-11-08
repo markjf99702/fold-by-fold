@@ -911,6 +911,13 @@ for (const hash of ['#%', '#crane-3%', '#%F0%9F']) {
   assert.deepEqual(await p.evaluate(() => [fold.state.i, fold.state.t]), [3, 0], '← part way through a fold did not take it back to its start');
   await p.keyboard.press('ArrowLeft');
   assert.deepEqual(await p.evaluate(() => [fold.state.i, fold.state.t]), [2, 0], '← at the start of a fold did not go to the step before');
+  // On step 1, with no step before, a fold that has only just moved goes back to its start, by the key or the button.
+  await p.evaluate(() => fold.set(0, 0.01));
+  await p.keyboard.press('ArrowLeft');
+  assert.deepEqual(await p.evaluate(() => [fold.state.i, fold.state.t]), [0, 0], '← on step 1 just after its fold moved did nothing');
+  await p.evaluate(() => fold.set(0, 0.01));
+  await p.click('#prev');
+  assert.deepEqual(await p.evaluate(() => [fold.state.i, fold.state.t]), [0, 0], 'the back button on step 1 just after its fold moved did nothing');
   await p.evaluate(() => fold.set(4, 0));
   await p.focus('#scrub');
   await p.keyboard.press('ArrowLeft');
