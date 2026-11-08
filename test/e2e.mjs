@@ -1076,6 +1076,25 @@ for (const hash of ['#%', '#crane-3%', '#%F0%9F']) {
   await p.context().close();
 }
 
+// The slider is drawn in the page's own style rather than the browser's (a white track with a grey border, on the
+// washi page): its track fills in the accent colour as far as the fold has gone, set by the page, whether the fold
+// moves by a finger on the slider or by Play. A finger still reaches it 44 px tall (above).
+{
+  const p = await fresh('#crane-10');
+  await p.waitForFunction(() => fold.state.id === 'crane');
+  const fill = () => p.evaluate(() => { const s = document.getElementById('scrub'); return [getComputedStyle(s).appearance, s.style.getPropertyValue('--p'), `${fold.state.t * 100}%`]; });
+  assert.deepEqual(await fill(), ['none', '0%', '0%'], 'the slider is the browser\'s own, or its track is filled');
+  const b = await p.locator('#scrub').boundingBox();
+  await p.touchscreen.tap(b.x + 11 + (b.width - 22) * 0.7, b.y + b.height / 2);
+  await p.waitForFunction(() => fold.state.t > 0.6, null, { timeout: 3000 }).catch(() => {});
+  const [, tapped, t] = await fill();
+  assert.ok(tapped === t && parseFloat(t) > 60, `a tap on the slider at 70% filled its track to ${tapped}, with the fold at ${t}`);
+  await p.click('#play');
+  await p.waitForFunction(() => fold.state.t >= 1, null, { timeout: 15000 });
+  assert.deepEqual((await fill()).slice(1), ['100%', '100%'], 'the slider\'s track did not fill as the fold played');
+  await p.context().close();
+}
+
 // Next and the back button keep the focus at the ends of a model. Going through a model with Enter on Next, the focus
 // fell to the page at the last step, as the button turned itself off under it; the back button did the same at the
 // first step. They say they're unavailable there instead, and pressing them does nothing.

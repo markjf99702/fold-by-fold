@@ -471,6 +471,7 @@ function paintControls() {
 function scrubAt(t) {
   const s = $('scrub');
   s.value = Math.round(t * 1000);
+  s.style.setProperty('--p', `${t * 100}%`); // how far the track is filled
   const say = t <= 0 ? 'Not started' : t >= 1 ? 'Folded' : `${Math.min(99, Math.max(1, Math.round(t * 100)))}% folded`;
   if (s.getAttribute('aria-valuetext') !== say) s.setAttribute('aria-valuetext', say);
 }
