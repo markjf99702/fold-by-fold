@@ -51,6 +51,16 @@ function petal(face, root) {
   };
 }
 
+// The creases that guide a petal fold on a face of the frog base, made the way the crane makes them: the face's
+// two lower edges folded in to the middle line together, and opened again. They run from the face's bottom corner
+// up to where its petal fold crease meets its sides.
+function guide(face) {
+  return (h) => h.together(
+    (k) => k.crease(k.through(face.k, onFace(face, ...PA)), { flap: onFace(face, 0.2, 0.03) }),
+    (k) => k.crease(k.through(face.k, onFace(face, ...PB)), { flap: onFace(face, 0.03, 0.2) }),
+  );
+}
+
 // A paper point on one half of a face (side 'a' or 'b'), in the part of the squashed flap next to the
 // middle line, well away from the leg.
 function pageSeed(face, side) {
@@ -741,7 +751,11 @@ export const MODELS = [
         do: (h) => h.valley(h.through(C, K1), { flap: [0.17, 0.35] }),
       },
       {
-        say: 'Petal fold this face, as for the crane: lift its bottom corner up, folding along a line across the face a little above its widest points. As it rises, let the lower edges fold in to meet at the middle line, and press it flat.',
+        say: 'Fold the two lower edges of this face in to the middle line, and unfold. These creases guide the petal fold, as on the crane.',
+        do: guide(FACE.K1),
+      },
+      {
+        say: 'Petal fold this face, as for the crane: lift its bottom corner up, folding along the line between the tops of the two creases. As it rises, the lower edges fold in along the creases to meet at the middle line. Press it flat.',
         name: 'Petal fold',
         do: (h) => h.mech(petal(FACE.K1, [0.8, 0.8])),
       },
@@ -755,7 +769,11 @@ export const MODELS = [
         do: (h) => h.valley(h.through(C, K2), { flap: [0.83, 0.74] }),
       },
       {
-        say: 'Petal fold this face the same way.',
+        say: 'Fold the lower edges of this face in to the middle line, and unfold, as before.',
+        do: guide(FACE.K3),
+      },
+      {
+        say: 'Petal fold this face the same way, along the creases.',
         name: 'Petal fold',
         do: (h) => h.mech(petal(FACE.K3, [0.2, 0.2])),
       },
@@ -766,6 +784,10 @@ export const MODELS = [
           (k) => k.valley(k.through(C, K2), { flap: [0.55, 0.78] }),
           (k) => k.valley(k.through(C, K2), { flap: [0.26, 0.83] }),
         ),
+      },
+      {
+        say: 'Crease this face the same way: lower edges in to the middle line, and unfold.',
+        do: guide(FACE.K4),
       },
       {
         say: 'Petal fold it.',
@@ -783,6 +805,10 @@ export const MODELS = [
           (k) => k.valley(k.through(C, K2), { flap: [0.45, 0.22] }),
           (k) => k.valley(k.through(C, K2), { flap: [0.57, 0.17] }),
         ),
+      },
+      {
+        say: 'Crease the last face the same way.',
+        do: guide(FACE.K2),
       },
       {
         say: 'Petal fold the last face. This is the frog base: four long points at the top, four short ones at the bottom.',

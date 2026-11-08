@@ -372,7 +372,7 @@ function recoloured(step, a, b) {
 }
 
 // A fold eases in and out: in its first tenth and its last, hardly anything moves, so hardly any of the paper seen from
-// above changes colour. (The frog's petal folds flashed white as Play began, and frog 21 again as it landed, from a
+// above changes colour. (The frog's petal folds flashed white as Play began, and frog 24 again as it landed, from a
 // layer whose thickness ran ahead of its hinges and rose through the layer over it.) What's left stays under 2%: rays
 // that fall right by a crease, and a fold and unfold, which moves at twice the pace. Turning the model over changes
 // everything at once, and the flapping bird stands up in the first third of its step, keeping its own time.
@@ -523,6 +523,25 @@ test('crane: a petal fold lays the petal over the top of the base, with its side
   assert.ok(pos.get(sideId) > pos.get(petalId), 'the side is not folded onto the petal');
 });
 
+test('frog: each petal fold comes after a step that creases the face along the sides it folds in', () => {
+  const b = once(MODELS.find((m) => m.id === 'frog'));
+  const petals = b.steps.map((st, i) => [st, i]).filter(([st]) => st.name === 'Petal fold');
+  assert.equal(petals.length, 4);
+  for (const [petal, i] of petals) {
+    const guide = b.steps[i - 1];
+    assert.ok(guide.motion.folded && guide.name === 'Fold and unfold', `frog step ${i}: ${guide.name}, not a fold and unfold`);
+    // The sides fold in along the face's two marked mountain creases, from its bottom corner: each lies along a line the
+    // step before folded and unfolded.
+    const sides = petal.motion.specs.filter((sp) => sp.fold === 'mountain' && sp.mark !== false);
+    assert.equal(sides.length, 2);
+    for (const sp of sides) {
+      const [a, c] = [petal.from.at(sp.a), petal.from.at(sp.b)];
+      assert.ok(guide.motion.parts.some((p) => Math.abs(side(p.line, a)) < 1e-9 && Math.abs(side(p.line, c)) < 1e-9), `frog step ${i + 1}: no crease along ${sp.a}-${sp.b}`);
+    }
+    assert.match(petal.say + guide.say, /crease/i, `frog steps ${i}-${i + 1} don't say the creases guide it`);
+  }
+});
+
 test('crane: each reverse-folded point ends up between the front and back of the model', () => {
   const b = build(MODELS.find((m) => m.id === 'crane'));
   const split = line([1, 0], [0, 1]);
@@ -639,7 +658,7 @@ test('each step is labelled with the symbol for what it draws: Rotate its own, m
   const steps = (id) => build(MODELS.find((m) => m.id === id)).steps;
   const crane = steps('crane'), frog = steps('frog');
   assert.equal(symbol(steps('plane')[4]), 'rotate');
-  assert.equal(symbol(frog[24]), 'rotate');
+  assert.equal(symbol(frog[28]), 'rotate');
   assert.equal(symbol(steps('fortune-teller')[3]), 'turnOver');
   assert.equal(symbol(crane[8]), 'unfold');
   assert.equal(symbol(crane[5]), 'both', 'a collapse');
@@ -694,14 +713,14 @@ test('folds made together along one line share the line, and their arrows sit si
   const steps = (id) => build(MODELS.find((m) => m.id === id)).steps;
   const crane = steps('crane'), frog = steps('frog');
   // Both wings at once: one valley line, the front wing's valley arrow and the back wing's mountain arrow apart.
-  for (const step of [crane[21], crane[22], frog[25], steps('flapping-bird')[18], steps('plane')[7]]) {
+  for (const step of [crane[21], crane[22], frog[29], steps('flapping-bird')[18], steps('plane')[7]]) {
     const m = marks(step);
     assert.deepEqual(m.map((k) => [k.type, !!k.line]), [['valley', true], ['mountain', false]], step.say);
     const along = (q) => (q[0] - m[0].line[0][0]) * (m[0].line[1][0] - m[0].line[0][0]) + (q[1] - m[0].line[0][1]) * (m[0].line[1][1] - m[0].line[0][1]);
     assert.ok(Math.abs(along(m[0].arrow.from) - along(m[1].arrow.from)) > 0.02, `${step.say}: the arrows lie on top of each other`);
   }
   // Two layers turned together the same way: one line, one arrow.
-  for (const step of [frog[19], frog[22]]) assert.equal(marks(step).length, 1, step.say);
+  for (const step of [frog[21], frog[25]]) assert.equal(marks(step).length, 1, step.say);
   // Corners folded to the middle: the lines meet at their ends rather than crossing.
   const ft = marks(steps('fortune-teller')[2]);
   assert.equal(ft.length, 4);
@@ -1033,7 +1052,7 @@ function segmentIn(p, q, poly) {
 test('wherever the paper lies flat partway through a step, it could be real paper', () => {
   // Halfway through the frog's leg reverse folds, where the page lies turned open, a fold passes through the layers
   // under it: paper passing through a thick stack mid-fold, which Mark had left as it is but for the waterbomb's tucks.
-  const thick = new Set(['frog 27', 'frog 28', 'frog 30', 'frog 31']);
+  const thick = new Set(['frog 31', 'frog 32', 'frog 34', 'frog 35']);
   const problems = [];
   let checked = 0;
   for (const model of MODELS) {

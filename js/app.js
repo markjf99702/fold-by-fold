@@ -303,7 +303,7 @@ function renderSteps(steps) {
   roomForWords(steps);
 }
 
-// On a phone the bar of ticks is the way to jump to a step, but they're narrow (the frog's 34 share about 360 px),
+// On a phone the bar of ticks is the way to jump to a step, but they're narrow (the frog's 38 share about 360 px),
 // so a finger can slide along the bar and the step under it is picked as it goes, the way the slider under the
 // words works. A finger picks once it moves along the bar, or as it lifts after a tap: one going up or down is
 // swiping somewhere else, so until then it picks nothing. A mouse picks as soon as it's pressed. The ticks are
@@ -410,7 +410,7 @@ function paint() {
     words.scrollTop = 0; // a new step's words start at the top
     fadeWords();
     // Tab stops at the step's tick only, the way it does at the chosen paper colour, rather than at every one of the
-    // frog's 34. A tick that has the focus hands it on to the step's tick, so a key pressed next acts on the step
+    // frog's 38. A tick that has the focus hands it on to the step's tick, so a key pressed next acts on the step
     // you're on: after the arrow keys or Next, or a finger sliding along the bar.
     const handOn = $('ticks').contains(document.activeElement);
     document.querySelectorAll('#ticks button').forEach((b, k) => {

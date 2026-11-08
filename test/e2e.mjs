@@ -571,8 +571,8 @@ async function fresh(hash = '', { init, arg, ...opts } = {}) {
 // its edge, and a fold behind lifts the model to make room under it, and neither runs off the stage part way. On a
 // wide screen, a phone held sideways and a phone held upright, a quarter, half and three quarters of the way through.
 for (const [width, height, list] of [
-  [1280, 800, ['crane-3', 'crane-22', 'fortune-teller-8', 'waterbomb-9', 'helmet-10', 'frog-32']],
-  [844, 390, ['crane-3', 'crane-22', 'fortune-teller-8', 'waterbomb-9', 'helmet-10', 'frog-32']],
+  [1280, 800, ['crane-3', 'crane-22', 'fortune-teller-8', 'waterbomb-9', 'helmet-10', 'frog-36']],
+  [844, 390, ['crane-3', 'crane-22', 'fortune-teller-8', 'waterbomb-9', 'helmet-10', 'frog-36']],
   [390, 844, ['fortune-teller-8', 'crane-22']],
 ]) {
   const p = await fresh('#cup', { viewport: { width, height }, deviceScaleFactor: 1 });
@@ -1070,7 +1070,7 @@ for (const reduce of [false, true]) {
   await c.goto(base);
   await c.waitForSelector('#home:not([hidden])');
   assert.equal(await c.getAttribute('.swatch[aria-label="Indigo"]', 'aria-checked'), 'true', 'a new tab lost the paper picked in another');
-  assert.deepEqual(await c.evaluate(() => ['crane', 'frog'].map((id) => document.querySelector(`.model[data-model="${id}"] .count`).textContent)), ['Step 5 of 23', 'Step 3 of 34'], 'a new tab lost a place saved in another');
+  assert.deepEqual(await c.evaluate(() => ['crane', 'frog'].map((id) => document.querySelector(`.model[data-model="${id}"] .count`).textContent)), ['Step 5 of 23', 'Step 3 of 38'], 'a new tab lost a place saved in another');
   await c.close();
   // The gallery in one tab shows what's picked and folded in another.
   await a.click('#back');
@@ -1083,7 +1083,7 @@ for (const reduce of [false, true]) {
   await b.click('#next');
   await a.waitForFunction(() => document.querySelector('.swatch[aria-label="Marigold"]').getAttribute('aria-checked') === 'true'
     && document.querySelector('.model .thumb polygon[fill="#e3a034"]')
-    && document.querySelector('.model[data-model="frog"] .count').textContent === 'Step 4 of 34', null, { timeout: 3000 })
+    && document.querySelector('.model[data-model="frog"] .count').textContent === 'Step 4 of 38', null, { timeout: 3000 })
     .catch(() => assert.fail('the gallery did not show the paper picked, or the place reached, in another tab'));
   await a.context().close();
 }
@@ -1147,9 +1147,9 @@ for (const hash of ['#%', '#crane-3%', '#%F0%9F']) {
 // A link to a step past the end opens the last step, a step before the first opens the first, and a link that names
 // no model opens the gallery.
 {
-  const p = await fresh('#frog-35');
+  const p = await fresh('#frog-39');
   await p.waitForFunction(() => fold.state.id === 'frog');
-  assert.equal(await p.evaluate(() => fold.state.i), 33, '#frog-35 did not open the frog\'s last step');
+  assert.equal(await p.evaluate(() => fold.state.i), 37, '#frog-39 did not open the frog\'s last step');
   await p.evaluate(() => { location.hash = 'crane-0'; });
   await p.waitForFunction(() => fold.state.id === 'crane');
   assert.equal(await p.evaluate(() => fold.state.i), 0, '#crane-0 did not open the crane\'s first step');
@@ -1557,7 +1557,7 @@ for (const hash of ['#%', '#crane-3%', '#%F0%9F']) {
   await p.context().close();
 }
 
-// The frog's 34 ticks are too narrow to hit one with a finger, so a finger slides along the bar and the step under
+// The frog's 38 ticks are too narrow to hit one with a finger, so a finger slides along the bar and the step under
 // it is picked as it goes; lifting it leaves that step, and a tap picks the tick tapped. A finger going up or down
 // from the bar scrolls instead. A mouse can drag along it too, and the ticks are still buttons for the keyboard.
 {
@@ -1567,7 +1567,7 @@ for (const hash of ['#%', '#crane-3%', '#%F0%9F']) {
     const r = li.getBoundingClientRect();
     return [r.left + r.width / 2, r.top + r.height / 2];
   }));
-  assert.equal(at.length, 34);
+  assert.equal(at.length, 38);
   const step = () => p.evaluate(() => fold.state.i);
   // A touch move reaches the page with the next frame, after CDP has answered, so wait a moment for the step.
   const stepNow = async (want) => { await p.waitForFunction((n) => fold.state.i === n, want, { timeout: 1000 }).catch(() => {}); return step(); };
@@ -1619,7 +1619,7 @@ for (const hash of ['#%', '#crane-3%', '#%F0%9F']) {
 }
 
 // The bar of ticks is one stop for Tab, at the step you're on, the way the paper colours are: each tick was a stop of
-// its own, 34 presses to get past the frog's. With a tick in focus the arrow keys move the focus along with the step.
+// its own, 38 presses to get past the frog's. With a tick in focus the arrow keys move the focus along with the step.
 // A screen reader comes to the step's words straight after the paper, then the ticks: they were read first, every one.
 {
   const p = await fresh('#frog-12');
@@ -1650,13 +1650,13 @@ for (const hash of ['#%', '#crane-3%', '#%F0%9F']) {
 }
 
 // A screen reader is told the step you land on, with its number, once you stop on it: a finger sliding along the ticks
-// past fourteen steps queued fourteen sets of words, and "Step 17 of 34" was never said. Moving the slider, or a fold
+// past fourteen steps queued fourteen sets of words, and "Step 17 of 38" was never said. Moving the slider, or a fold
 // playing, says nothing.
 {
   const p = await fresh('#frog');
   await p.waitForFunction(() => fold.state.id === 'frog');
   await p.waitForTimeout(600); // the first step is told
-  assert.equal(await p.textContent('#tell'), `Step 1 of 34. ${await p.textContent('#say')}`, 'opening a model did not tell the first step');
+  assert.equal(await p.textContent('#tell'), `Step 1 of 38. ${await p.textContent('#say')}`, 'opening a model did not tell the first step');
   assert.equal(await p.getAttribute('#say', 'aria-live'), null, 'the words on screen are read out as well');
   await p.evaluate(() => { window.told = []; new MutationObserver(() => told.push(document.getElementById('tell').textContent)).observe(document.getElementById('tell'), { childList: true, characterData: true, subtree: true }); });
   const at = await p.evaluate(() => [...document.querySelectorAll('#ticks li')].map((li) => { const r = li.getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; }));
@@ -1667,7 +1667,7 @@ for (const hash of ['#%', '#crane-3%', '#%F0%9F']) {
   await p.waitForFunction(() => fold.state.i === 16, null, { timeout: 2000 }).catch(() => {});
   await p.waitForTimeout(800);
   const say = await p.textContent('#say');
-  assert.deepEqual(await p.evaluate(() => told), [`Step 17 of 34. ${say}`], 'a slide along the ticks was not told once, as the step it stopped on');
+  assert.deepEqual(await p.evaluate(() => told), [`Step 17 of 38. ${say}`], 'a slide along the ticks was not told once, as the step it stopped on');
   await p.evaluate(() => {
     told.length = 0;
     const s = document.getElementById('scrub');
@@ -2059,7 +2059,7 @@ for (const [width, height, id] of [[390, 844, 'crane'], [360, 780, 'crane'], [39
     document.querySelector('#ticks li:nth-child(5) button').click();
   }));
   assert.ok(shown[0] < 200, `the frog's player took ${Math.round(shown[0])} ms to show, on a phone a sixth as fast`);
-  assert.deepEqual(shown.slice(1, 6), ['Frog', 'Step 1 of 34', 'Colored side up, tur', 34, null], 'the frog\'s player showed without its name, step, words or ticks, or only once it was folded');
+  assert.deepEqual(shown.slice(1, 6), ['Frog', 'Step 1 of 38', 'Colored side up, tur', 38, null], 'the frog\'s player showed without its name, step, words or ticks, or only once it was folded');
   assert.deepEqual(shown[6], ['opacity'], `the word on the mat fades in by ${shown[6]}, which stays put while the page is busy folding, so it never shows`);
   await p.waitForFunction(() => fold.state.id === 'frog', null, { timeout: 30000 });
   assert.deepEqual(await p.evaluate(() => [fold.state.i, fold.state.t, fold.state.playing, document.getElementById('glWait').hidden]), [0, 0, false, true], 'a key or button pressed while the frog was being folded did something, or the paper is still on its way');
@@ -2073,7 +2073,7 @@ for (const [width, height, id] of [[390, 844, 'crane'], [360, 780, 'crane'], [39
     else requestAnimationFrame(look);
   }) });
   await q.waitForFunction(() => fold.state.id === 'frog', null, { timeout: 30000 });
-  assert.deepEqual(await q.evaluate(() => [window.shell, fold.state.i]), [['Step 16 of 34', false], 15], 'a link to the frog showed nothing until it was folded');
+  assert.deepEqual(await q.evaluate(() => [window.shell, fold.state.i]), [['Step 16 of 38', false], 15], 'a link to the frog showed nothing until it was folded');
   await q.context().close();
 }
 
