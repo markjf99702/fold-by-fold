@@ -210,7 +210,7 @@ const BIRD_BASE = [
       }),
     },
     {
-      say: 'Turn it over.',
+      say: 'Turn it over from side to side, so the long point stays at the top.',
       do: (h) => h.turnOver(),
     },
     {
@@ -579,7 +579,7 @@ export const MODELS = [
       },
       ...waterbombSide((p) => p, 'Fold the two bottom corners of the top layer up to the top point.'),
       {
-        say: 'Turn it over.',
+        say: 'Turn it over from side to side, keeping the point at the top.',
         do: (h) => h.turnOver(),
       },
       ...waterbombSide(([u, v]) => [u, 1 - v], 'Do the same on this side: fold the bottom corners of the top layer up to the top point.',
@@ -602,7 +602,7 @@ export const MODELS = [
         ),
       },
       {
-        say: 'Turn it over.',
+        say: 'Turn it over from side to side, keeping the thin points at the bottom.',
         do: (h) => h.turnOver(),
       },
       {
@@ -706,7 +706,7 @@ export const MODELS = [
         do: (h) => h.squash({ top: h.at(C), bottom: h.at(K1), corner: h.at(M34), seed: [0.7, 0.85] }),
       },
       {
-        say: 'Turn it over.',
+        say: 'Turn it over from side to side, keeping the closed point at the top.',
         do: (h) => h.turnOver(),
       },
       {
@@ -723,7 +723,7 @@ export const MODELS = [
         do: (h) => h.squash({ top: h.at(C), bottom: h.at(K1), corner: h.at(M23), seed: [0.85, 0.35] }),
       },
       {
-        say: 'Turn it over.',
+        say: 'Turn it over from side to side, keeping the closed point at the top.',
         do: (h) => h.turnOver(),
       },
       {
@@ -746,7 +746,7 @@ export const MODELS = [
         do: (h) => h.mech(petal(FACE.K1, [0.8, 0.8])),
       },
       {
-        say: 'Turn it over.',
+        say: 'Turn it over from side to side, so the long point stays at the top.',
         do: (h) => h.turnOver(),
       },
       {
@@ -773,7 +773,7 @@ export const MODELS = [
         do: (h) => h.mech(petal(FACE.K4, [0.8, 0.2])),
       },
       {
-        say: 'Turn it over.',
+        say: 'Turn it over from side to side, so the long points stay at the top.',
         do: (h) => h.turnOver(),
       },
       {
@@ -816,7 +816,7 @@ export const MODELS = [
         ], { axis: h.through(C, M12), page: pageSeed(FACE.K2, 'b') }),
       },
       {
-        say: 'Turn it over.',
+        say: 'Turn it over from side to side, keeping the front legs at the top.',
         do: (h) => h.turnOver(),
       },
       {
@@ -834,7 +834,7 @@ export const MODELS = [
         ], { axis: h.through(C, M12), page: pageSeed(FACE.K4, 'b') }),
       },
       {
-        say: 'Turn it over.',
+        say: 'Turn it over from side to side, keeping the front legs at the top.',
         do: (h) => h.turnOver(),
       },
       {
