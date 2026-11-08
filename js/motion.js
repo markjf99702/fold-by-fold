@@ -659,13 +659,15 @@ function pieceMark(from, motion, ids, z) {
 }
 
 // A collapse or petal fold: the creases that close, drawn where they lie now, and an arrow following one
-// point of the paper from where it starts to where it ends up.
+// point of the paper from where it starts to where it ends up. A model standing up (the fortune teller opening) has its
+// creases given on the table, as seen from above, and no arrow: nothing ends up anywhere flat.
 function mechMarks(step) {
   const { from, to, motion } = step;
   const levels = from.levels();
   let top = 0;
   for (const id of from.order) top = Math.max(top, levels.get(id));
   const z = (top + 1) * LAYER + 0.002;
+  if (motion.stands) return motion.lines.map((l) => ({ type: l.fold > 0 ? 'valley' : 'mountain', line: [[...l.a, z], [...l.b, z]] }));
   const out = [];
   for (const s of motion.specs) {
     if (s.mark === false || (s.fold !== 'valley' && s.fold !== 'mountain')) continue;

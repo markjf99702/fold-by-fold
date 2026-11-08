@@ -198,7 +198,8 @@ for (const model of MODELS) {
         }
       };
       check(0, step.from);
-      const bends = step.motion.kind === 'bend' || step.motion.parts?.some((p) => p.bend);
+      // A step that bends flaps part way, or stands the model up, ends in 3D with its paper lying as it began.
+      const bends = step.motion.kind === 'bend' || step.motion.parts?.some((p) => p.bend) || step.motion.stands;
       if (!bends) check(1, step.motion.folded ? step.from : step.to);
       // Halfway through a fold and unfold (or several made together), every layer is where the fold puts it: a flap
       // folded behind is under the rest, not level with it.
@@ -489,6 +490,58 @@ test('a step that names a corner to fold names the one that moves, as the paper 
     }
   }
   assert.ok(checked >= 10, `only ${checked} steps name a corner`);
+});
+
+// A square creased on both diagonals and both middle lines, stood up on them as the fortune teller opens: the creases
+// meet 45 degrees apart, so with the diagonals rising theta from the middle, the middle lines rise phi, where
+// cos 45 = cos theta cos phi cos 45 + sin theta sin phi, and they close by twice those, in step with each other.
+function cone(theta, wrong = 1) {
+  const fold = (th) => {
+    const t = th * Math.PI / 180, a = Math.cos(t) * Math.SQRT1_2, b = Math.sin(t);
+    return [2 * th, 2 * (Math.atan2(b, a) - Math.acos(Math.min(1, Math.SQRT1_2 / Math.hypot(a, b)))) * 180 / Math.PI];
+  };
+  const [middles, diagonals] = fold(theta), ease = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
+  const pace = (k) => (t) => (t > 0 ? fold(theta * ease(t))[k] / fold(theta)[k] : 0);
+  const corners = [[0, 0], [1, 0], [1, 1], [0, 1]], middle = [[0.5, 0], [1, 0.5], [0.5, 1], [0, 0.5]];
+  return { id: 'cone', paper: { kind: 'Square' }, steps: [
+    { say: 'Fold corner to corner, and unfold.', do: (h) => h.crease(h.onto([0, 0], [1, 1]), { move: [0, 0] }) },
+    { say: 'Fold the other corners together, and unfold.', do: (h) => h.crease(h.onto([1, 0], [0, 1]), { move: [1, 0] }) },
+    { say: 'Fold in half behind, and unfold.', do: (h) => h.crease(h.onto([0, 0], [0, 1]), { move: [0, 0], type: 'mountain' }) },
+    { say: 'Fold in half behind the other way, and unfold.', do: (h) => h.crease(h.onto([0, 0], [1, 0]), { move: [0, 0], type: 'mountain' }) },
+    { say: 'Push the middles of the edges down: the middle rises.', do: (h) => {
+      const c = h.at([0.5, 0.5]);
+      return h.standUp({
+        root: [0.4, 0.2], level: corners,
+        creases: [
+          ...middle.map((q) => ({ a: c, b: h.at(q), fold: -middles * wrong, schedule: pace(0) })),
+          ...corners.map((q) => ({ a: c, b: h.at(q), fold: diagonals, schedule: pace(1) })),
+        ],
+      });
+    } },
+  ] };
+}
+
+test('a square stands up on its creases as one linked motion, rising evenly, and ends standing with its paper as it lay', () => {
+  const b = build(cone(60));
+  const last = b.steps.at(-1);
+  assert.ok(last.motion.stands && last.motion.kind === 'mech');
+  assert.deepEqual(last.to.order, last.from.order, 'standing up restacked the paper');
+  const at = (t, q) => { const id = last.from.facetAt(q).id; return transformPoint(poses(last, t).find((it) => it.facet.id === id).pose, ...q); };
+  // The corners stay level as they come in, each the way it started from the middle; the middle rises above them.
+  for (const t of [0.25, 0.5, 1]) {
+    const mid = at(t, [0.5, 0.5]), ks = [[0, 0], [1, 0], [1, 1], [0, 1]].map((q) => at(t, q));
+    for (const [k, p] of ks.entries()) {
+      // (To within how closely the solver keeps the paper joined on the way.)
+      assert.ok(close(p[2], ks[0][2], 1e-6), `at t=${t} the corners aren't level`);
+      const start = last.from.at([[0, 0], [1, 0], [1, 1], [0, 1]][k]);
+      assert.ok(Math.abs(Math.atan2(p[1] - mid[1], p[0] - mid[0]) - Math.atan2(start[1], start[0])) < 1e-6, `at t=${t} the model turned round`);
+    }
+    if (t === 1) assert.ok(close(mid[2] - ks[0][2], Math.SQRT1_2 * Math.sin(Math.PI / 3), 1e-6), `the middle ends ${(mid[2] - ks[0][2]).toFixed(4)} above the corners`);
+  }
+  // Marked as a diagram would: the middle lines as mountains and the diagonals as valleys, seen from above.
+  assert.deepEqual(marks(last).map((m) => m.type), ['mountain', 'mountain', 'mountain', 'mountain', 'valley', 'valley', 'valley', 'valley']);
+  // Creases that can't all close that far together are refused.
+  assert.throws(() => build(cone(60, 1.25)), /cone step 5: The (paper jams on the way|creases don't close up)/);
 });
 
 test('the checker catches paper passing through paper', () => {

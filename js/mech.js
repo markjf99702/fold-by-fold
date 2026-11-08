@@ -25,6 +25,7 @@ const STEP = 6 * Math.PI / 180;
 // ---------- 3D rigid transforms: { r: row-major 3x3, t: [x, y, z] } ----------
 
 const I3 = () => ({ r: [1, 0, 0, 0, 1, 0, 0, 0, 1], t: [0, 0, 0] });
+const sub3 = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
 
 function mulR(a, b) {
   const o = new Array(9);
@@ -161,6 +162,35 @@ export function mechanism(sheet, { creases: specs, root, arrow = null, samples =
   const r = run(from, null, plan, { root, samples });
   r.motion.specs = specs;
   r.motion.arrow = arrow;
+  return r;
+}
+
+// The last step of a model that stands it up in 3D by closing several creases part way, all at once, as one linked
+// motion: the fortune teller opening into its four points. Each crease is given where it lies on the table, { a, b, fold },
+// with fold the angle it closes to, in degrees, positive for a valley as seen from above, and `schedule` (t -> how much
+// of that it has closed) to keep it to the others' pace: every layer joined across it there turns about it, while
+// layers already folded together along it stay so. The paper keeps its stacking, as a bend does. `level` names four paper
+// points, going round, whose plane is kept level and facing the way it started, so the model rises evenly rather than
+// tipping up off the part it hangs from, and `roll` ({ line, angle, schedule }) turns the whole model over about a line
+// on the table as it goes.
+export function standUp(sheet, { creases: lines, root, level, roll = null, samples = 60 }) {
+  const from = sheet.clone();
+  from._world = new Map();
+  const on = (ln, q) => {
+    const d = sub(ln.b, ln.a), L2 = dot(d, d), u = dot(sub(q, ln.a), d) / L2;
+    return Math.abs(cross(d, sub(q, ln.a))) / Math.sqrt(L2) < 1e-7 && u > -1e-7 && u < 1 + 1e-7;
+  };
+  const plan = (j) => {
+    if (Math.abs(j.theta0) > 1e-9) return null;
+    const f = from.facets.get(j.f);
+    const ln = lines.find((l) => on(l, apply(f.m, j.p0)) && on(l, apply(f.m, j.p1)));
+    if (!ln) return null;
+    // Toward the facet's colored side is positive (see run()): a valley from above, on a facet lying white side up, turns
+    // toward its white side.
+    return { target: (ln.fold * Math.PI / 180) * (det(f.m) > 0 ? 1 : -1), schedule: ln.schedule, weight: 1 };
+  };
+  const r = run(from, null, plan, { root, samples, standing: { level, roll } });
+  Object.assign(r.motion, { lines, stands: true });
   return r;
 }
 
@@ -307,8 +337,8 @@ function angleIn(sheet, j) {
 // to go wherever the others make it), via (an angle to pass through on the way), when ([start, end] as
 // fractions of the step), schedule (t -> 0..1), weight (how closely to keep to all that) }. `to`, if known,
 // is the finished state; otherwise it is worked out from where the hinges end up. turnsPage: the motion turns a
-// page over and back, lying open and flat halfway (see between()).
-function run(from, known, plan, { root, samples, turnsPage = false }) {
+// page over and back, lying open and flat halfway (see between()). standing: it ends standing up in 3D (see standUp()).
+function run(from, known, plan, { root, samples, turnsPage = false, standing = null }) {
   // The hinges are solved as if the paper had no thickness, so creases that meet at a point really do meet
   // there. The thickness goes back in afterward (see the end).
 
@@ -492,20 +522,22 @@ function run(from, known, plan, { root, samples, turnsPage = false }) {
   let gap = 0;
   for (const L of loopPts) for (const p of L.pts) {
     const a = applyT(WEnd.get(L.bf), p), b = applyT(WEnd.get(L.bg), p);
-    gap = Math.max(gap, Math.hypot(a[0] - b[0], a[1] - b[1]));
+    gap = Math.max(gap, Math.hypot(a[0] - b[0], a[1] - b[1], standing ? a[2] - b[2] : 0));
   }
-  if (gap > 1e-4) throw new Error(`The creases don't close up flat (gap ${gap.toFixed(4)})`);
+  if (gap > 1e-4) throw new Error(`The creases don't close up${standing ? '' : ' flat'} (gap ${gap.toFixed(4)})`);
 
-  // The finished state, flat.
+  // The finished state, flat; or for a model stood up, the paper as it lay, as for a bend.
   const to = from.clone();
   to._world = new Map();
-  for (const id of from.order) {
+  if (!standing) for (const id of from.order) {
     const f = from.facets.get(id);
     const P = composeT(WEnd.get(bodyOf.get(id)), flatT(f.m, 0));
     if (Math.abs(P.r[2]) + Math.abs(P.r[5]) + Math.abs(P.r[6]) + Math.abs(P.r[7]) > 1e-6) throw new Error('The folded state is not flat');
     to.facets.set(id, { ...f, m: { a: P.r[0], b: P.r[1], c: P.r[3], d: P.r[4], e: P.t[0], f: P.t[1] } });
   }
-  if (known) {
+  if (standing) {
+    // Nothing to stack: it keeps the order it had.
+  } else if (known) {
     // It has to land where the flat state says.
     for (const id of from.order) {
       const a = to.facets.get(id).m, b = known.facets.get(id).m;
@@ -608,7 +640,7 @@ function run(from, known, plan, { root, samples, turnsPage = false }) {
     const z0 = new Map(), z1 = new Map(), zm = new Map();
     for (const id of from.order) {
       z0.set(id, zFrom(id));
-      z1.set(id, onPiece(WEnd3, id, zTo(id)));
+      z1.set(id, standing ? zFrom(id) : onPiece(WEnd3, id, zTo(id))); // stood up, each layer stays where it was on its piece
       if (xMid) zm.set(id, onPiece(WMid3, id, zMid(id)));
     }
     return {
@@ -643,12 +675,39 @@ function run(from, known, plan, { root, samples, turnsPage = false }) {
     const lvStart = from.levels();
     if (thick?.lvStart !== lvStart) thick = thickness(lvStart);
     const W = thick.kin(xs[k].map((v, i) => v + (xs[k + 1][i] - v) * w));
-    return from.order.map((id) => {
+    const items = from.order.map((id) => {
       const f = from.facets.get(id);
       return { facet: f, pose: composeT(W.get(bodyOf.get(id)), flatT(f.m, thick.height(id, u))) };
     });
+    return standing ? stood(standing, from, items, u) : items;
   };
   return { from, to, motion };
+}
+
+// A model standing up as it goes (standUp()), hung from a part of it that stays put, is turned so the plane of its level
+// points lies level, facing the way it started, about their middle, which stays over the spot where it started; and so
+// the first of them is the same way from there as it started. Then it rolls over as the step says.
+function stood({ level, roll }, from, items, u) {
+  const facet = level.map((q) => from.facetAt(q).id);
+  const P = level.map((q, k) => applyT(items.find((it) => it.facet.id === facet[k]).pose, [q[0], q[1], 0]));
+  const flat = level.map((q) => from.at(q));
+  const mid = (pts) => [0, 1, 2].map((c) => pts.reduce((s, q) => s + (q[c] ?? 0), 0) / pts.length);
+  const g = mid(P), g0 = mid(flat);
+  const a = sub3(P[2], P[0]), b = sub3(P[3], P[1]);
+  const facing = Math.sign(cross(sub(flat[2], flat[0]), sub(flat[3], flat[1]))) || 1;
+  let n = [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+  const len = Math.hypot(...n) * facing;
+  n = n.map((x) => x / len);
+  const s = Math.hypot(n[0], n[1]);
+  let T = s > 1e-12 ? axisRot(g, [n[1] / s, -n[0] / s, 0], Math.atan2(s, n[2])) : I3();
+  const p0 = applyT(T, P[0]);
+  T = composeT(axisRot(g, [0, 0, 1], Math.atan2(flat[0][1] - g0[1], flat[0][0] - g0[0]) - Math.atan2(p0[1] - g[1], p0[0] - g[0])), T);
+  T = composeT({ r: [1, 0, 0, 0, 1, 0, 0, 0, 1], t: [g0[0] - g[0], g0[1] - g[1], 0] }, T);
+  if (roll) {
+    const k = roll.schedule ? roll.schedule(u) : ease(u);
+    T = composeT(axisRot([roll.line.p[0], roll.line.p[1], 0], [roll.line.d[0], roll.line.d[1], 0], (roll.angle * Math.PI / 180) * k), T);
+  }
+  return items.map((it) => ({ facet: it.facet, pose: composeT(T, it.pose) }));
 }
 
 // Orders the finished facets from the table up. Facets that didn't move keep their order; for the rest,

@@ -5,7 +5,7 @@
 // square, [0, 0] at one corner); `at` says where such a point is now.
 
 import { Sheet, fold, foldUnfold, bend, turnOver, turn, together, reverse } from './paper.js';
-import { mechanism, between, squash } from './mech.js';
+import { mechanism, between, squash, standUp } from './mech.js';
 import { bisector, line, lineAt, side, flip, intersect, mid, lerp, reflectPoint, angleBisector, sub } from './geom.js';
 
 export function build(model) {
@@ -105,6 +105,14 @@ function helpers(current) {
     // point on the part that stays put; arrow is a paper point to follow with an arrow.
     mech: (o) => {
       const r = mechanism(current(), o);
+      r.motion.name = o.name;
+      return r;
+    },
+    // The last step of a model that stands it up by closing creases part way as one linked motion (the fortune teller
+    // opening). Each crease is a segment on the table, { a, b, fold: degrees, positive for a valley from above }; level
+    // names four paper points, going round, whose plane stays level; roll turns the whole model over as it goes.
+    standUp: (o) => {
+      const r = standUp(current(), o);
       r.motion.name = o.name;
       return r;
     },
