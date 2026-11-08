@@ -1955,7 +1955,10 @@ for (const [width, height, id] of [[390, 844, 'crane'], [360, 780, 'crane'], [39
     card.addEventListener('click', () => { t0 = performance.now(); }, { capture: true, once: true });
     requestAnimationFrame(function look() {
       const $ = (id) => document.getElementById(id);
-      if (t0 && !$('player').hidden) done([performance.now() - t0, $('modelName').textContent, $('stepCount').textContent, $('say').textContent.slice(0, 20), $('ticks').children.length, fold.state.id]);
+      // What the word on the mat fades in by: the page is busy folding meanwhile, and only an opacity goes on changing then.
+      const fades = () => [...new Set(document.getAnimations().filter((a) => $('glWait').contains(a.effect?.target))
+        .flatMap((a) => a.effect.getKeyframes().flatMap(Object.keys)).filter((k) => !['offset', 'computedOffset', 'easing', 'composite'].includes(k)))];
+      if (t0 && !$('player').hidden) done([performance.now() - t0, $('modelName').textContent, $('stepCount').textContent, $('say').textContent.slice(0, 20), $('ticks').children.length, fold.state.id, fades()]);
       else requestAnimationFrame(look);
     });
     card.click();
@@ -1964,7 +1967,8 @@ for (const [width, height, id] of [[390, 844, 'crane'], [360, 780, 'crane'], [39
     document.querySelector('#ticks li:nth-child(5) button').click();
   }));
   assert.ok(shown[0] < 200, `the frog's player took ${Math.round(shown[0])} ms to show, on a phone a sixth as fast`);
-  assert.deepEqual(shown.slice(1), ['Frog', 'Step 1 of 34', 'Colored side up, tur', 34, null], 'the frog\'s player showed without its name, step, words or ticks, or only once it was folded');
+  assert.deepEqual(shown.slice(1, 6), ['Frog', 'Step 1 of 34', 'Colored side up, tur', 34, null], 'the frog\'s player showed without its name, step, words or ticks, or only once it was folded');
+  assert.deepEqual(shown[6], ['opacity'], `the word on the mat fades in by ${shown[6]}, which stays put while the page is busy folding, so it never shows`);
   await p.waitForFunction(() => fold.state.id === 'frog', null, { timeout: 30000 });
   assert.deepEqual(await p.evaluate(() => [fold.state.i, fold.state.t, fold.state.playing, document.getElementById('glWait').hidden]), [0, 0, false, true], 'a key or button pressed while the frog was being folded did something, or the paper is still on its way');
   await p.click('#play');
