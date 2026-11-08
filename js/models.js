@@ -107,6 +107,20 @@ function cicadaSide(h, s) {
   return h.through({ table: [c[0] + s * 0.36 * hw, top] }, { table: [c[0] + s * 0.61 * hw, top - 1.11 * hw] });
 }
 
+// The lily's kite folds on a face: each edge from a side corner to the closed end, at the middle of the paper,
+// folds in to the middle line, along the line that halves the angle between them there. kind: 'valley' for the face in
+// front, 'mountain' for the one behind. Each flap is found from a point between the edge and its fold line.
+function lilyEdges(face, kind) {
+  return [[PA, [0.412, 0.32]], [PB, [0.32, 0.412]]].map(([corner, seed]) => (k) => {
+    // The middle line runs up to the face's point, which stays put while the other edge folds in.
+    const c = k.at(C);
+    return k[kind](k.angleBisector(c, k.sub(k.at(onFace(face, ...corner)), c), k.sub(k.at(face.k), c)), { flap: onFace(face, ...seed) });
+  });
+}
+
+// How far the lily's front and back petals fold out, from straight up.
+const LILY_OPEN = 145;
+
 // The jumping frog's index card: 3 by 5, so 1 wide and 5/3 tall. The top square collapses into a
 // waterbomb base around X, the middle of the square; the body below it is BODY tall.
 const CARD = 5 / 3, BODY = CARD - 1;
@@ -280,6 +294,116 @@ const BIRD_BASE = [
           { a: K2, b: P12, fold: 'mountain', mark: false }, { a: K4, b: P41, fold: 'mountain', mark: false },
         ],
       }),
+    },
+];
+
+// The frog base, shared by the frog and the lily: the square base, its four flaps squashed, and each face petal folded,
+// on a plain face found by turning pages, after creasing it along the sides it folds in.
+const FROG_BASE = [
+  ...SQUARE_BASE,
+    {
+      say: 'Lift the right flap so it stands straight up, open it, and squash it flat so its folded edge lands on the middle line. This is a squash fold.',
+      do: (h) => h.squash({ top: h.at(C), bottom: h.at(K1), corner: h.at(M34), seed: [0.7, 0.85] }),
+    },
+    {
+      say: 'Turn it over from side to side, keeping the closed point at the top.',
+      do: (h) => h.turnOver(),
+    },
+    {
+      say: 'Squash fold the right flap on this side the same way.',
+      do: (h) => h.squash({ top: h.at(C), bottom: h.at(K1), corner: h.at(M12), seed: [0.3, 0.15] }),
+    },
+    {
+      say: 'Turn the top layer on the right over to the left, like the page of a book.',
+      name: 'Turn a page',
+      do: (h) => h.valley(h.through(C, K1), { flap: [0.85, 0.1] }),
+    },
+    {
+      say: 'Squash fold the flap that was underneath.',
+      do: (h) => h.squash({ top: h.at(C), bottom: h.at(K1), corner: h.at(M23), seed: [0.85, 0.35] }),
+    },
+    {
+      say: 'Turn it over from side to side, keeping the closed point at the top.',
+      do: (h) => h.turnOver(),
+    },
+    {
+      say: 'Turn the top layer on the right over to the left again.',
+      name: 'Turn a page',
+      do: (h) => h.valley(h.through(C, K1), { flap: [0.35, 0.85] }),
+    },
+    {
+      say: 'Squash fold the last flap. Now all four flaps are squashed.',
+      do: (h) => h.squash({ top: h.at(C), bottom: h.at(K1), corner: h.at(M41), seed: [0.15, 0.7] }),
+    },
+    {
+      say: 'Turn the top layer on the right over to the left, so a plain face with no squash in it is on top.',
+      name: 'Turn a page',
+      do: (h) => h.valley(h.through(C, K1), { flap: [0.17, 0.35] }),
+    },
+    {
+      say: 'Fold the two lower edges of this face in to the middle line, and unfold. These creases guide the petal fold, as on the crane.',
+      do: guide(FACE.K1),
+    },
+    {
+      say: 'Petal fold this face, as for the crane: lift its bottom corner up, folding along the line between the tops of the two creases. As it rises, the lower edges fold in along the creases to meet at the middle line. Press it flat.',
+      name: 'Petal fold',
+      do: (h) => h.mech(petal(FACE.K1, [0.8, 0.8])),
+    },
+    {
+      say: 'Turn it over from side to side, so the long point stays at the top.',
+      do: (h) => h.turnOver(),
+    },
+    {
+      say: 'Turn the top layer on the right over to the left, so a plain face is on top again.',
+      name: 'Turn a page',
+      do: (h) => h.valley(h.through(C, K2), { flap: [0.83, 0.74] }),
+    },
+    {
+      say: 'Fold the lower edges of this face in to the middle line, and unfold, as before.',
+      do: guide(FACE.K3),
+    },
+    {
+      say: 'Petal fold this face the same way, along the creases.',
+      name: 'Petal fold',
+      do: (h) => h.mech(petal(FACE.K3, [0.2, 0.2])),
+    },
+    {
+      say: 'Turn two layers on the right over to the left together, to find the next plain face.',
+      name: 'Turn a page',
+      do: (h) => h.together(
+        (k) => k.valley(k.through(C, K2), { flap: [0.55, 0.78] }),
+        (k) => k.valley(k.through(C, K2), { flap: [0.26, 0.83] }),
+      ),
+    },
+    {
+      say: 'Crease this face the same way: lower edges in to the middle line, and unfold.',
+      do: guide(FACE.K4),
+    },
+    {
+      say: 'Petal fold it.',
+      name: 'Petal fold',
+      do: (h) => h.mech(petal(FACE.K4, [0.8, 0.2])),
+    },
+    {
+      say: 'Turn it over from side to side, so the long points stay at the top.',
+      do: (h) => h.turnOver(),
+    },
+    {
+      say: 'Turn two layers on the right over to the left, to find the last plain face.',
+      name: 'Turn a page',
+      do: (h) => h.together(
+        (k) => k.valley(k.through(C, K2), { flap: [0.45, 0.22] }),
+        (k) => k.valley(k.through(C, K2), { flap: [0.57, 0.17] }),
+      ),
+    },
+    {
+      say: 'Crease the last face the same way.',
+      do: guide(FACE.K2),
+    },
+    {
+      say: 'Petal fold the last face. This is the frog base: four long points at the top, four short ones at the bottom.',
+      name: 'Petal fold',
+      do: (h) => h.mech(petal(FACE.K2, [0.2, 0.8])),
     },
 ];
 
@@ -812,117 +936,82 @@ export const MODELS = [
     ],
   },
   {
+    // The traditional lily (yuri), as origami.me draws it (diagram by Kelly Tan): the frog base, its four points folded
+    // down, the lower edges of each face folded in to the middle, and the petals opened out.
+    id: 'lily',
+    name: 'Lily',
+    level: 'Tricky',
+    blurb: 'The traditional flower from the frog base. Four petals open round a long stem.',
+    paper: { kind: 'Square', colorUp: true, turn: 45 },
+    steps: [
+      ...FROG_BASE,
+      {
+        say: 'Fold the long point of the front face down, along the line between its side corners. Fold the one at the back down behind the same way.',
+        name: 'Valley and mountain',
+        do: (h) => {
+          const hinge = h.through(onFace(FACE.K2, ...PA), onFace(FACE.K2, ...PB));
+          return h.together(
+            (k) => k.valley(hinge, { flap: onFace(FACE.K2, 0.02, 0.01) }),
+            (k) => k.mountain(hinge, { flap: onFace(FACE.K4, 0.02, 0.01) }),
+          );
+        },
+      },
+      {
+        say: 'Fold the two upper edges of the front face in to the middle line, so they meet along it, and the two upper edges of the back face in behind.',
+        name: 'Valley and mountain',
+        do: (h) => h.together(...lilyEdges(FACE.K2, 'valley'), ...lilyEdges(FACE.K4, 'mountain')),
+      },
+      {
+        say: 'Turn two layers on the left over to the right, and two layers behind over from right to left, to find the faces whose points are still up.',
+        name: 'Turn pages',
+        do: (h) => h.together(
+          // Each pair of layers turns as one page.
+          (k) => k.valley(k.through(C, K2), { flap: [pageSeed(FACE.K2, 'a'), pageSeed(FACE.K1, 'a')] }),
+          (k) => k.mountain(k.through(C, K2), { flap: [pageSeed(FACE.K4, 'a'), pageSeed(FACE.K3, 'b')] }),
+        ),
+      },
+      {
+        say: 'Fold these two points down too, the front one toward you and the back one behind.',
+        name: 'Valley and mountain',
+        do: (h) => {
+          const hinge = h.through(onFace(FACE.K1, ...PA), onFace(FACE.K1, ...PB));
+          return h.together(
+            (k) => k.valley(hinge, { flap: onFace(FACE.K1, 0.02, 0.01) }),
+            (k) => k.mountain(hinge, { flap: onFace(FACE.K3, 0.02, 0.01) }),
+          );
+        },
+      },
+      {
+        say: 'Fold the upper edges in to the middle line on these faces too, front and back.',
+        name: 'Valley and mountain',
+        do: (h) => h.together(...lilyEdges(FACE.K1, 'valley'), ...lilyEdges(FACE.K3, 'mountain')),
+      },
+      {
+        say: 'Stand it up on the closed end, the stem, so the petals are at the top. Fold the front petal down and out, across its widest part, and the back one down behind. With real paper, fold the two petals between them out to the sides too, and curl each one round a pencil. That’s the lily.',
+        name: 'Shape',
+        view: { yaw: -150, pitch: 12, size: 0.8, lift: 0.36 },
+        do: (h) => {
+          // Across the widest part of the petals, where their folded-in corners end: above that the four petals are free
+          // of each other.
+          const left = h.sheet().order.flatMap((id) => h.sheet().world(id)).reduce((a, q) => (q[0] < a[0] ? q : a));
+          const hinge = h.level(left[1]);
+          return h.shape([
+            (k) => k.bend(hinge, LILY_OPEN, { flap: onFace(FACE.K1, 0.03, 0.01) }),
+            (k) => k.bend(hinge, LILY_OPEN, { flap: onFace(FACE.K3, 0.03, 0.01), type: 'mountain' }),
+          // Stood up on the closed end, at the top until now: the stem.
+          ], { line: { p: [0, h.sheet().bounds().cy], d: [1, 0] }, angle: -90 });
+        },
+      },
+    ],
+  },
+  {
     id: 'frog',
     name: 'Frog',
     level: 'Tricky',
     blurb: 'The traditional frog with four legs. Squash folds, petal folds and a lot of reverse folds.',
     paper: { kind: 'Square', colorUp: true, turn: 45 },
     steps: [
-      ...SQUARE_BASE,
-      {
-        say: 'Lift the right flap so it stands straight up, open it, and squash it flat so its folded edge lands on the middle line. This is a squash fold.',
-        do: (h) => h.squash({ top: h.at(C), bottom: h.at(K1), corner: h.at(M34), seed: [0.7, 0.85] }),
-      },
-      {
-        say: 'Turn it over from side to side, keeping the closed point at the top.',
-        do: (h) => h.turnOver(),
-      },
-      {
-        say: 'Squash fold the right flap on this side the same way.',
-        do: (h) => h.squash({ top: h.at(C), bottom: h.at(K1), corner: h.at(M12), seed: [0.3, 0.15] }),
-      },
-      {
-        say: 'Turn the top layer on the right over to the left, like the page of a book.',
-        name: 'Turn a page',
-        do: (h) => h.valley(h.through(C, K1), { flap: [0.85, 0.1] }),
-      },
-      {
-        say: 'Squash fold the flap that was underneath.',
-        do: (h) => h.squash({ top: h.at(C), bottom: h.at(K1), corner: h.at(M23), seed: [0.85, 0.35] }),
-      },
-      {
-        say: 'Turn it over from side to side, keeping the closed point at the top.',
-        do: (h) => h.turnOver(),
-      },
-      {
-        say: 'Turn the top layer on the right over to the left again.',
-        name: 'Turn a page',
-        do: (h) => h.valley(h.through(C, K1), { flap: [0.35, 0.85] }),
-      },
-      {
-        say: 'Squash fold the last flap. Now all four flaps are squashed.',
-        do: (h) => h.squash({ top: h.at(C), bottom: h.at(K1), corner: h.at(M41), seed: [0.15, 0.7] }),
-      },
-      {
-        say: 'Turn the top layer on the right over to the left, so a plain face with no squash in it is on top.',
-        name: 'Turn a page',
-        do: (h) => h.valley(h.through(C, K1), { flap: [0.17, 0.35] }),
-      },
-      {
-        say: 'Fold the two lower edges of this face in to the middle line, and unfold. These creases guide the petal fold, as on the crane.',
-        do: guide(FACE.K1),
-      },
-      {
-        say: 'Petal fold this face, as for the crane: lift its bottom corner up, folding along the line between the tops of the two creases. As it rises, the lower edges fold in along the creases to meet at the middle line. Press it flat.',
-        name: 'Petal fold',
-        do: (h) => h.mech(petal(FACE.K1, [0.8, 0.8])),
-      },
-      {
-        say: 'Turn it over from side to side, so the long point stays at the top.',
-        do: (h) => h.turnOver(),
-      },
-      {
-        say: 'Turn the top layer on the right over to the left, so a plain face is on top again.',
-        name: 'Turn a page',
-        do: (h) => h.valley(h.through(C, K2), { flap: [0.83, 0.74] }),
-      },
-      {
-        say: 'Fold the lower edges of this face in to the middle line, and unfold, as before.',
-        do: guide(FACE.K3),
-      },
-      {
-        say: 'Petal fold this face the same way, along the creases.',
-        name: 'Petal fold',
-        do: (h) => h.mech(petal(FACE.K3, [0.2, 0.2])),
-      },
-      {
-        say: 'Turn two layers on the right over to the left together, to find the next plain face.',
-        name: 'Turn a page',
-        do: (h) => h.together(
-          (k) => k.valley(k.through(C, K2), { flap: [0.55, 0.78] }),
-          (k) => k.valley(k.through(C, K2), { flap: [0.26, 0.83] }),
-        ),
-      },
-      {
-        say: 'Crease this face the same way: lower edges in to the middle line, and unfold.',
-        do: guide(FACE.K4),
-      },
-      {
-        say: 'Petal fold it.',
-        name: 'Petal fold',
-        do: (h) => h.mech(petal(FACE.K4, [0.8, 0.2])),
-      },
-      {
-        say: 'Turn it over from side to side, so the long points stay at the top.',
-        do: (h) => h.turnOver(),
-      },
-      {
-        say: 'Turn two layers on the right over to the left, to find the last plain face.',
-        name: 'Turn a page',
-        do: (h) => h.together(
-          (k) => k.valley(k.through(C, K2), { flap: [0.45, 0.22] }),
-          (k) => k.valley(k.through(C, K2), { flap: [0.57, 0.17] }),
-        ),
-      },
-      {
-        say: 'Crease the last face the same way.',
-        do: guide(FACE.K2),
-      },
-      {
-        say: 'Petal fold the last face. This is the frog base: four long points at the top, four short ones at the bottom.',
-        name: 'Petal fold',
-        do: (h) => h.mech(petal(FACE.K2, [0.2, 0.8])),
-      },
+      ...FROG_BASE,
       {
         say: 'Turn it around so the four long points are at the bottom. They will be the legs.',
         do: (h) => h.turn(180),

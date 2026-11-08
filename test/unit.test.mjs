@@ -381,7 +381,8 @@ test('as a fold begins and as it lands, the paper seen from above keeps its colo
   // In the frog's squash folds the back layer of the flap lifts ahead of the front one and shows through it as they open
   // (31-45% of the face turns white by a tenth of the way). Of the paper passing through paper mid-fold, Mark had the
   // waterbomb's tucks mended and the squash and petal folds left as they are.
-  const thick = new Set(['frog 7', 'frog 9', 'frog 11', 'frog 14']);
+  // The lily is folded from the same frog base, with the same squash folds.
+  const thick = new Set(['frog 7', 'frog 9', 'frog 11', 'frog 14', 'lily 7', 'lily 9', 'lily 11', 'lily 14']);
   const flashes = [];
   for (const model of MODELS) {
     for (const [i, step] of once(model).steps.entries()) {
@@ -426,7 +427,7 @@ test('js/finished.js has a picture for every model and nothing else', () => {
 
 test('a model that ends standing up is pictured standing, seen from where the player ends it', () => {
   const standers = MODELS.filter((m) => once(m).steps.at(-1).view).map((m) => m.id);
-  assert.deepEqual(standers, ['plane', 'fortune-teller', 'crane', 'flapping-bird']);
+  assert.deepEqual(standers, ['plane', 'fortune-teller', 'crane', 'flapping-bird', 'lily']);
   for (const id of standers) {
     const b = once(MODELS.find((m) => m.id === id));
     const last = b.steps.at(-1);
@@ -593,6 +594,34 @@ test('frog: each petal fold comes after a step that creases the face along the s
     }
     assert.match(petal.say + guide.say, /crease/i, `frog steps ${i}-${i + 1} don't say the creases guide it`);
   }
+});
+
+// The lily as origami.me draws it: the frog base with its four long points folded down, each face's edges at the closed
+// end folded in to the middle line, and the petals opened out from a long stem.
+test('lily: from the frog base it narrows to a long stem, and stands on it with its petals open', () => {
+  const lily = MODELS.find((m) => m.id === 'lily');
+  assert.ok(lily, 'there is no lily');
+  const b = once(lily), frog = once(MODELS.find((m) => m.id === 'frog'));
+  // The frog base: the same twenty-eight steps as the frog's.
+  const base = frog.steps.findIndex((st) => /This is the frog base/.test(st.say)) + 1;
+  assert.equal(base, 28);
+  assert.deepEqual(lily.steps.slice(0, base), MODELS.find((m) => m.id === 'frog').steps.slice(0, base));
+  // Narrowed: at the closed end every face's edges meet the middle line, so the paper there is only as wide as
+  // the creases at 11.25 degrees either side of it allow.
+  const narrow = b.steps.at(-2).to, c = narrow.at([0.5, 0.5]);
+  const near = narrow.order.flatMap((id) => narrow.world(id)).filter((q) => Math.abs(q[1] - c[1]) < 0.25);
+  const half = Math.max(...near.map((q) => Math.abs(q[0] - c[0])));
+  assert.ok(half < 0.25 * Math.tan(Math.PI / 16) + 1e-9, `the stem is ${(2 * half).toFixed(3)} wide a quarter of the way up`);
+  // Standing: the closed end lowest, on the mat, and all four petal points above it; the front and back petals
+  // bent out, lower than the two between them.
+  const last = b.steps.at(-1), items = poses(last, 1).filter((it) => !it.bridge);
+  const where = (q) => { const it = items.find((x) => covers(x.facet.poly, q, 1e-9)); return transformPoint(it.pose, ...q); };
+  const z = (q) => where(q)[2];
+  assert.ok(z([0.5, 0.5]) < 0.01, 'the lily does not stand on its stem');
+  const tips = [[0, 0], [1, 0], [1, 1], [0, 1]].map(z);
+  assert.ok(tips.every((t) => t > 0.2), `the petal points are not up above the stem: ${tips.map((t) => t.toFixed(2))}`);
+  const [k1, k2, k3, k4] = tips;
+  assert.ok(Math.max(k1, k3) < Math.min(k2, k4) - 0.1, 'the front and back petals are not bent out');
 });
 
 test('fortune teller: its last step opens it into its four points, up and together, with the squares outside', () => {
@@ -819,7 +848,7 @@ test('turning the model over or around draws its symbol on the table just in fro
       n++;
     }
   }
-  assert.equal(n, 18, 'sixteen steps turn a model over and two turn it around');
+  assert.equal(n, 23, 'twenty-one steps turn a model over and two turn it around');
 });
 
 test('folds made together along one line share the line, and their arrows sit side by side', () => {
