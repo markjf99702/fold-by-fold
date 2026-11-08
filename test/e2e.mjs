@@ -186,9 +186,13 @@ assert.equal(s.playing, false);
 assert.equal(s.t, 0.5);
 assert.equal(await page.textContent('#playLabel'), 'Carry on');
 
-// Back to the start of the step, then back a step, then forward again.
+// Replay this fold plays the fold again from its start. With the paper back at the start, the back button goes back a
+// step, and Next forward again.
 await page.click('#prev');
-assert.equal((await state()).t, 0);
+assert.deepEqual(await page.evaluate(() => [fold.state.i, fold.state.t, fold.state.playing]), [1, 0, true], 'Replay this fold did not play the fold again from its start');
+await page.waitForFunction(() => fold.state.t > 0.2, null, { timeout: 10000 }).catch(() => assert.fail('Replay this fold did not move the paper'));
+await page.locator('#scrub').evaluate((el) => { el.value = 0; el.dispatchEvent(new Event('input', { bubbles: true })); });
+assert.equal(await page.getAttribute('#prev', 'aria-label'), 'Previous step');
 await page.click('#prev');
 assert.equal((await state()).i, 0);
 await page.click('#next');
@@ -973,8 +977,7 @@ for (const reduce of [false, true]) {
   assert.deepEqual(await p.evaluate(() => [fold.state.playing, fold.state.t < 1]), [false, true], 'the fold ran on out of sight');
   assert.equal(await p.textContent('#playLabel'), 'Carry on');
   await show();
-  await p.click('#prev');
-  await p.click('#play');
+  await p.click('#prev'); // Replay this fold: the marks are up again, and then it plays
   await hide();
   assert.deepEqual(await p.evaluate(() => [fold.state.playing, fold.state.t]), [false, 0], 'the fold went on out of sight from the marks');
   assert.equal(await p.textContent('#playLabel'), 'Play');
@@ -1197,10 +1200,10 @@ for (const hash of ['#%', '#crane-3%', '#%F0%9F']) {
   assert.equal(await p.evaluate(() => fold.state.i), 3, '← did nothing once a button had been pressed');
   await p.keyboard.press('ArrowRight');
   assert.deepEqual(await p.evaluate(() => [fold.state.i, fold.state.playing, fold.state.t]), [4, false, 0], '→ did not go to the next step, or played it');
-  // A fold part way through goes back to its start, and from there to the step before.
+  // A fold part way through plays again from its start, and from there ← goes to the step before.
   await p.evaluate(() => fold.set(3, 0.5));
   await p.keyboard.press('ArrowLeft');
-  assert.deepEqual(await p.evaluate(() => [fold.state.i, fold.state.t]), [3, 0], '← part way through a fold did not take it back to its start');
+  assert.deepEqual(await p.evaluate(() => [fold.state.i, fold.state.t, fold.state.playing]), [3, 0, true], '← part way through a fold did not play it again from its start');
   await p.keyboard.press('ArrowLeft');
   assert.deepEqual(await p.evaluate(() => [fold.state.i, fold.state.t]), [2, 0], '← at the start of a fold did not go to the step before');
   // On step 1, with no step before, a fold that has only just moved goes back to its start, by the key or the button.

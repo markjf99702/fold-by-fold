@@ -941,11 +941,21 @@ $('toKey').addEventListener('click', () => {
   key.focus({ preventScroll: true });
 });
 $('play').addEventListener('click', primary);
-// The back button, and the ← key: a fold that has moved goes back to its start, and from there to the step before. On
-// step 1 there's no step before, so a fold that has only just moved goes back to its start too.
+// The back button, and the ← key: a fold that has moved plays again from its start (Replay this fold), and one that
+// hasn't goes to the step before. On step 1 there's no step before, so a fold that has only just moved goes back to its
+// start.
 function stepBack() {
   if (P.waiting) return;
-  if (P.t > 0.02 || (P.i === 0 && P.t > 0)) { P.t = 0; P.playing = false; paint(); } else if (P.i > 0) go(P.i - 1);
+  if (P.t > 0.02) replay();
+  else if (P.i === 0 && P.t > 0) { P.t = 0; P.playing = false; paint(); }
+  else if (P.i > 0) go(P.i - 1);
+}
+// Plays this step's fold again from its start, with its marks back on the paper for a moment first, as when the step
+// came up.
+function replay() {
+  P.t = 0;
+  P.shownAt = performance.now();
+  start();
 }
 $('prev').addEventListener('click', () => { if (!isOff($('prev'))) stepBack(); });
 $('next').addEventListener('click', () => { if (!isOff($('next'))) go(P.i + 1); });
