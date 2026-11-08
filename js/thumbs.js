@@ -1,6 +1,7 @@
 // The pictures of the finished models on the gallery's cards: each facet with its front side in the paper's color
-// and its back side white. A model that lies flat is seen from above, in its stacking order; one whose last step
-// stands it up is seen in 3D, from where the player ends it, with the player's light on it.
+// and its back side white, and a light edge round the sheet. A model that lies flat is seen from above, in its
+// stacking order; one whose last step stands it up is seen in 3D, from where the player ends it, with the player's
+// light on it.
 //
 // It comes in two parts so the gallery needn't fold every model to show them: finished() works out the shapes,
 // which tools/make-thumbs.mjs does ahead of time for the finished models (js/finished.js), and picture() draws
@@ -116,10 +117,16 @@ function darker(hex, k) {
   return `#${((c[0] << 16) | (c[1] << 8) | c[2]).toString(16).padStart(6, '0')}`;
 }
 
+// The cut edge of the paper catching the light: a thin light line round the whole sheet, so dark and green papers
+// stand out from the green mat as well as the light ones do. It's every facet's outline drawn first with a wide light
+// stroke, which the facets then cover, all but the half of it outside the paper.
+const RIM = 'rgba(255,250,240,.75)', RIM_WIDTH = 1.6;
+
 export function picture(shapes, { front = '#d9412b', back = '#f3eee3', edge = 'rgba(40,30,20,.45)', label = '' } = {}) {
+  const rim = shapes.map(([, points]) => `M${points.replaceAll(' ', 'L')}Z`).join('');
   const polys = shapes.map(([up, points, shade = 0]) =>
     `<polygon points="${points}" fill="${darker(up ? front : back, shade)}" stroke="${edge}" stroke-width=".45" stroke-linejoin="round"/>`);
   // Without a label the picture is decoration, and screen readers skip it.
   const a11y = label ? `role="img" aria-label="${label}"` : 'aria-hidden="true"';
-  return `<svg viewBox="0 0 100 100" ${a11y}>${polys.join('')}</svg>`;
+  return `<svg viewBox="0 0 100 100" ${a11y}><path class="rim" d="${rim}" fill="none" stroke="${RIM}" stroke-width="${RIM_WIDTH}" stroke-linejoin="round"/>${polys.join('')}</svg>`;
 }

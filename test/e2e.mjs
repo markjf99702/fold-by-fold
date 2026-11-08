@@ -73,6 +73,8 @@ assert.equal(await page.isVisible('#home'), true, 'no gallery');
 const cards = await page.locator('.model').count();
 assert.ok(cards >= 5, `only ${cards} models`);
 assert.equal(await page.locator('.model .thumb svg polygon').count() > cards, true, 'the model pictures are empty');
+// Each with a light edge round the paper, under it, so dark and green papers stand out from the mat too.
+assert.equal(await page.locator('.model .thumb svg > path.rim:first-child').count(), cards, 'a picture has no light edge round the paper');
 // The pictures were worked out ahead of time, so the gallery shows them without folding a single model.
 assert.deepEqual(await page.evaluate(() => fold.built), [], 'the gallery folded models to show their pictures');
 assert.equal(await sideways(), false, 'the gallery scrolls sideways on a phone');

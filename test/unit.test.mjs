@@ -333,6 +333,22 @@ test('a model that ends standing up is pictured standing, seen from where the pl
   for (const m of MODELS.filter((x) => !standers.includes(x.id))) assert.deepEqual(finished(once(m)), outline(once(m).end), m.id);
 });
 
+test('every gallery picture has a thin light edge round the paper, the same in every paper colour', () => {
+  for (const [id, shapes] of Object.entries(FINISHED)) {
+    for (const front of ['#d9412b', '#2f4f8f', '#3f8a57']) {
+      const svg = picture(shapes, { front });
+      const rim = svg.match(/<path class="rim" d="([^"]*)" fill="none" stroke="([^"]*)" stroke-width="([^"]*)"/);
+      assert.ok(rim, `${id} has no light edge`);
+      // Under the paper, so only the part outside it shows, and round every facet, so it follows the whole outline.
+      assert.ok(svg.indexOf('<path class="rim"') < svg.indexOf('<polygon'), `${id}'s light edge is drawn over the paper`);
+      assert.equal(rim[1].split('Z').filter(Boolean).length, shapes.length, id);
+      assert.equal(rim[2], 'rgba(255,250,240,.75)', `${id}'s edge is not light, or changes with the paper`);
+      // Thin: what shows outside the paper is half the stroke, under 1% of the picture's width.
+      assert.ok(+rim[3] / 2 < 1, `${id}'s light edge is ${rim[3] / 2} of 100 wide`);
+    }
+  }
+});
+
 test('a standing picture draws what is nearer the camera over what is further, and the side the camera sees', () => {
   // Two squares, one above the other, given in either order: from above, the upper one is drawn last, with its front
   // showing; from below, the lower one is drawn last, and the camera sees their backs.
