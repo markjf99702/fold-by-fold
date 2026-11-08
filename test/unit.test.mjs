@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import { readFileSync, readdirSync } from 'node:fs';
 import assert from 'node:assert/strict';
 import { Sheet, fold, turnOver, together, creases, isFlipped } from '../js/paper.js';
-import { apply, area, bisector, side, centroid, overlapArea, line, ccw, clip, inside as covers } from '../js/geom.js';
+import { apply, area, bisector, side, centroid, overlapArea, line, ccw, clip, det, inside as covers } from '../js/geom.js';
 import { build } from '../js/build.js';
 import { poses, marks, symbol, corners, transformPoint, LAYER } from '../js/motion.js';
 import { MODELS } from '../js/models.js';
@@ -631,6 +631,28 @@ test('jumping frog: its front legs stick out past the sides of its head, where t
   }
   const legs = b.steps.findIndex((st) => /front legs/.test(st.say));
   assert.equal(legs, 5, 'the front legs are not folded out straight after the flaps go up');
+});
+
+// The cicada as origami.me draws it: the wings fold down slanted so their points stick out past the diamond, the two layers
+// of the top corner fold down one a little short of the other so a strip of white shows between them, and the sides
+// fold behind, leaving it narrower than the diamond and even on both sides.
+test('cicada: its wings stick out past the diamond, a strip of white shows under its head, and its sides go behind', () => {
+  const cicada = MODELS.find((m) => m.id === 'cicada');
+  assert.ok(cicada, 'there is no cicada');
+  const b = once(cicada), after = (n) => b.steps[n - 1].to;
+  const wings = after(3), c = wings.at([0.5, 0.5]), top = wings.at([0, 1]);
+  // The diamond's side corners, with the paper corner that folds up to the top and down again as each wing.
+  for (const [corner, tip] of [[[0.5, 1], [1, 1]], [[0, 0.5], [0, 0]]]) {
+    const edge = line(c, wings.at(corner));
+    assert.ok(side(edge, wings.at(tip)) * side(edge, top) < -1e-6, `the wing from paper corner ${tip} doesn't stick out past the diamond`);
+  }
+  const layers = after(5), first = layers.at([1, 0]), last = layers.at([0, 1]);
+  assert.ok(last[1] > first[1] + 0.02 && Math.abs(last[0] - first[0]) < 1e-9, 'the last layer does not stop short of the first, in line with it');
+  const strip = layers.topAt([first[0], (first[1] + last[1]) / 2]);
+  assert.ok(strip && det(strip.m) < 0, 'no white shows between the two layers folded down');
+  const diamond = after(2).bounds(), end = b.end.bounds();
+  assert.ok(end.x1 - end.x0 < 0.75 * (diamond.x1 - diamond.x0), 'the sides did not go behind');
+  assert.ok(Math.abs(end.cx - diamond.cx) < 1e-9, 'the cicada is not even on both sides');
 });
 
 test('crane: each reverse-folded point ends up between the front and back of the model', () => {

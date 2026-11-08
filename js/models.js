@@ -92,6 +92,21 @@ function footLine(h, face, at, deg) {
   return { p: [tip[0] + at * along[0], tip[1] + at * along[1]], d: [Math.cos(r) * along[0] - Math.sin(r) * along[1], Math.sin(r) * along[0] + Math.cos(r) * along[1]] };
 }
 
+// The cicada's wings fold down along lines this many degrees off level, from the diamond's side corners, so their points
+// stick out past its lower edges; its last layer's point stops CICADA_GAP short of the first, and its head folds down
+// CICADA_HEAD, about a centimeter on a 15 cm square.
+const WING = 7.5, CICADA_GAP = 0.05, CICADA_HEAD = 0.07;
+// Where the cicada's wing folds meet, in the middle.
+const wingsMeet = (h) => h.intersect(h.lineAt(h.at([0.5, 1]), -WING), h.lineAt(h.at([0, 0.5]), 180 + WING));
+// The line each side of the cicada folds behind along (s: -1 left, 1 right): from the head's top edge, about a third of
+// the way out, slanting out to the wing, as origami.me draws it. It's worked out from the middle of the paper, at the
+// bottom of the diamond, and the diamond's right corner, which stay put till the right side folds.
+function cicadaSide(h, s) {
+  const c = h.at([0.5, 0.5]), hw = h.at([0, 0.5])[0] - c[0];
+  const top = (c[1] + 2 * hw + c[1] + hw * (1 - Math.tan(WING * Math.PI / 180)) + CICADA_GAP) / 2 - CICADA_HEAD;
+  return h.through({ table: [c[0] + s * 0.36 * hw, top] }, { table: [c[0] + s * 0.61 * hw, top - 1.11 * hw] });
+}
+
 // The jumping frog's index card: 3 by 5, so 1 wide and 5/3 tall. The top square collapses into a
 // waterbomb base around X, the middle of the square; the body below it is BODY tall.
 const CARD = 5 / 3, BODY = CARD - 1;
@@ -475,6 +490,55 @@ export const MODELS = [
             roll: { line: { p: mid, d: [1, 0] }, angle: 180, schedule: (t) => ease(Math.min(1, Math.max(0, (t - 0.4) / 0.48))) },
           });
         },
+      },
+    ],
+  },
+  {
+    // The traditional cicada (semi), as origami.me (diagram by Mili Pacheco) and the Origami Resource Center draw it.
+    id: 'cicada',
+    name: 'Cicada',
+    level: 'Easy',
+    blurb: 'The semi, a summer insect from Japan. A triangle, two wings and a head.',
+    paper: { kind: 'Square', colorUp: false, turn: 45 },
+    steps: [
+      {
+        say: 'White side up, turned like a diamond. Fold the bottom corner up to the top corner.',
+        do: (h) => h.valley(h.onto([1, 0], [0, 1]), { move: [1, 0] }),
+      },
+      {
+        say: 'Fold the left and right corners up to meet the top corner. Now you have a diamond.',
+        do: (h) => h.together(
+          (k) => k.valley(k.onto([1, 1], [0, 1]), { move: [1, 1] }),
+          (k) => k.valley(k.onto([0, 0], [0, 1]), { move: [0, 0] }),
+        ),
+      },
+      {
+        say: 'Fold the top points of those two flaps back down, a little slanted, so they stick out past the bottom edges. These are the wings.',
+        do: (h) => h.together(
+          (k) => k.valley(k.lineAt(k.at([0.5, 1]), -WING), { flap: [0.97, 0.99] }),
+          (k) => k.valley(k.lineAt(k.at([0, 0.5]), 180 + WING), { flap: [0.03, 0.01] }),
+        ),
+      },
+      {
+        say: 'Fold the top corner of the front layer down, so its point lands where the wings meet.',
+        do: (h) => h.valley(h.ontoPoint([1, 0], wingsMeet(h)), { flap: [0.97, 0.03] }),
+      },
+      {
+        say: 'Fold the top corner of the last layer down too, a little short of the first, so a strip of white shows below it.',
+        do: (h) => { const p = wingsMeet(h); return h.valley(h.ontoPoint([0, 1], [p[0], p[1] + CICADA_GAP]), { flap: [0.03, 0.97] }); },
+      },
+      {
+        say: 'Fold the top edge down a little, through all the layers. This is the head.',
+        // A level line has the paper above it on its left, the side that moves.
+        do: (h) => h.valley(h.level(h.sheet().bounds().y1 - CICADA_HEAD)),
+      },
+      {
+        say: 'Fold the left side behind, along a line slanting out from the head to the wing.',
+        do: (h) => h.mountain(cicadaSide(h, -1), { move: [0.5, 1] }),
+      },
+      {
+        say: 'Fold the right side behind the same way. That’s the cicada.',
+        do: (h) => h.mountain(cicadaSide(h, 1), { move: [0, 0.5] }),
       },
     ],
   },
