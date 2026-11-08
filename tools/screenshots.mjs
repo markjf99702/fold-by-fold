@@ -63,14 +63,16 @@ async function at(page, i, t, aim) {
   await page.context().close();
 }
 
-// Link preview, 1200 x 630: a real fold, part way, on the cutting mat beside the name.
+// Link preview, 1200 x 630: the finished crane standing on the cutting mat beside the name, seen from where the
+// player ends it. The crane stands a little right of the middle, so a preview cropped to a square in the middle
+// still shows all of it.
 {
   const page = await open({ width: 1200, height: 630 }, 1, '#crane');
   await page.waitForFunction(() => fold.state.id === 'crane');
   await page.addStyleTag({ content: `
     .player { display: block !important; position: relative; }
     .bar, .panel { display: none !important; }
-    .stage { position: absolute !important; inset: 0 auto 0 0; width: 1640px; height: 630px; background: var(--mat); }
+    .stage { position: absolute !important; inset: 0 auto 0 0; width: 1440px; height: 630px; background: var(--mat); }
     .og { position: absolute; left: 76px; top: 50%; transform: translateY(-50%); width: 420px; color: #f4efe4; }
     .og p.eyebrow { font-size: 22px; letter-spacing: .14em; text-transform: uppercase; margin: 0 0 14px; color: #bcd3c8; font-weight: 700; }
     .og h1 { font-family: var(--display); font-weight: 800; font-size: 96px; line-height: 1; margin: 0 0 22px; }
@@ -83,8 +85,8 @@ async function at(page, i, t, aim) {
     document.getElementById('player').append(d);
     dispatchEvent(new Event('resize'));
   });
-  // The crane's petal fold, part way.
-  await at(page, PETAL, 0.42, [-65, 38]);
+  // The crane's last step, done: it stands, with its wings out.
+  await at(page, await page.evaluate(() => document.querySelectorAll('#stepList li').length), 1);
   const png = await page.screenshot();
   await writeFile(join(out, 'og.png'), await small(png));
   await page.context().close();
