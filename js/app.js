@@ -147,7 +147,7 @@ function duration(step) {
   return base * pace();
 }
 
-function openModel(id, i = null) {
+function openModel(id, i = null, { landed = false } = {}) {
   const m = MODELS.find((x) => x.id === id);
   if (!m) { location.hash = ''; return; }
   show('player');
@@ -180,6 +180,7 @@ function openModel(id, i = null) {
   // until you move on from the link's step yourself.
   const link = i !== null && prefs.progress[id] > 0;
   go(i ?? Math.min(prefs.progress[id] || 0, P.b.steps.length - 1), { snap: true, keep: !link });
+  if (landed) { P.t = 1; keepAim(); paint(); frameCamera(true); }
   document.title = `${m.name} · Fold by Fold`;
 }
 
@@ -328,6 +329,7 @@ function paint() {
   }
   $('scrub').value = Math.round(P.t * 1000);
   $('speed').setAttribute('aria-pressed', prefs.slow);
+  nameInAddress();
   document.querySelectorAll('#ticks button').forEach((b, k) => b.classList.toggle('done', k < P.i || (k === P.i && P.t >= 1)));
   dirty = true;
 }
@@ -527,15 +529,36 @@ document.addEventListener('keydown', () => { if (!$('player').hidden) keepAwake(
 // set the #part, as they always did.
 const framed = window.self !== window.top;
 
+// The address names the step you're on (#crane-12, and the first step just #crane), so copying it or sharing it from
+// the browser sends that step. It's rewritten in place once the step has settled for a moment: sliding along the ticks
+// passes many steps a second, and browsers limit how often a page may rewrite its address (Safari throws after 100
+// times in 30 seconds). The page's history also notes whether the step's fold had landed, so a reload, or a phone
+// reopening the tab, shows it folded as you left it rather than asking for that fold again; a copied address opens
+// the step from its start. In a frame the address is left alone.
+let addressed = null; // the address as the page last opened or wrote it
+let addressTimer = 0;
+function nameInAddress() {
+  if (framed) return;
+  clearTimeout(addressTimer);
+  addressTimer = setTimeout(() => {
+    if ($('player').hidden || location.hash !== addressed) return; // gone somewhere else meanwhile
+    const hash = '#' + P.id + (P.i ? '-' + (P.i + 1) : '');
+    const landed = P.t >= 1;
+    if (hash === addressed && !!history.state?.landed === landed) return;
+    try {
+      history.replaceState({ ...history.state, landed }, '', hash);
+      addressed = hash;
+    } catch { /* rewritten too often: the next step catches it up */ }
+  }, 300);
+}
+
 function route() {
+  addressed = location.hash;
   let h = '';
   try { h = decodeURIComponent(location.hash.slice(1)); } catch { /* a link mangled on the way: the gallery */ }
   const m = /^([a-z-]+?)(?:-(\d+))?$/.exec(h);
   if (m && MODELS.some((x) => x.id === m[1])) {
-    openModel(m[1], m[2] ? +m[2] - 1 : null);
-    // A link to a step opens it once; after that the address is the model's, so a reload picks up where
-    // you got to instead of going back to the link's step.
-    if (m[2] && !framed) history.replaceState(history.state, '', '#' + m[1]);
+    openModel(m[1], m[2] ? +m[2] - 1 : null, { landed: !!m[2] && history.state?.landed === true });
   } else {
     renderHome(); // first, so the cards are there to scroll back to
     show('home');

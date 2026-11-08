@@ -327,13 +327,15 @@ async function fresh(hash = '', { init, arg, ...opts } = {}) {
   return p;
 }
 
-// A link to a step opens that step once. After that a reload picks up where you got to, not the link's step.
+// A link to a step opens that step, and the address follows the steps from there, so a reload opens the step you're
+// on, not the link's step.
 {
   const p = await fresh('#crane-3');
   await p.waitForFunction(() => fold.state.id === 'crane');
   assert.equal(await p.evaluate(() => fold.state.i), 2);
   for (let k = 0; k < 4; k++) await p.click('#next');
   assert.equal(await p.evaluate(() => fold.state.i), 6);
+  await p.waitForFunction(() => location.hash === '#crane-7', null, { timeout: 3000 }).catch(() => assert.fail('the address did not follow the steps'));
   await p.reload();
   await p.waitForFunction(() => fold.state.id === 'crane');
   assert.equal(await p.evaluate(() => fold.state.i), 6, 'a reload went back to the step in the link');
@@ -352,7 +354,7 @@ async function fresh(hash = '', { init, arg, ...opts } = {}) {
 }
 
 // A link to a step in a model you've started shows that step without losing your place: that waits until you
-// fold on from there yourself.
+// fold on from there yourself. A reload stays on the link's step, which the address names, and the place stays too.
 {
   const p = await fresh('#crane-10', { init: () => { if (!sessionStorage.seeded) { sessionStorage.seeded = 1; localStorage.setItem('fold-by-fold.v1', '{"progress":{"crane":17}}'); } } });
   await p.waitForFunction(() => fold.state.id === 'crane');
@@ -361,7 +363,13 @@ async function fresh(hash = '', { init, arg, ...opts } = {}) {
   assert.equal(await saved(), 17, 'a link to a step lost the place you had got to');
   await p.reload();
   await p.waitForFunction(() => fold.state.id === 'crane');
-  assert.equal(await p.evaluate(() => fold.state.i), 17, 'a reload after the link did not go back to your place');
+  assert.equal(await p.evaluate(() => fold.state.i), 9, 'a reload after the link left the step the address names');
+  assert.equal(await saved(), 17, 'a reload after the link lost the place you had got to');
+  await p.click('#back');
+  await p.waitForSelector('#home:not([hidden])');
+  await p.click('.model[data-model="crane"]');
+  await p.waitForFunction(() => fold.state.id === 'crane');
+  assert.equal(await p.evaluate(() => fold.state.i), 17, 'the crane opened from the gallery did not go back to your place');
   await p.goto(base + '#crane-10');
   await p.waitForFunction(() => fold.state.i === 9);
   await p.click('#play');
@@ -390,6 +398,12 @@ async function fresh(hash = '', { init, arg, ...opts } = {}) {
   assert.equal(await saved(), 4, 'folding an earlier step did not make it your place');
   await p.waitForFunction(() => fold.state.t >= 1, null, { timeout: 15000 });
   assert.equal(await saved(), 5, 'the fold landing did not move your place on to the next step');
+  // A reload shows the step folded as you left it, from the address, rather than asking for that fold again.
+  await p.waitForFunction(() => location.hash === '#crane-5' && history.state?.landed, null, { timeout: 3000 }).catch(() => assert.fail('the address did not name the step folded'));
+  await p.reload();
+  await p.waitForFunction(() => fold.state.id === 'crane');
+  assert.deepEqual(await p.evaluate(() => [fold.state.i, fold.state.t]), [4, 1], 'a reload did not show the fold as it was left');
+  assert.equal(await p.textContent('#playLabel'), 'Next fold');
   await p.click('#back');
   await p.waitForSelector('#home:not([hidden])');
   assert.equal(await p.textContent('.model[data-model="crane"] .count'), 'Step 6 of 23', 'the crane\'s card doesn\'t say the next step');
@@ -408,6 +422,53 @@ async function fresh(hash = '', { init, arg, ...opts } = {}) {
   await p.waitForFunction(() => fold.state.i === 22);
   await scrub(1000);
   assert.equal(await saved(), 22, 'the last step folded saved a step past the end');
+  await p.context().close();
+}
+
+// The address names the step you're on, so a reload stays there and the address copied into another browser opens it.
+// It's written once the step settles, not for every step a finger slides past (browsers limit how often a page may
+// rewrite it), and it leaves the back arrow's way back to the gallery as it was.
+{
+  const p = await fresh();
+  await p.click('.model:has(h3:text("Samurai helmet"))');
+  await p.waitForSelector('#player:not([hidden])');
+  assert.equal(await p.evaluate(() => location.hash), '#helmet');
+  await p.evaluate(() => { location.hash = 'helmet-6'; });
+  await p.waitForFunction(() => fold.state.i === 5);
+  await p.click('#next');
+  await p.waitForFunction(() => location.hash === '#helmet-7', null, { timeout: 3000 }).catch(() => assert.fail('the address does not name the step'));
+  const url = p.url();
+  await p.reload();
+  await p.waitForFunction(() => fold.state.id === 'helmet');
+  assert.equal(await p.textContent('#stepCount'), 'Step 7 of ' + await p.evaluate(() => fold.state.steps), 'a reload left the step in the address');
+  const writes = await p.evaluate(() => new Promise((done) => {
+    let n = 0;
+    const own = history.replaceState;
+    history.replaceState = function (...a) { n++; return own.apply(this, a); };
+    for (const b of [...document.querySelectorAll('#ticks button')].slice(0, 9)) b.click();
+    setTimeout(() => { history.replaceState = own; done([n, location.hash]); }, 800);
+  }));
+  assert.deepEqual(writes, [1, '#helmet-9'], 'the address was rewritten for every step passed, or not for the last');
+  await p.evaluate(() => document.querySelector('#ticks button').click());
+  await p.waitForFunction(() => location.hash === '#helmet', null, { timeout: 3000 }).catch(() => assert.fail('step 1 is not named by the model alone'));
+  const other = await fresh(new URL(url).hash);
+  await other.waitForFunction(() => fold.state.id === 'helmet');
+  assert.deepEqual(await other.evaluate(() => [fold.state.i, fold.state.t]), [6, 0], 'the copied address did not open its step from the start');
+  await other.context().close();
+  await p.context().close();
+}
+
+// Opened from the gallery, the back arrow still goes back the way the browser's Back does once the address names a step.
+{
+  const p = await fresh();
+  const before = await p.evaluate(() => history.length);
+  await p.click('.model:has(h3:text("Paper cup"))');
+  await p.waitForSelector('#player:not([hidden])');
+  await p.click('#next');
+  await p.waitForFunction(() => location.hash === '#cup-2', null, { timeout: 3000 });
+  await p.click('#back');
+  await p.waitForSelector('#home:not([hidden])');
+  assert.deepEqual(await p.evaluate(() => [history.length, location.hash]), [before + 1, ''], 'the back arrow added a page after the address named a step');
   await p.context().close();
 }
 
