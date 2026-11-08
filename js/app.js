@@ -679,10 +679,11 @@ $('toKey').addEventListener('click', () => {
   key.focus({ preventScroll: true });
 });
 $('play').addEventListener('click', primary);
-$('prev').addEventListener('click', () => {
-  if (isOff($('prev'))) return;
-  if (P.t > 0.02) { P.t = 0; P.playing = false; paint(); } else go(P.i - 1);
-});
+// The back button, and the ← key: a fold that has moved goes back to its start, and from there to the step before.
+function stepBack() {
+  if (P.t > 0.02) { P.t = 0; P.playing = false; paint(); } else if (P.i > 0) go(P.i - 1);
+}
+$('prev').addEventListener('click', () => { if (!isOff($('prev'))) stepBack(); });
 $('next').addEventListener('click', () => { if (!isOff($('next'))) go(P.i + 1, { play: true }); });
 $('speed').addEventListener('click', () => {
   prefs.slow = !prefs.slow;
@@ -748,7 +749,7 @@ document.addEventListener('keydown', (e) => {
     primary();
   } else if (e.key === 'ArrowRight' && !onSlider) {
     if (P.i < P.b.steps.length - 1) go(P.i + 1, { play: true });
-  } else if (e.key === 'ArrowLeft' && !onSlider) go(P.i - 1);
+  } else if (e.key === 'ArrowLeft' && !onSlider) stepBack();
 });
 window.addEventListener('hashchange', route);
 // A fold runs by the clock, and nothing is drawn while the page is out of sight, so locking the phone or switching to

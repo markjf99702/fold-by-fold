@@ -893,7 +893,7 @@ for (const hash of ['#%', '#crane-3%', '#%F0%9F']) {
 }
 
 // The arrow keys step through the folds, also once a button has been pressed; → on the last step leaves it
-// be, and the slider keeps the arrow keys for itself.
+// be, ← does what the back button does, and the slider keeps the arrow keys for itself.
 {
   const p = await fresh('#cup-5');
   await p.waitForFunction(() => fold.state.id === 'cup');
@@ -904,6 +904,13 @@ for (const hash of ['#%', '#crane-3%', '#%F0%9F']) {
   assert.equal(await p.evaluate(() => fold.state.i), 3, '← did nothing once a button had been pressed');
   await p.keyboard.press('ArrowRight');
   assert.deepEqual(await p.evaluate(() => [fold.state.i, fold.state.playing]), [4, true], '→ did not play the next fold');
+  // A fold part way through goes back to its start, and from there to the step before.
+  await p.evaluate(() => fold.set(3, 0.5));
+  await p.keyboard.press('ArrowLeft');
+  assert.deepEqual(await p.evaluate(() => [fold.state.i, fold.state.t]), [3, 0], '← part way through a fold did not take it back to its start');
+  await p.keyboard.press('ArrowLeft');
+  assert.deepEqual(await p.evaluate(() => [fold.state.i, fold.state.t]), [2, 0], '← at the start of a fold did not go to the step before');
+  await p.evaluate(() => fold.set(4, 0));
   await p.focus('#scrub');
   await p.keyboard.press('ArrowLeft');
   assert.equal(await p.evaluate(() => fold.state.i), 4, 'the slider\'s arrow keys changed the step');
