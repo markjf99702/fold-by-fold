@@ -1,6 +1,6 @@
 // The folding engine, without a browser:  node --test test/unit.test.mjs
 import { test } from 'node:test';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import assert from 'node:assert/strict';
 import { Sheet, fold, turnOver, together, creases, isFlipped } from '../js/paper.js';
 import { apply, area, bisector, side, centroid, overlapArea, line, ccw, clip, inside as covers } from '../js/geom.js';
@@ -929,6 +929,19 @@ test('a shared link shows the preview picture, from where the site lives, and ev
   for (const { src, sizes } of pngs) assert.equal(pngSize(src).join('x'), sizes, `${src} is not ${sizes}`);
   const touch = html.match(/<link rel="apple-touch-icon" href="([^"]*)"/)[1];
   assert.deepEqual(pngSize(touch), [180, 180], `${touch} is not 180 x 180`);
+});
+
+test('every file the site names is named from where it is, never from the top of the address', () => {
+  // The site is at the top of its own address now, so an address written from the top (/css/app.css) would work
+  // there and break everywhere else: the single file opened from disk, or the site served from a path (as it is
+  // without the CNAME file). The browser tests serve it from the top, so they can't tell.
+  const files = ['index.html', 'manifest.webmanifest', 'sw.js', 'css/app.css', ...readdirSync(new URL('../js/', import.meta.url)).map((f) => `js/${f}`)];
+  const fromTop = /(?:href|src)\s*=\s*["']\/(?!\/)|url\(\s*["']?\/(?!\/)|(?:from|import\(|fetch\(|register\()\s*["']\/(?!\/)|"(?:src|start_url|scope)"\s*:\s*"\//;
+  for (const f of files) assert.doesNotMatch(here(f).toString(), fromTop, `${f} names a file from the top of the address`);
+  // And the offline copy's list of files.
+  const shell = [...here('sw.js').toString().match(/SHELL = \[([^\]]*)\]/)[1].replace(/\/\/.*/g, '').matchAll(/'([^']*)'/g)].map((m) => m[1]);
+  assert.ok(shell.length > 10);
+  assert.deepEqual(shell.filter((f) => f.startsWith('/')), [], 'sw.js keeps a file named from the top of the address');
 });
 
 test('the README names the models there are, in the gallery\'s order, and how long they run', () => {

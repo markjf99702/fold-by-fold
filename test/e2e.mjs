@@ -18,7 +18,7 @@ const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/cs
 // ETag. `net` is the connection: 'up', 'down' (the server drops every connection) or 'stalled' (a train, a captive
 // wifi: it takes each request and holds on to it). With `release` set it serves the next release (see the offline
 // checks). The site lives at the top of its own address, fold-by-fold.junkdrawer.works, so it's served from the top
-// here too.
+// here too (the unit tests check it names every file from where it is, for anywhere else it's served).
 let net = 'up', release = false;
 const held = [];
 const server = createServer((req, res) => {
