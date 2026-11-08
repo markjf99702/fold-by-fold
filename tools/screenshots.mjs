@@ -38,11 +38,13 @@ async function open(viewport, deviceScaleFactor, hash = '') {
   return page;
 }
 
-// Shows step i (from 1) of the open model at moment t, seen from yaw/pitch if given.
+// Shows step i (from 1) of the open model at moment t, seen from yaw/pitch if given. The camera goes straight there
+// rather than easing (a picture taken on its way came out a little different each time).
 async function at(page, i, t, aim) {
   await page.evaluate(([i, t, aim]) => {
     fold.set(i - 1, t);
     if (aim) fold.view().aim(aim[0], aim[1]);
+    fold.view().settle(1);
   }, [i, t, aim]);
   await page.waitForTimeout(400);
 }
