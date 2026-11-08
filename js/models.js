@@ -735,7 +735,7 @@ export const MODELS = [
     id: 'hat',
     name: 'Paper hat',
     level: 'Easy',
-    blurb: 'The newspaper hat. Fold it from a big sheet of newspaper, open it, and wear it.',
+    blurb: 'The newspaper hat. Big enough to wear if you fold it from a double page of newspaper.',
     paper: { kind: 'Printer paper', colorUp: false, size: [1, Math.SQRT2] },
     steps: [
       {
