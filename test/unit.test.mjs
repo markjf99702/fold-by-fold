@@ -61,6 +61,25 @@ test('a fold can only take a flap that nothing is lying on', () => {
   assert.equal(fold(half, strip, { type: 'mountain', layers: 'flap', seed: [0.9, 0.5] }).motion.moving.length, 1);
 });
 
+test('a tuck into a pocket the flap can\'t reach is refused, rather than passing paper through paper', () => {
+  // A corner folded over, then a strip tucked under a layer that lies beyond that fold.
+  const model = { id: 'tuck', steps: [
+    { say: 'Fold a corner over.', do: (h) => h.valley(h.through([0.75, 0.625], [0.375, 0.75]), { flap: [0.125, 0.75] }) },
+    { say: 'Tuck the left strip under.', do: (h) => h.valley(h.through([0.125, 0.375], [0.125, 0.875]), { flap: [0, 0.375], into: { below: [0.75, 0.25] } }) },
+  ] };
+  assert.throws(() => build(model), /tuck step 2: The flap can't tuck there: folds \d+\/\d+ and \d+\/\d+ interleave/);
+});
+
+test('folds made together that would move the same paper are refused, rather than landing somewhere they don\'t start from', () => {
+  // The same corner folded two ways at once: the second would fold it from where the first left it.
+  const A = [0.125, 0.125];
+  const model = { id: 'twice', steps: [{ say: 'Fold one corner two ways at once.', do: (h) => h.together(
+    (k) => k.valley(k.onto(A, [0.191, 0.152]), { flap: A }),
+    (k) => k.valley(k.onto(A, [0.5, 0.625]), { flap: A }),
+  ) }] };
+  assert.throws(() => build(model), /twice step 1: Folds made together must move different flaps$/);
+});
+
 test('four corners folded in together all meet at the center', () => {
   const s = Sheet.square();
   const corner = (q) => (sh) => fold(sh, bisector(sh.at(q), [0, 0]), { type: 'valley', layers: 'flap', seed: q });

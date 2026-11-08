@@ -9,6 +9,7 @@ import {
   apply, compose, det, invert, reflection, rotation, clip, cuts, ccw, area, inside, overlapArea,
   sharedSegment, side, sub, near, flip, centroid, IDENTITY,
 } from './geom.js';
+import { crossings } from './check.js';
 
 let nextId = 1;
 const newId = () => nextId++;
@@ -289,6 +290,10 @@ export function fold(sheet, L, opts = {}) {
     if (k < 0) throw new Error('The pocket is inside the moving flap');
     rest.splice(into.above ? k + 1 : k, 0, ...flipped);
     to.order = rest;
+    // A tuck skips the check for layers in the way, above, so check instead that it lands where real paper could:
+    // into a pocket the flap can't reach, it would have to pass through paper.
+    const problems = crossings(to);
+    if (problems.length) throw new Error(`The flap can't tuck there: ${problems[0]}`);
   }
   return result(from, to, { kind: 'fold', line: L, moving, sign: type === 'valley' ? 1 : -1, type });
 }
@@ -320,6 +325,7 @@ export function together(sheet, makers) {
   const last = results[results.length - 1];
   const from = last.from.clone();
   from._world = new Map();
+  const expand = (id) => (from.facets.has(id) ? [id] : (cutInto.get(id) || []).flatMap(expand));
   // Put every earlier flap back where it started.
   for (let k = 0; k < results.length - 1; k++) {
     const r = results[k];
@@ -328,8 +334,16 @@ export function together(sheet, makers) {
       from.facets.set(id, { ...from.facets.get(id), m: r.from.facets.get(id).m });
     }
   }
+  // Each fold takes its own flap. One that took paper an earlier fold had moved would start from where that
+  // fold left it, not from where the paper lies, and the motion would land somewhere else.
+  const mover = new Map();
+  results.forEach((r, k) => {
+    for (const id of r.motion.moving.flatMap(expand)) {
+      if (mover.has(id) && mover.get(id) !== k) throw new Error('Folds made together must move different flaps');
+      mover.set(id, k);
+    }
+  });
   // The stacking before anything moved, with every later cut put in place of the facet it cut.
-  const expand = (id) => (from.facets.has(id) ? [id] : (cutInto.get(id) || []).flatMap(expand));
   from.order = results[0].from.order.flatMap(expand);
   if (from.order.length !== from.facets.size) throw new Error('Lost track of a facet while folding together');
   const bends = results.every((r) => r.motion.kind === 'bend');
