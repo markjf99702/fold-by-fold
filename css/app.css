@@ -205,6 +205,8 @@ html:has(#player:not([hidden])) { overscroll-behavior-y: none; }
 .bar-title { flex: 1; min-width: 0; }
 .bar-title h2 { font-family: var(--display); font-weight: 800; font-size: 1.2rem; margin: 0; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .bar-title p { margin: 0; font-size: .82rem; color: var(--muted); }
+/* The model's name takes the focus when a model opens, for the keyboard and screen readers; it isn't a control. */
+#modelName:focus { outline: none; }
 .bar-end { display: flex; gap: 8px; }
 
 .stage { grid-area: stage; position: relative; min-height: 0; container-type: size; }

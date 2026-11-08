@@ -622,13 +622,20 @@ function nameInAddress() {
   }, 300);
 }
 
+// A model opened from the gallery (a card, or Forward back to it) puts the focus on its name, so a screen reader says
+// where you are and Tab goes on from the top of the player. Otherwise the focus would fall to the page as the gallery
+// hides. A page opened at a model, from a link or a reload, leaves the focus where the browser puts it.
+let routed = false;
 function route() {
   addressed = location.hash;
+  const lost = routed && (!document.activeElement || document.activeElement === document.body || $('home').contains(document.activeElement));
+  routed = true;
   let h = '';
   try { h = decodeURIComponent(location.hash.slice(1)); } catch { /* a link mangled on the way: the gallery */ }
   const m = /^([a-z-]+?)(?:-(\d+))?$/.exec(h);
   if (m && MODELS.some((x) => x.id === m[1])) {
     openModel(m[1], m[2] ? +m[2] - 1 : null, { landed: !!m[2] && history.state?.landed === true });
+    if (lost && !$('player').hidden) $('modelName').focus({ preventScroll: true });
   } else {
     renderHome(); // first, so the cards are there to scroll back to
     show('home');

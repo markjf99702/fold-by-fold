@@ -1248,6 +1248,37 @@ for (const [width, height] of [[1280, 800], [390, 844], [360, 780]]) {
   await p.context().close();
 }
 
+// Opening a model from the gallery puts the focus on its name, so a screen reader says where you are and Tab goes on
+// from the top of the player, to the view buttons next: the focus fell to the page, and in Chrome the first Tab went
+// to the list of steps. Back in the gallery it's on the card again, and Forward from there opens the model the same
+// way. A model opened from a link leaves the focus where the browser puts it.
+{
+  const p = await fresh('', { viewport: { width: 1280, height: 800 }, deviceScaleFactor: 1, hasTouch: false });
+  await p.waitForSelector('#home:not([hidden])');
+  const on = () => p.evaluate(() => { const a = document.activeElement; return a.id || a.dataset.model || a.tagName; });
+  await p.focus('.model[data-model="cup"]');
+  await p.keyboard.press('Enter');
+  await p.waitForSelector('#player:not([hidden])');
+  await p.waitForTimeout(100);
+  assert.equal(await on(), 'modelName', 'opening a model did not put the focus on its name');
+  await p.keyboard.press('Tab');
+  assert.equal(await on(), 'topView', 'Tab from the model\'s name did not go on to the view buttons');
+  await p.keyboard.press('Shift+Tab');
+  await p.keyboard.press('Enter');
+  await p.waitForSelector('#home:not([hidden])');
+  assert.equal(await on(), 'cup', 'back in the gallery, the focus is not on the card');
+  await p.goForward();
+  await p.waitForSelector('#player:not([hidden])');
+  await p.waitForTimeout(100);
+  assert.equal(await on(), 'modelName', 'Forward from the gallery did not put the focus on the model\'s name');
+  await p.goto(base + '#heart');
+  await p.waitForFunction(() => fold.state.id === 'heart');
+  await p.reload();
+  await p.waitForFunction(() => fold.state.id === 'heart');
+  assert.equal(await on(), 'BODY', 'a model opened from a link took the focus');
+  await p.context().close();
+}
+
 // On a phone turned sideways, nothing sits under the notch or the rounded corners at the sides.
 {
   const p = await fresh();
