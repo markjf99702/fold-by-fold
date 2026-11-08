@@ -17,9 +17,8 @@ const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/cs
 // The server answers the way GitHub Pages does: a browser may keep each file for ten minutes, and asks again by its
 // ETag. `net` is the connection: 'up', 'down' (the server drops every connection) or 'stalled' (a train, a captive
 // wifi: it takes each request and holds on to it). With `release` set it serves the next release (see the offline
-// checks). The site lives at junkdrawer.works/fold-by-fold/, a path on an address other tools share, so it's served at
-// that path here too: an address written from the top (/css/app.css) finds nothing, as it would find nothing of
-// this site there, and the offline copy's worker looks after that path alone, as it does there.
+// checks). The site lives at the top of its own address, fold-by-fold.junkdrawer.works, so it's served from the top
+// here too.
 let net = 'up', release = false;
 const held = [];
 const server = createServer((req, res) => {
@@ -27,12 +26,8 @@ const server = createServer((req, res) => {
   if (net === 'stalled') { held.push([req, res]); return; }
   serve(req, res);
 }).listen(0);
-const HOME = '/fold-by-fold/';
 async function serve(req, res) {
-  let path = decodeURIComponent(new URL(req.url, 'http://x').pathname);
-  if (path === HOME.slice(0, -1)) { res.writeHead(301, { location: HOME }); res.end(); return; }
-  if (!path.startsWith(HOME)) { res.writeHead(404); res.end(); return; }
-  path = path.slice(HOME.length);
+  let path = decodeURIComponent(new URL(req.url, 'http://x').pathname).slice(1);
   if (path === '' || path.endsWith('/')) path += 'index.html';
   let body;
   try { body = await readFile(join(root, path)); } catch { res.writeHead(404); res.end(); return; }
@@ -44,8 +39,7 @@ async function serve(req, res) {
   res.writeHead(200, head);
   res.end(body);
 }
-const origin = `http://localhost:${server.address().port}`;
-const base = origin + HOME;
+const base = `http://localhost:${server.address().port}/`;
 // Waits for ok() to come true, for up to ms, or fails saying what didn't happen.
 const until = async (ok, ms, what) => {
   for (const end = Date.now() + ms; !(await ok());) { assert.ok(Date.now() < end, what); await new Promise((r) => setTimeout(r, 100)); }
@@ -260,8 +254,8 @@ for (const dir of ['js', 'css', 'fonts']) {
 }
 for (const f of ['./', 'index.html', 'icon.svg', 'manifest.webmanifest', 'icon-192.png']) assert.ok(shell.includes(f), `sw.js doesn't list ${f}`);
 
-// Other tools on junkdrawer.works share this address and its caches, so the offline copy clears out only
-// its own old caches, never theirs, even one whose name starts the same way.
+// The offline copy clears out only its own old caches, by their whole name, never another site's, even one whose
+// name starts the same way: a copy served from a path on a shared address would share that address's caches.
 {
   const c = await browser.newContext();
   const p = await c.newPage();

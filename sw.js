@@ -8,7 +8,7 @@
 // fingerprint of every file in SHELL: change any of them and test/e2e.mjs fails until FILES is changed to match (it
 // says what to), which changes this file, so every copy is made whole again at once.
 const CACHE = 'fold-by-fold-v5'; // bump the number when the file list changes
-const FILES = '7dfb1cbf'; // test/e2e.mjs checks this
+const FILES = '1b99b476'; // test/e2e.mjs checks this
 const SHELL = [
   './', 'index.html', 'icon.svg', 'manifest.webmanifest',
   'css/app.css', 'js/app.js', 'js/build.js', 'js/check.js', 'js/finished.js', 'js/geom.js', 'js/mech.js', 'js/models.js', 'js/motion.js',
@@ -25,8 +25,9 @@ self.addEventListener('install', e => {
 });
 
 self.addEventListener('activate', e => {
-  // The other tools at junkdrawer.works share this address and its caches, so only this one's old copies go,
-  // matched by their whole name: another tool's name could start the same way (fold-by-fold-something-v1).
+  // Only this one's old copies go, matched by their whole name. It has an address of its own, but a copy served from
+  // a path on an address other sites share (as it was once, at junkdrawer.works/fold-by-fold/) would share their
+  // caches too, and another site's name could start the same way (fold-by-fold-something-v1).
   e.waitUntil(caches.keys()
     .then(keys => Promise.all(keys.filter(k => k !== CACHE && /^fold-by-fold-v[0-9]+$/.test(k)).map(k => caches.delete(k))))
     .then(() => self.clients.claim()));

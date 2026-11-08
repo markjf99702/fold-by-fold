@@ -1,6 +1,6 @@
 # Fold by Fold
 
-**Use it: [junkdrawer.works/fold-by-fold](https://junkdrawer.works/fold-by-fold/)**
+**Use it: [fold-by-fold.junkdrawer.works](https://fold-by-fold.junkdrawer.works/)**
 
 **Origami instructions that fold in front of you.** A printed diagram shows a fold as a dashed line and an arrow, and it's up to you to work out which way the paper goes. Here, each step is a real sheet of paper folding in 3D. Watch it, replay it, slow it down, stop it halfway, and drag to look at it from the side or underneath.
 
@@ -41,7 +41,7 @@ npm run build                 # dist/fold-by-fold.html, the whole thing in one f
 
 Opening `index.html` straight from disk won't work, because browsers block JavaScript modules on `file://`. The built file does work that way.
 
-To put it online with GitHub Pages: **Settings → Pages → Build and deployment → Deploy from a branch**, then pick `main` and `/ (root)`.
+To put it online with GitHub Pages: **Settings → Pages → Build and deployment → Deploy from a branch**, then pick `main` and `/ (root)`. The `CNAME` file puts it at its own address, fold-by-fold.junkdrawer.works; leave it out to serve it at the repository's own Pages address.
 
 ### Adding a model
 

@@ -861,8 +861,10 @@ test('a shared link shows the preview picture, from where the site lives, and ev
   const html = here('index.html').toString();
   const meta = (p) => html.match(new RegExp(`<meta property="${p}" content="([^"]*)"`))?.[1];
   // Sites that show a link's preview fetch the picture themselves, so it needs the whole address.
-  assert.equal(meta('og:url'), 'https://junkdrawer.works/fold-by-fold/');
-  assert.equal(meta('og:image'), 'https://junkdrawer.works/fold-by-fold/og.png');
+  assert.equal(meta('og:url'), 'https://fold-by-fold.junkdrawer.works/');
+  assert.equal(meta('og:image'), 'https://fold-by-fold.junkdrawer.works/og.png');
+  // GitHub Pages serves it at that address because of the CNAME file, and sends junkdrawer.works/fold-by-fold/ there.
+  assert.equal(here('CNAME').toString(), 'fold-by-fold.junkdrawer.works\n');
   assert.deepEqual(pngSize('og.png'), [1200, 630], 'og.png is not 1200 x 630');
   const { icons } = JSON.parse(here('manifest.webmanifest'));
   const pngs = icons.filter((i) => i.type === 'image/png');
