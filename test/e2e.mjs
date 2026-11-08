@@ -164,7 +164,7 @@ async function throughMat(p) {
 }
 await page.evaluate(() => fold.set(0, 0));
 
-// Play folds step 1, then offers the next fold, which plays step 2.
+// Play folds step 1, then offers the next fold, which goes to step 2 and waits there with its marks on the paper.
 await page.click('#play');
 assert.equal(await page.textContent('#playLabel'), 'Pause');
 // Once the paper moves, the back button takes the fold back to its start, even on step 1.
@@ -175,6 +175,9 @@ assert.equal(await page.textContent('#playLabel'), 'Next fold');
 await page.click('#play');
 assert.equal((await state()).i, 1, 'next fold did not move on');
 assert.match(await page.textContent('#stepCount'), /^Step 2 of/);
+assert.equal(await page.textContent('#playLabel'), 'Play', 'next fold did not wait on the next step for Play');
+await page.waitForTimeout(1500);
+assert.deepEqual(await page.evaluate(() => [fold.state.playing, fold.state.t]), [false, 0], 'next fold played the next step by itself');
 
 // Dragging the slider stops the fold wherever it's left.
 await page.locator('#scrub').evaluate((el) => { el.value = 500; el.dispatchEvent(new Event('input', { bubbles: true })); });
@@ -1021,9 +1024,10 @@ for (const reduce of [false, true]) {
 {
   const p = await fresh('#cup');
   await p.waitForFunction(() => fold.state.id === 'cup');
-  // From Play to the fold moving, and from there to its end.
+  // From Play, pressed as the step comes up, to the fold moving, and from there to its end.
   const timed = () => p.evaluate(() => new Promise((done) => {
-    fold.set(0, 0);
+    fold.set(1, 0);
+    document.querySelector('#ticks li:nth-child(1) button').click();
     document.getElementById('play').click();
     const t0 = performance.now();
     let moved = 0;
@@ -1087,6 +1091,27 @@ for (const reduce of [false, true]) {
     && document.querySelector('.model[data-model="frog"] .count').textContent === 'Step 4 of 38', null, { timeout: 3000 })
     .catch(() => assert.fail('the gallery did not show the paper picked, or the place reached, in another tab'));
   await a.context().close();
+}
+
+// Play pressed once a step's marks have been up for a moment folds at once: the marks hold the paper still for a
+// moment only when Play comes straight after going to the step. Pressed straight away, they still show first.
+{
+  const p = await fresh('#plane-2');
+  await p.waitForFunction(() => fold.state.id === 'plane');
+  const early = await p.evaluate(() => new Promise((done) => {
+    document.querySelector('#ticks li:nth-child(1) button').click();
+    document.getElementById('play').click();
+    setTimeout(() => done(fold.state.t), 300);
+  }));
+  assert.equal(early, 0, 'Play straight after going to a step moved the paper before its marks had shown');
+  await p.waitForFunction(() => fold.state.t >= 1, null, { timeout: 10000 });
+  await p.click('#play'); // Next fold: step 3, waiting
+  await p.waitForTimeout(1500); // reading it
+  const pressed = await p.evaluate(() => { document.getElementById('play').click(); return performance.now(); });
+  await p.waitForFunction(() => fold.state.t > 0, null, { timeout: 3000 });
+  const waited = await p.evaluate((pressed) => performance.now() - pressed, pressed);
+  assert.ok(waited < 600, `Play, with the marks up for a while, held the paper still for ${Math.round(waited)} ms`);
+  await p.context().close();
 }
 
 // Two quick presses of Play still fold. The second comes while the marks are up and the paper hasn't moved yet, so it
@@ -1159,8 +1184,9 @@ for (const hash of ['#%', '#crane-3%', '#%F0%9F']) {
   await p.context().close();
 }
 
-// The arrow keys step through the folds, also once a button has been pressed; → on the last step leaves it
-// be, ← does what the back button does, and the slider keeps the arrow keys for itself.
+// The arrow keys step through the folds, also once a button has been pressed: → goes to the next step and waits
+// there for Play, and on the last step leaves it be, ← does what the back button does, and the slider keeps the arrow
+// keys for itself.
 {
   const p = await fresh('#cup-5');
   await p.waitForFunction(() => fold.state.id === 'cup');
@@ -1170,7 +1196,7 @@ for (const hash of ['#%', '#crane-3%', '#%F0%9F']) {
   await p.keyboard.press('ArrowLeft');
   assert.equal(await p.evaluate(() => fold.state.i), 3, '← did nothing once a button had been pressed');
   await p.keyboard.press('ArrowRight');
-  assert.deepEqual(await p.evaluate(() => [fold.state.i, fold.state.playing]), [4, true], '→ did not play the next fold');
+  assert.deepEqual(await p.evaluate(() => [fold.state.i, fold.state.playing, fold.state.t]), [4, false, 0], '→ did not go to the next step, or played it');
   // A fold part way through goes back to its start, and from there to the step before.
   await p.evaluate(() => fold.set(3, 0.5));
   await p.keyboard.press('ArrowLeft');
@@ -1330,12 +1356,12 @@ for (const hash of ['#%', '#crane-3%', '#%F0%9F']) {
   assert.deepEqual(await now(), [4, true], 'Space after a click on the list of steps did not play');
   await moving();
   await p.click('#next');
-  await moving();
   await p.keyboard.press(' ');
-  assert.deepEqual(await now(), [5, false], 'Space after a click on Next did not pause on that step');
+  assert.deepEqual(await now(), [5, true], 'Space after a click on Next did not play the step it went to');
+  await moving();
   await p.click('#speed');
   await p.keyboard.press(' ');
-  assert.deepEqual(await now(), [5, true], 'Space after a click on Slow did not play');
+  assert.deepEqual(await now(), [5, false], 'Space after a click on Slow did not pause');
   assert.equal(await p.getAttribute('#speed', 'aria-pressed'), 'true', 'Space after a click on Slow turned it off again');
   const bar = await p.locator('#scrub').boundingBox();
   await p.mouse.click(bar.x + bar.width / 2, bar.y + bar.height / 2);
@@ -1350,7 +1376,7 @@ for (const hash of ['#%', '#crane-3%', '#%F0%9F']) {
   assert.deepEqual(await now(), [2, false], 'Space after a click on Play pressed the button the keyboard had been on');
   await p.focus('#next');
   await p.keyboard.press(' ');
-  assert.deepEqual(await now(), [3, true], 'Space did not press Next with the focus on it from the keyboard');
+  assert.deepEqual(await now(), [3, false], 'Space did not press Next with the focus on it from the keyboard');
   // In a narrower window, with the bar of ticks in place of the list, the same goes for a click on a tick, and a click
   // leaves nothing with the focus. The ticks and the list still pick a step from a tap, too.
   await p.setViewportSize({ width: 800, height: 800 });
@@ -1365,7 +1391,9 @@ for (const hash of ['#%', '#crane-3%', '#%F0%9F']) {
   await t.tap('#stepList li:nth-child(6) button');
   await t.waitForFunction(() => fold.state.i === 5, null, { timeout: 2000 }).catch(() => assert.fail('a tap on the list of steps did not pick its step'));
   await t.tap('#next');
-  await t.waitForFunction(() => fold.state.i === 6 && fold.state.playing, null, { timeout: 2000 }).catch(() => assert.fail('a tap on Next did not play the next step'));
+  await t.waitForFunction(() => fold.state.i === 6, null, { timeout: 2000 }).catch(() => assert.fail('a tap on Next did not go to the next step'));
+  await t.waitForTimeout(1500);
+  assert.deepEqual(await t.evaluate(() => [fold.state.playing, fold.state.t]), [false, 0], 'a tap on Next played the next step by itself');
   await t.context().close();
 }
 

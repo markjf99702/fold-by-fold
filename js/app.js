@@ -158,7 +158,7 @@ function paintHome() {
 
 let view = null;
 const P = { b: null, id: null, i: 0, t: 0, playing: false, holding: false, clock: 0, t0: 0, pace: 1, waiting: false, shownAt: -Infinity };
-const HOLD = 850; // how long the marks show on the paper before Play moves it
+const HOLD = 850; // how long the marks show on the paper, at least, before Play moves it
 const MARKS_IN = 160; // how long a step's marks take to fade in, in ms
 const pace = () => (prefs.slow ? 2.2 : 1); // Slow gives the marks and the fold a little over twice as long
 
@@ -325,14 +325,15 @@ function slideTo(x, first) {
   go(i);
 }
 
-function go(i, { play = false, snap = false, keep = true } = {}) {
+// Goes to step i, with its paper as it was before the fold and the fold's marks on it. Nothing goes on to play it:
+// you read the step, look at its marks, and press Play.
+function go(i, { snap = false, keep = true } = {}) {
   if (P.waiting) return;
   P.i = Math.max(0, Math.min(i, P.b.steps.length - 1));
   P.t = 0;
   P.playing = false;
   if (keep) keepPlace(P.i, { further: true });
-  if (play) start();
-  else keepAim();
+  keepAim();
   paint();
   frameCamera(snap);
 }
@@ -372,6 +373,9 @@ function keepPlace(i = P.i, { further = false } = {}) {
 // The place for the fold as it is: the step after once this one's fold has landed, except on the last step.
 const placeNow = () => (P.t >= 1 && P.i < P.b.steps.length - 1 ? P.i + 1 : P.i);
 
+// Plays the fold from where it is. From its start, the paper waits until its marks have been up for a moment (HOLD),
+// counted from when they came up: pressed straight after going to a step, the marks still show before the paper
+// moves, and pressed after reading the step and looking at them, it folds at once.
 function start() {
   keepPlace();
   if (P.t >= 1) P.t = 0;
@@ -396,7 +400,7 @@ function primary() {
   // the fold now. Pausing there would have stopped it before it began.
   if (P.playing && P.holding) { P.holding = false; P.clock = performance.now(); P.t0 = P.t; paint(); }
   else if (P.playing) pause();
-  else if (P.t >= 1) { if (last) go(0); else go(P.i + 1, { play: true }); }
+  else if (P.t >= 1) go(last ? 0 : P.i + 1);
   else start();
 }
 
@@ -691,7 +695,7 @@ function loop(now) {
   const step = P.b.steps[P.i];
   if (P.playing) {
     if (P.holding) {
-      if (now - P.clock >= HOLD * P.pace) { P.holding = false; P.clock = now; }
+      if (now - P.shownAt >= HOLD * P.pace) { P.holding = false; P.clock = now; }
     } else {
       P.t = Math.min(1, P.t0 + (now - P.clock) / duration(step));
       scrubAt(P.t);
@@ -944,7 +948,7 @@ function stepBack() {
   if (P.t > 0.02 || (P.i === 0 && P.t > 0)) { P.t = 0; P.playing = false; paint(); } else if (P.i > 0) go(P.i - 1);
 }
 $('prev').addEventListener('click', () => { if (!isOff($('prev'))) stepBack(); });
-$('next').addEventListener('click', () => { if (!isOff($('next'))) go(P.i + 1, { play: true }); });
+$('next').addEventListener('click', () => { if (!isOff($('next'))) go(P.i + 1); });
 $('speed').addEventListener('click', () => {
   save({ slow: !prefs.slow });
   $('speed').setAttribute('aria-pressed', prefs.slow);
@@ -1024,7 +1028,7 @@ document.addEventListener('keydown', (e) => {
     e.preventDefault();
     primary();
   } else if (e.key === 'ArrowRight' && !onSlider) {
-    if (P.i < P.b.steps.length - 1) go(P.i + 1, { play: true });
+    if (P.i < P.b.steps.length - 1) go(P.i + 1);
   } else if (e.key === 'ArrowLeft' && !onSlider) stepBack();
 });
 window.addEventListener('hashchange', route);
