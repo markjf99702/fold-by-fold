@@ -7,7 +7,7 @@
 <p align="center">
   <img src="docs/phone-home.png" alt="The gallery: the name Fold by Fold, a line saying to have paper ready and fold along with a link to how to read the marks, a row of paper colours to pick from, and cards for a paper cup and a paper airplane, each with a picture of the finished model, the airplane seen at an angle with its wings out, and under each name how hard it is, the paper to use and how many steps: Easy, Square, 5 steps; Easy, Printer paper, 8 steps" width="250">
   &nbsp;
-  <img src="docs/phone-marks.png" alt="Step 10 of 23 of the crane, a petal fold. A red square base lies on a green cutting mat, marked the way a printed diagram would be: a dashed valley line across it, two dash-dot mountain lines from the bottom point, and a long arrow lifting the bottom corner up past the top. Below: Petal fold, the words for the step, a slider and a Play button" width="250">
+  <img src="docs/phone-marks.png" alt="Step 10 of 23 of the crane, a petal fold. A red square base lies on a green cutting mat, marked the way a printed diagram would be: a dashed valley line across it, two dash-dot mountain lines from the bottom point, and a long arrow lifting the bottom corner up past the top. Below: the step's number, 10, in large type, Petal fold with a question mark for the key, the words for the step, a slider, and Play beside Slow and Aa" width="250">
   &nbsp;
   <img src="docs/phone-fold.png" alt="The same petal fold seen at an angle, part way through: the bottom corner of the top layer is lifting up off the paper, and its two sides are folding in along their creases, showing the white inside" width="250">
 </p>
