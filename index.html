@@ -119,6 +119,7 @@
 
       <div class="stage" id="stage">
         <canvas id="gl" aria-label="The paper, in 3D. Tap it to play, drag to turn it, pinch or scroll to zoom, and double-tap to put the view back. With the keyboard, the arrow keys turn it and plus and minus zoom." role="img" tabindex="0"></canvas>
+        <div class="goal-card" id="goalCard" aria-hidden="true" hidden></div>
         <p class="gl-wait" id="glWait" hidden><span>Folding the paper…</span></p>
         <p class="hint" id="hint" aria-hidden="true"><span class="touch"><span>Tap to play ·</span> <span>drag to turn ·</span> <span>double-tap to reset</span></span><span class="mouse"><span>Click to play ·</span> <span>drag to turn ·</span> <span>double-click to reset</span></span></p>
         <p class="gl-error" id="glError" hidden>This browser can’t draw the paper in 3D, but every step is still written out to fold along.</p>
@@ -149,7 +150,10 @@
           <button type="button" class="ctl" id="allModels" hidden>All models</button>
           <button type="button" class="speed" id="speed" aria-pressed="false">Slow</button>
         </div>
-        <ol class="step-list" id="stepList" aria-label="All steps"></ol>
+        <div class="step-list" id="stepList">
+          <p class="goal" id="goal"></p>
+          <ol id="steps" aria-label="All steps"></ol>
+        </div>
       </div>
     </section>
   </main>

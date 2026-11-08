@@ -252,6 +252,14 @@ html:has(#player:not([hidden])) { overscroll-behavior-y: none; }
   .hint .touch { display: none; }
   .hint .mouse { display: inline; }
 }
+/* What you'll make, in a corner of the mat on step 1 (app.js fades it with the marks): the finished model's picture on a
+   piece of the mat, as on its card, ringed in light so it reads as a card lying there rather than paper on the table. */
+.goal-card {
+  position: absolute; top: 10px; left: max(10px, env(safe-area-inset-left)); width: clamp(56px, 19cqmin, 84px); aspect-ratio: 1;
+  border-radius: 9px; background: var(--mat); display: grid; place-items: center; pointer-events: none;
+  box-shadow: 0 0 0 1.5px rgba(238, 243, 239, .45), 0 3px 10px rgba(0, 0, 0, .3);
+}
+.goal-card svg, .goal-pic svg { width: 80%; height: 80%; filter: drop-shadow(0 2px 3px rgba(0, 0, 0, .25)); }
 /* While a model is folded for the first time, the mat waits with a quiet word, which only shows if that takes a moment.
    It fades in by its opacity, which the browser goes on animating while the page is busy folding; a colour would stay
    where it was until the folding ended, so the word never showed. */
@@ -426,10 +434,18 @@ html:has(#player:not([hidden])) { overscroll-behavior-y: none; }
   .panel > * { flex-shrink: 0; }
   .ticks { display: none; }
   .step-list {
-    display: block; list-style: none; margin: 6px 0 0; padding: 0; counter-reset: s;
+    display: block; margin: 6px 0 0; counter-reset: s;
     border-top: 1px solid var(--line);
     flex: 1 1 auto; min-height: 0; overflow: auto; overscroll-behavior: contain;
   }
+  .step-list ol { list-style: none; margin: 0; padding: 0; }
+  /* What you'll make heads the list: the finished model's picture, as on its card, and what the card says of it. */
+  .goal {
+    display: grid; grid-template-columns: 88px 1fr; gap: 12px; align-items: center; margin: 0; padding: 12px 6px;
+    font-size: .92rem; line-height: 1.45; color: var(--muted); border-bottom: 1px solid var(--line);
+  }
+  .goal-pic { width: 88px; aspect-ratio: 1; border-radius: 9px; background: var(--mat); display: grid; place-items: center; }
+  .goal-card { display: none; }
   .step-list li button {
     appearance: none; border: 0; background: none; width: 100%; text-align: left; cursor: pointer; position: relative;
     display: grid; grid-template-columns: 2em 1fr; gap: 8px; padding: 10px 6px; border-radius: 8px; font-size: .92rem; color: var(--muted);

@@ -1183,6 +1183,33 @@ for (const reduce of [false, true]) {
   await p.context().close();
 }
 
+// What you'll make shows in the player too, so a link to a step shows it, not only the gallery: under the paper, in a
+// corner of the mat on step 1, in your paper, fading out with the marks as the paper moves; on a wide screen at the top
+// of the list of steps, with the line from the model's card.
+{
+  const p = await fresh('#crane', { init: () => localStorage.setItem('fold-by-fold.v1', '{"paper":"indigo"}') });
+  await p.waitForFunction(() => fold.state.id === 'crane' && document.getElementById('glWait').hidden);
+  await p.waitForFunction(() => !document.getElementById('goalCard').hidden, null, { timeout: 3000 }).catch(() => assert.fail('step 1 does not show what you\'ll make'));
+  assert.ok(await p.locator('#goalCard svg polygon[fill="#2f4f8f"]').count() > 0, 'the picture of what you\'ll make is not in your paper');
+  const [card, stage] = await p.evaluate(() => ['#goalCard', '#stage'].map((q) => document.querySelector(q).getBoundingClientRect().toJSON()));
+  assert.ok(card.left >= stage.left && card.top >= stage.top && card.right < stage.left + stage.width / 3 && card.bottom < stage.top + stage.height / 3, `the picture is not in a corner of the mat: ${JSON.stringify(card)}`);
+  await p.click('#play');
+  await p.waitForFunction(() => fold.state.t > 0.3, null, { timeout: 10000 });
+  await p.waitForFunction(() => document.getElementById('goalCard').hidden, null, { timeout: 2000 }).catch(() => assert.fail('the picture stayed once the paper moved'));
+  await p.evaluate(() => fold.set(1, 0));
+  await p.waitForTimeout(300);
+  assert.equal(await p.isVisible('#goalCard'), false, 'the picture shows past step 1');
+  await p.evaluate(() => fold.set(0, 0));
+  await p.waitForFunction(() => !document.getElementById('goalCard').hidden, null, { timeout: 2000 }).catch(() => assert.fail('back on step 1, the picture did not come back'));
+  await p.setViewportSize({ width: 1280, height: 800 });
+  await p.waitForTimeout(200);
+  const blurb = await p.evaluate(async () => (await import('./js/models.js')).MODELS.find((m) => m.id === 'crane').blurb);
+  assert.deepEqual(await p.evaluate(() => [document.getElementById('goal').offsetParent !== null, document.getElementById('goal').textContent, document.querySelectorAll('#goal svg polygon[fill="#2f4f8f"]').length > 0, document.getElementById('goal').compareDocumentPosition(document.getElementById('steps')) & Node.DOCUMENT_POSITION_FOLLOWING]),
+    [true, blurb, true, 4], 'on a wide screen the list of steps does not start with what you\'ll make');
+  assert.equal(await p.isVisible('#goalCard'), false, 'on a wide screen the picture is on the mat as well as at the top of the list');
+  await p.context().close();
+}
+
 // Two quick presses of Play still fold. The second comes while the marks are up and the paper hasn't moved yet, so it
 // looks as if the first did nothing: it starts the fold then, rather than pausing it before it begins.
 {

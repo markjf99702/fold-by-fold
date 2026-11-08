@@ -206,8 +206,9 @@ function outline(m, i) {
   words.scrollTop = 0;
   fadeWords();
   renderSteps(m.steps);
+  showGoal(m);
   $('ticks').children[k].firstChild.setAttribute('aria-current', 'step');
-  $('stepList').children[k].firstChild.setAttribute('aria-current', 'step');
+  $('steps').children[k].firstChild.setAttribute('aria-current', 'step');
   [...$('ticks').children].forEach((li, j) => li.firstChild.classList.toggle('done', j < k));
   unavailable($('prev'), k === 0);
   unavailable($('next'), k === n - 1);
@@ -280,6 +281,7 @@ function ready(m, i, landed) {
   P.id = id;
   $('modelName').textContent = m.name;
   renderSteps(P.b.steps);
+  showGoal(m);
   // A link's step becomes where you got to only in a model you haven't started. In one you have, your place stays
   // until you move on from the link's step yourself.
   // A step opened with its fold landed (a reload, say) has saved the place after it already, or, in a model finished,
@@ -295,7 +297,7 @@ function ready(m, i, landed) {
 // fold), so its tick is called by its number alone.
 function renderSteps(steps) {
   shown = null; // new lists, so the step is marked in them afresh
-  const ticks = $('ticks'), list = $('stepList');
+  const ticks = $('ticks'), list = $('steps');
   ticks.innerHTML = '';
   list.innerHTML = '';
   steps.forEach((s, i) => {
@@ -451,15 +453,15 @@ function paint() {
       if (k === P.i) b.setAttribute('aria-current', 'step'); else b.removeAttribute('aria-current');
       if (k === P.i && handOn) b.focus({ preventScroll: true });
     });
-    const list = $('stepList');
-    [...list.children].forEach((li, k) => {
+    const list = $('stepList'), steps = $('steps');
+    [...steps.children].forEach((li, k) => {
       if (k === P.i) li.firstChild.setAttribute('aria-current', 'step'); else li.firstChild.removeAttribute('aria-current');
     });
     // The list keeps the step in its middle, so the steps after it show too. Only where the list is shown (beside the
     // paper on a wide screen): elsewhere it would cost a layout for nothing. The list scrolls itself, since scrolling
     // the step into view could scroll the page as well, and in Chrome it moves where the next Tab goes.
     if (list.offsetParent) {
-      const b = list.children[P.i].getBoundingClientRect(), l = list.getBoundingClientRect();
+      const b = steps.children[P.i].getBoundingClientRect(), l = list.getBoundingClientRect();
       list.scrollTop += (b.top + b.bottom) / 2 - (l.top + list.clientTop + list.clientHeight / 2);
     }
   }
@@ -585,6 +587,27 @@ const CHIP = {
   unfold: '<svg viewBox="0 0 34 12" aria-hidden="true"><path d="M6 10C6 3 22 2 24 6.5"/><path class="hollow" d="M20.4 6.6l5.2 3.3.3-6.1z"/></svg>',
 };
 const chipFor = (step) => `${CHIP[symbol(step, marksOf(step))]}<span>${step.name}</span>`;
+
+// What you'll make, so a link to a step shows it too, not only the gallery: the finished model's picture in your paper,
+// as on its card. On a wide screen it heads the list of steps, with what the card says of the model. Under or beside the
+// paper, where there's no list, it sits in a corner of the mat on step 1 and fades out with the marks as the paper moves.
+function showGoal(m) {
+  const pic = picture(FINISHED[m.id], { front: paperColor(), back: BACK });
+  const says = document.createElement('span');
+  says.className = 'goal-says';
+  says.textContent = m.blurb;
+  $('goal').innerHTML = `<span class="goal-pic">${pic}</span>`;
+  $('goal').append(says);
+  $('goalCard').innerHTML = pic;
+  goalCard(0); // until the step is drawn
+}
+let goalAlpha = 0;
+function goalCard(a) {
+  if (a === goalAlpha) return;
+  goalAlpha = a;
+  $('goalCard').hidden = a <= 0.01;
+  $('goalCard').style.opacity = a;
+}
 
 // ---------- Drawing and the camera ----------
 
@@ -745,6 +768,7 @@ function loop(now) {
   if (!dirty) return;
   dirty = false;
   const alpha = P.t <= 0 ? marksIn : Math.max(0, 1 - P.t * 5);
+  goalCard(P.i === 0 ? alpha : 0); // with step 1's marks
   view.show(poses(step, P.t), alpha > 0.01 ? marksOf(step) : null, alpha); // none to draw while they're faded out
   view.draw();
 }
