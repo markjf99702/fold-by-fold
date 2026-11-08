@@ -729,6 +729,33 @@ for (const [width, height, list] of [
   await p.context().close();
 }
 
+// The page asks the browser for frames only while something moves: none on the gallery, and none on a player left
+// alone, rather than one for every frame forever. Play still runs its fold to the end, and the paper is drawn again
+// when the stage changes size.
+{
+  const p = await fresh('', { init: () => {
+    window.frameCount = 0;
+    const ask = window.requestAnimationFrame.bind(window);
+    window.requestAnimationFrame = (f) => ask((t) => { window.frameCount++; f(t); });
+  } });
+  await p.waitForSelector('#home:not([hidden])');
+  const idle = async () => { const a = await p.evaluate(() => frameCount); await p.waitForTimeout(1000); return (await p.evaluate(() => frameCount)) - a; };
+  await p.waitForTimeout(500);
+  assert.ok(await idle() <= 2, 'the gallery asks for frames while nothing moves');
+  await p.click('.model:has(h3:text("Heart"))');
+  await p.waitForFunction(() => fold.state.id === 'heart');
+  await p.waitForTimeout(1500); // the camera settles
+  assert.ok(await idle() <= 2, 'a player left alone asks for frames');
+  await p.click('#play');
+  await p.waitForFunction(() => fold.state.t >= 1, null, { timeout: 15000 }).catch(() => assert.fail('the fold did not finish'));
+  await p.waitForTimeout(1500);
+  assert.ok(await idle() <= 2, 'the player asks for frames once the fold has landed');
+  await p.setViewportSize({ width: 360, height: 700 });
+  await p.waitForFunction(() => { const c = document.getElementById('gl'); return c.width === Math.round(c.clientWidth * Math.min(devicePixelRatio, 2)) && c.height === Math.round(c.clientHeight * Math.min(devicePixelRatio, 2)); }, null, { timeout: 3000 }).catch(() => {});
+  assert.ok(await p.evaluate(() => { const c = document.getElementById('gl'); return c.width === Math.round(c.clientWidth * 2); }), 'the paper was not drawn again for the new size');
+  await p.context().close();
+}
+
 // Locking the phone or switching to another app mid-fold pauses it, since nothing is drawn out of sight: coming back,
 // it carries on from where it was. A fold whose marks were still up comes back to Play.
 {

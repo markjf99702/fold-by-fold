@@ -155,6 +155,8 @@ function openModel(id, i = null, { landed = false } = {}) {
     try {
       view = new View($('gl'));
       wireCamera();
+      // The stage changes size with the words beside or under it, not only with the window.
+      if ('ResizeObserver' in window) new ResizeObserver(redraw).observe($('gl'));
       // A phone can take the 3D away from a page and give it back a moment later. If it doesn't come back, the
       // stage would be a blank box, so say what to do. A fold playing stops where it is rather than running on out
       // of sight.
@@ -164,7 +166,7 @@ function openModel(id, i = null, { landed = false } = {}) {
         clearTimeout(lost);
         lost = setTimeout(() => { $('glError').textContent = 'The 3D view stopped. Reload the page to bring the paper back.'; $('glError').hidden = false; }, 3000);
       });
-      $('gl').addEventListener('webglcontextrestored', () => { clearTimeout(lost); $('glError').hidden = true; dirty = true; }); // after the view has rebuilt
+      $('gl').addEventListener('webglcontextrestored', () => { clearTimeout(lost); $('glError').hidden = true; redraw(); }); // after the view has rebuilt
     } catch {
       // No 3D here: say so and put away what only works in 3D. The words, slider and buttons still work.
       $('glError').hidden = false;
@@ -341,7 +343,7 @@ function paint() {
   $('speed').setAttribute('aria-pressed', prefs.slow);
   nameInAddress();
   document.querySelectorAll('#ticks button').forEach((b, k) => b.classList.toggle('done', k < P.i || (k === P.i && P.t >= 1)));
-  dirty = true;
+  redraw();
 }
 
 // The back button takes a fold that has moved back to its start, and otherwise goes to the step before. Kept up to
@@ -374,8 +376,16 @@ const chipFor = (step) => `${CHIP[symbol(step)]}<span>${step.name}</span>`;
 
 // ---------- Drawing and the camera ----------
 
+// A frame is drawn only when something has changed: the page asks for the next one while a fold plays or its marks
+// are up, while the camera is on its way somewhere, or after redraw(). Otherwise the browser is left alone, rather
+// than waking the page for every frame (120 times a second on some phones) to find nothing to draw.
 let dirty = true;
 let lastFrame = 0;
+let asked = 0; // the frame asked for, if one is
+function redraw() {
+  dirty = true;
+  if (!asked) asked = requestAnimationFrame(loop);
+}
 // With reduced motion asked for, the camera never swings or glides on its own (to a step's own angle, between steps,
 // back to the usual view or straight down): it's where it's going at once. A fold still plays at its own pace once
 // Play is pressed, since that's the instruction.
@@ -421,14 +431,15 @@ function frameCamera(snap) {
     view.frame((x0 + x1) / 2, (y0 + y1) / 2, size, top / 2, { box, fit: { pts, yaw: -90, pitch: 58 } });
   }
   if (snap) view.settle(1);
-  dirty = true;
+  redraw();
 }
 
 function loop(now) {
-  requestAnimationFrame(loop);
-  if (!P.b || $('player').hidden) return;
+  asked = 0;
+  if (!P.b || $('player').hidden) { lastFrame = 0; return; }
   const dt = Math.min(0.1, (now - (lastFrame || now)) / 1000);
   lastFrame = now;
+  const more = () => { if (!asked) asked = requestAnimationFrame(loop); };
   const step = P.b.steps[P.i];
   if (P.playing) {
     if (P.holding) {
@@ -439,10 +450,11 @@ function loop(now) {
       if (P.t >= 1) { P.playing = false; keepPlace(placeNow()); paint(); } else paintControls();
     }
     dirty = true;
+    if (P.playing) more();
   }
   if (!view) return; // no 3D: the fold's time still runs for the words and slider, with nothing to draw
-  const settled = view.settle(still.matches ? 1 : 1 - Math.pow(0.001, dt));
-  if (!settled) dirty = true;
+  if (!view.settle(still.matches ? 1 : 1 - Math.pow(0.001, dt))) { dirty = true; more(); }
+  if (!asked) lastFrame = 0; // the next frame, whenever it comes, starts the camera's easing afresh
   if (!dirty) return;
   dirty = false;
   const alpha = P.t <= 0 ? 1 : Math.max(0, 1 - P.t * 5);
@@ -487,7 +499,7 @@ function wireCamera() {
       if (pinch && s) view.zoomAt(pinch / s, mx, my);
       pinch = s;
     }
-    dirty = true;
+    redraw();
   });
   const up = (e) => { pts.delete(e.pointerId); pinch = pts.size === 2 ? spread() : 0; };
   c.addEventListener('pointerup', (e) => {
@@ -505,7 +517,7 @@ function wireCamera() {
     e.preventDefault();
     const r = c.getBoundingClientRect();
     view.zoomAt(Math.exp(e.deltaY * 0.0012), e.clientX - r.left, e.clientY - r.top);
-    dirty = true;
+    redraw();
   }, { passive: false });
   c.addEventListener('dblclick', () => { if (pointer === 'mouse') resetView(); });
   // The paper takes pinches for its own zoom. If the page itself has been zoomed in (by a pinch on the words, say),
@@ -527,7 +539,7 @@ function resetView() {
   view.pan = [0, 0];
   if (step.view && P.t > 0) aimFor(step);
   else { view.aim(-90, 58); if (aimedFor) { aimedFor = null; frameCamera(false); } }
-  dirty = true;
+  redraw();
 }
 
 // ---------- Screens and wiring ----------
@@ -677,7 +689,7 @@ $('ticks').addEventListener('pointerup', (e) => {
 });
 // The browser has taken the finger for scrolling.
 $('ticks').addEventListener('pointercancel', (e) => { if (e.pointerId === sliding?.id) sliding = null; });
-$('topView').addEventListener('click', () => { if (view) { view.aim(-90, 89.9); dirty = true; } });
+$('topView').addEventListener('click', () => { if (view) { view.aim(-90, 89.9); redraw(); } });
 $('resetView').addEventListener('click', resetView);
 // Most browsers give a button the focus when it's clicked, and Space would then press it again: after Next, it went
 // on another step instead of pausing. So a mouse or a finger doesn't leave the focus on the player's buttons, and
@@ -709,7 +721,7 @@ document.addEventListener('visibilitychange', () => {
 });
 // Safari on an iPhone shows a button as pressed (:active) under a finger only once the page listens for touches.
 document.addEventListener('touchstart', () => {}, { passive: true });
-window.addEventListener('resize', () => { dirty = true; });
+window.addEventListener('resize', redraw);
 
 // A hook for the tests and screenshot scripts.
 window.fold = {
@@ -720,7 +732,6 @@ window.fold = {
 };
 
 route();
-requestAnimationFrame(loop);
 
 if (!('single' in document.documentElement.dataset) && 'serviceWorker' in navigator) {
   navigator.serviceWorker.register('sw.js').catch(() => {});
