@@ -423,24 +423,46 @@ function pieces(from, ids) {
 
 const NEAR = 0.07; // the closest an arrow starts to its line, so it doesn't shrink to a squiggle
 
+// Where line L runs over (or along the edge of) the convex polygon w, as [lo, hi] along L.d from L.p, or null. Its
+// ends are corners of w on the line, or where an edge of w crosses it.
+function alongLine(L, w) {
+  let lo = Infinity, hi = -Infinity;
+  const at = (q) => { const s = dot(sub(q, L.p), L.d); lo = Math.min(lo, s); hi = Math.max(hi, s); };
+  for (let i = 0; i < w.length; i++) {
+    const a = w[i], b = w[(i + 1) % w.length], sa = side(L, a), sb = side(L, b);
+    if (Math.abs(sa) < 1e-6) at(a);
+    else if (Math.abs(sb) >= 1e-6 && (sa > 0) !== (sb > 0)) at(lerp(a, b, sa / (sa - sb)));
+  }
+  return lo <= hi ? [lo, hi] : null;
+}
+
 function pieceMark(from, motion, ids, z) {
   const L = motion.line;
-  // How far along the line the piece reaches, its middle, and its point farthest from the line.
-  let lo = Infinity, hi = -Infinity, ax = 0, ay = 0, aw = 0, far = null, farOff = 0, farFacet = null, big = null, bigArea = 0;
+  // The piece's middle, and its point farthest from the line.
+  let ax = 0, ay = 0, aw = 0, far = null, farOff = 0, farFacet = null, big = null, bigArea = 0;
+  const runs = [];
   for (const id of ids) {
     const w = from.world(id);
     for (const q of w) {
       const off = Math.abs(side(L, q));
-      if (off < 1e-6) {
-        const s = dot(sub(q, L.p), L.d);
-        lo = Math.min(lo, s); hi = Math.max(hi, s);
-      } else if (off > farOff) { far = q; farOff = off; farFacet = w; }
+      if (off >= 1e-6 && off > farOff) { far = q; farOff = off; farFacet = w; }
     }
     const a = Math.abs(area(w)), c = centroid(w);
     ax += c[0] * a; ay += c[1] * a; aw += a;
     if (a > bigArea) { big = w; bigArea = a; }
+    // Where the line runs along this facet. One that only touches it at a corner has nowhere to draw it.
+    const run = alongLine(L, w);
+    if (run && run[1] - run[0] > 1e-6) runs.push(run);
   }
-  if (!isFinite(lo) || !big) return null;
+  if (!runs.length || !big) return null;
+  // The line goes only where there's paper: the longest stretch of it the piece covers without a gap.
+  runs.sort((p, q) => p[0] - q[0]);
+  let lo = runs[0][0], hi = runs[0][1], best = [lo, hi];
+  for (const [p, q] of runs.slice(1)) {
+    if (p > hi + 1e-6) { lo = p; hi = q; } else hi = Math.max(hi, q);
+    if (hi - lo > best[1] - best[0]) best = [lo, hi];
+  }
+  [lo, hi] = best;
   const on = (q) => ids.some((id) => inside(from.world(id), q, 1e-6));
   // The arrow starts in the middle of the piece, or in its biggest facet if the middle falls in a gap.
   let start = [ax / aw, ay / aw];

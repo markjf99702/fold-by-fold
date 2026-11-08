@@ -590,6 +590,23 @@ test('every arrow starts on the paper that moves and ends on paper where it land
   assert.deepEqual(problems, []);
 });
 
+test('a fold line is drawn only where there is paper, even where the moving paper touches the line at a lone corner', () => {
+  // The paper that moves meets the line along one short edge, and at one corner of another piece further along:
+  // the line ran on between them, over the table.
+  const b = build({ id: 'gap', steps: [
+    { say: 'Fold along the line through these two points.', do: (h) => h.valley(h.through([0.125, 0.25], [0.375, 0.625]), { move: [0.25, 0.625] }) },
+    { say: 'Fold the right edge behind.', do: (h) => h.mountain(h.onto([0.875, 0.625], [0.875, 0]), { move: [0.875, 0.625] }) },
+    { say: 'Fold along the line through these two points.', do: (h) => h.valley(h.through([0.125, 0], [0.625, 1]), { move: [0.375, 0.75] }) },
+  ] });
+  const step = b.steps[2];
+  const [m] = marks(step);
+  const onPaper = (q) => step.from.order.some((id) => covers(step.from.world(id), q, 1e-6));
+  const [a, c] = m.line;
+  const off = [];
+  for (let s = 0.15; s <= 0.85 + 1e-9; s += 0.05) if (!onPaper([a[0] + (c[0] - a[0]) * s, a[1] + (c[1] - a[1]) * s])) off.push(+s.toFixed(2));
+  assert.deepEqual(off, [], 'the line runs over the table');
+});
+
 test('a tuck is marked as one: its arrow breaks where the point goes in under the pocket', () => {
   const tucks = [];
   for (const model of MODELS) {
