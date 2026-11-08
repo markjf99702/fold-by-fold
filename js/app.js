@@ -172,6 +172,7 @@ function openModel(id, i = null, { landed = false } = {}) {
       // No 3D here: say so and put away what only works in 3D. The words, slider and buttons still work.
       $('glError').hidden = false;
       for (const id of ['hint', 'topView', 'resetView']) $(id).hidden = true;
+      $('gl').removeAttribute('tabindex'); // nothing there to turn
     }
   }
   if (view) {
@@ -564,6 +565,21 @@ function wireCamera() {
     redraw();
   }, { passive: false });
   c.addEventListener('dblclick', () => { if (pointer === 'mouse') resetView(); });
+  // From the keyboard, with the paper in focus: the arrow keys turn it the way a drag does, a little at a time, and +
+  // and - zoom. Meanwhile they don't step through the model (see the page's keys).
+  c.addEventListener('keydown', (e) => {
+    if (e.altKey || e.ctrlKey || e.metaKey) return;
+    const turn = { ArrowLeft: [15, 0], ArrowRight: [-15, 0], ArrowUp: [0, -10], ArrowDown: [0, 10] }[e.key];
+    const zoom = { '+': 0.8, '=': 0.8, '-': 1.25 }[e.key];
+    if (!turn && !zoom) return;
+    e.preventDefault();
+    if (turn) {
+      const { cam, goal } = view;
+      view.aim((goal.yaw ?? cam.yaw) + turn[0], Math.max(-80, Math.min(89.9, (goal.pitch ?? cam.pitch) + turn[1])));
+    } else view.zoomBy(zoom);
+    hideHint();
+    redraw();
+  });
   // The paper takes pinches for its own zoom. If the page itself has been zoomed in (by a pinch on the words, say),
   // a pinch on the paper zooms the page back out instead, since the paper may be most of what's on screen.
   if (window.visualViewport) {
@@ -758,14 +774,17 @@ $('resetView').addEventListener('click', resetView);
 // Most browsers give a button the focus when it's clicked, and Space would then press it again: after Next, it went
 // on another step instead of pausing. So a mouse or a finger doesn't leave the focus on the player's buttons, and
 // takes it off whatever had it, the way a click does; Space is then Play and Pause. The keyboard's focus is as it was.
+// The same goes for the paper, so after a drag the arrow keys step through the model again rather than turning it.
 $('player').addEventListener('mousedown', (e) => {
-  if (!e.target.closest('button')) return;
+  if (!e.target.closest('button, canvas')) return;
   e.preventDefault();
   if (e.currentTarget.contains(document.activeElement)) document.activeElement.blur();
 });
 document.addEventListener('keydown', (e) => {
   // With Alt, Ctrl or Cmd held the keys are the browser's (Alt+← is Back).
-  if ($('player').hidden || e.altKey || e.ctrlKey || e.metaKey) return;
+  // A key the paper or the slider has used already is theirs (the arrow keys turn the paper in focus).
+  if ($('player').hidden || e.altKey || e.ctrlKey || e.metaKey || e.defaultPrevented) return;
+  if (e.key === 'Escape') { $('back').click(); return; } // back to the gallery, as the back arrow goes
   const onSlider = e.target.closest('input'); // the slider moves itself with the arrow keys
   if (e.key === ' ') {
     if (e.target.closest('button')) return; // a button with focus presses itself

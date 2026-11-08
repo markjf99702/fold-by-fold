@@ -681,6 +681,7 @@ for (const [width, height, list] of [
   assert.equal(await p.isVisible('#glError'), true, 'no word that 3D is missing');
   assert.match(await p.textContent('#glError'), /can’t draw the paper in 3D, but every step is still written out/);
   for (const q of ['#hint', '#topView', '#resetView']) assert.equal(await p.isVisible(q), false, `${q} is still up without 3D`);
+  assert.equal(await p.getAttribute('#gl', 'tabindex'), null, 'Tab still stops at the paper without 3D');
   await p.click('#play');
   await p.waitForFunction(() => fold.state.t >= 1, null, { timeout: 10000 });
   assert.equal(await p.textContent('#playLabel'), 'Next fold');
@@ -991,6 +992,39 @@ for (const hash of ['#%', '#crane-3%', '#%F0%9F']) {
   await p.context().close();
 }
 
+// The paper turns and zooms from the keyboard too: with it in focus, the arrow keys turn it the way a drag does and
+// + and - zoom, and they don't step through the model meanwhile. A mouse pressed on the paper doesn't leave the focus
+// there, so after a drag the arrow keys step again. Escape goes back to the gallery, as the back arrow does.
+{
+  const p = await fresh('#crane-5', { viewport: { width: 1280, height: 800 }, deviceScaleFactor: 1, hasTouch: false });
+  await p.waitForFunction(() => fold.state.id === 'crane');
+  const cam = () => p.evaluate(() => { const v = fold.view(); return [fold.state.i, Math.round(v.cam.yaw), Math.round(v.cam.pitch), +v.zoom.toFixed(2)]; });
+  const settled = (yaw, pitch) => p.waitForFunction(([yaw, pitch]) => { const v = fold.view(); return v.goal.yaw === null && Math.round(v.cam.yaw) === yaw && Math.round(v.cam.pitch) === pitch; }, [yaw, pitch], { timeout: 5000 }).catch(() => {});
+  await p.focus('#resetView');
+  await p.keyboard.press('Tab');
+  assert.equal(await p.evaluate(() => document.activeElement.id), 'gl', 'Tab from the view buttons did not go to the paper');
+  await p.keyboard.press('ArrowRight');
+  await settled(-105, 58);
+  await p.keyboard.press('ArrowUp');
+  await settled(-105, 48);
+  assert.deepEqual(await cam(), [4, -105, 48, 1], 'the arrow keys did not turn the paper in focus, or stepped');
+  await p.keyboard.press('+');
+  assert.equal((await cam())[3], 0.8, '+ did not zoom in');
+  await p.keyboard.press('-');
+  assert.equal((await cam())[3], 1, '- did not zoom out');
+  const box = await p.locator('#gl').boundingBox();
+  await p.mouse.move(box.x + 200, box.y + 300);
+  await p.mouse.down();
+  await p.mouse.move(box.x + 260, box.y + 300, { steps: 4 });
+  await p.mouse.up();
+  assert.equal(await p.evaluate(() => document.activeElement === document.body), true, 'a drag on the paper left the focus on it');
+  await p.keyboard.press('ArrowRight');
+  assert.equal((await cam())[0], 5, 'after a drag on the paper, → did not step');
+  await p.keyboard.press('Escape');
+  await p.waitForSelector('#home:not([hidden])', { timeout: 3000 }).catch(() => assert.fail('Escape did not go back to the gallery'));
+  await p.context().close();
+}
+
 // Space plays and pauses after a click anywhere on the player. Most browsers give a clicked button the focus, and
 // Space would press it again: the step clicked in the list, Next (on another step), Slow (off again). The slider
 // leaves Space alone too. A button the keyboard has put the focus on still presses itself.
@@ -1265,7 +1299,9 @@ for (const hash of ['#%', '#crane-3%', '#%F0%9F']) {
   assert.equal(await p.locator('#ticks button[tabindex="0"]').count(), 1, 'Tab stops at more than one tick');
   await p.focus('#resetView');
   await p.keyboard.press('Tab');
-  assert.equal(await on(), 'tick 12', 'Tab from the view buttons did not go to the step\'s tick');
+  assert.equal(await on(), 'gl', 'Tab from the view buttons did not go to the paper');
+  await p.keyboard.press('Tab');
+  assert.equal(await on(), 'tick 12', 'Tab from the paper did not go to the step\'s tick');
   await p.keyboard.press('Tab');
   assert.equal(await on(), 'scrub', 'Tab from the step\'s tick did not go on to the slider');
   await p.keyboard.press('Shift+Tab');

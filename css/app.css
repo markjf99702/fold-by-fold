@@ -215,6 +215,7 @@ html:has(#player:not([hidden])) { overscroll-behavior-y: none; }
 .stage { grid-area: stage; position: relative; min-height: 0; container-type: size; }
 .stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; cursor: grab; }
 .stage canvas:active { cursor: grabbing; }
+.stage canvas:focus-visible { outline-offset: -3px; } /* inside the paper's edges, where the bar and panel can't cover it */
 .hint {
   position: absolute; left: 50%; bottom: 10px; transform: translateX(-50%); margin: 0;
   font-size: .8rem; padding: 4px 12px; border-radius: 99px; background: rgba(20, 30, 26, .55); color: #eef3ef;
