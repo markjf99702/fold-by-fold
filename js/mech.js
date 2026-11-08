@@ -210,7 +210,7 @@ export function between(from, to, { axis, page, samples = 80 }) {
   // Hang it all from a layer that stays put.
   const still = from.order.find((id) => !inPage.has(id));
   const root = centroid(from.facets.get(still).poly);
-  return run(from, to, plan, { root, samples });
+  return run(from, to, plan, { root, samples, turnsPage: true });
 }
 
 // A squash fold. The flap between the line from `top` to `bottom` (on the table) and its folded outer edge
@@ -311,8 +311,9 @@ function angleIn(sheet, j) {
 // The solver. plan(join) says what each crease does: null to stay as it is, or { target (radians, or null
 // to go wherever the others make it), via (an angle to pass through on the way), when ([start, end] as
 // fractions of the step), schedule (t -> 0..1), weight (how closely to keep to all that) }. `to`, if known,
-// is the finished state; otherwise it is worked out from where the hinges end up.
-function run(from, known, plan, { root, samples }) {
+// is the finished state; otherwise it is worked out from where the hinges end up. turnsPage: the motion turns a
+// page over and back, lying open and flat halfway (see between()).
+function run(from, known, plan, { root, samples, turnsPage = false }) {
   const levels = from.levels();
   // The hinges turn as if the paper had no thickness, so creases that meet at a point really do meet
   // there. Each layer's thickness is added back afterward, along its own face.
@@ -539,13 +540,43 @@ function run(from, known, plan, { root, samples }) {
   // ends up in the finished stack.
   const lv = to.levels();
   const lift1 = (id) => lv.get(id) * LAYER * Math.sign(endPose.get(id).r[8]);
+  // A page turned over and back lies flat halfway, turned over. Its thickness, blended straight from start to
+  // end along its own face, would put it under the layers it lies on there, and the whole model would be lifted
+  // off the mat to make room. So it goes by way of the paper's stack with the page open: that flat state,
+  // stacked as the layers lie just before they get there.
+  let liftMid = null;
+  if (turnsPage) {
+    const Wm = kin(xs[Math.round(samples / 2)]);
+    const open = from.clone();
+    open._world = new Map();
+    const midPose = new Map();
+    for (const id of from.order) {
+      const f = from.facets.get(id);
+      const P = composeT(Wm.get(bodyOf.get(id)), flatT(f.m, 0));
+      midPose.set(id, P);
+      open.facets.set(id, { ...f, m: { a: P.r[0], b: P.r[1], c: P.r[3], d: P.r[4], e: P.t[0], f: P.t[1] } });
+    }
+    const Wn = kin(xs[Math.floor(samples * 0.47)]);
+    open.order = stackOrder(
+      from, open,
+      (id) => composeT(Wn.get(bodyOf.get(id)), flatT(from.facets.get(id).m, 0)),
+      (id) => bodyOf.get(id) === rootBody,
+      (id) => bodyOf.get(id),
+      (id) => det(open.facets.get(id).m) * det(from.facets.get(id).m) < 0,
+    );
+    open._levels = null;
+    const lm = open.levels();
+    liftMid = (id) => lm.get(id) * LAYER * Math.sign(midPose.get(id).r[8]);
+  }
+  const lift = (id, u) => (!liftMid ? lift0(id) + (lift1(id) - lift0(id)) * u
+    : u < 0.5 ? lift0(id) + (liftMid(id) - lift0(id)) * (u / 0.5) : liftMid(id) + (lift1(id) - liftMid(id)) * ((u - 0.5) / 0.5));
 
   const motion = {
     kind: 'mech', pathGap,
     moving: from.order.filter((id) => bodyOf.get(id) !== rootBody),
   };
   // Poses at time t: between samples the hinge angles are blended, and each layer's thickness moves over
-  // to where it sits in the finished stack.
+  // to where it sits in the finished stack (by way of where it sits with the page open, for a page turn).
   motion.at = (t) => {
     const N = xs.length - 1;
     const u = Math.min(1, Math.max(0, t));
@@ -553,7 +584,7 @@ function run(from, known, plan, { root, samples }) {
     const W = kin(xs[k].map((v, i) => v + (xs[k + 1][i] - v) * w));
     return from.order.map((id) => {
       const f = from.facets.get(id);
-      const P = thick(composeT(W.get(bodyOf.get(id)), flatT(f.m, 0)), lift0(id) + (lift1(id) - lift0(id)) * u);
+      const P = thick(composeT(W.get(bodyOf.get(id)), flatT(f.m, 0)), lift(id, u));
       return { facet: f, pose: P };
     });
   };

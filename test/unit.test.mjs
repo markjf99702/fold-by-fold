@@ -2,7 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Sheet, fold, turnOver, together, creases, isFlipped } from '../js/paper.js';
-import { apply, area, bisector, side, centroid, overlapArea, line, inside as covers } from '../js/geom.js';
+import { apply, area, bisector, side, centroid, overlapArea, line, ccw, inside as covers } from '../js/geom.js';
 import { build } from '../js/build.js';
 import { poses, marks, symbol, corners, LAYER } from '../js/motion.js';
 import { MODELS } from '../js/models.js';
@@ -228,6 +228,29 @@ test('crane: each reverse-folded point ends up between the front and back of the
       }
     }
   }
+});
+
+test('crane: halfway through the neck\'s reverse fold the page lies open on top of the left half, and the model stays on the mat', () => {
+  const step = once(MODELS.find((m) => m.id === 'crane')).steps[18];
+  const at = (t) => new Map(poses(step, t).filter((it) => !it.bridge).map((it) => [it.facet.id, it]));
+  const start = at(0), half = at(0.5);
+  const height = (it) => corners(it)[0][2];
+  const footprint = (it) => ccw(corners(it).map((p) => [p[0], p[1]]));
+  // The page is the paper turned over by then; everything else lies as it did, or has yet to move.
+  const page = [...half.keys()].filter((id) => Math.sign(half.get(id).pose.r[8]) !== Math.sign(start.get(id).pose.r[8]));
+  assert.ok(page.length >= 4, `only ${page.length} pieces turned over with the page`);
+  const under = [];
+  for (const p of page) {
+    for (const [id, it] of half) {
+      if (page.includes(id) || overlapArea(footprint(half.get(p)), footprint(it)) < 1e-6) continue;
+      if (height(half.get(p)) <= height(it)) under.push(`${p} at ${height(half.get(p)).toFixed(4)} under ${id} at ${height(it).toFixed(4)}`);
+    }
+  }
+  assert.deepEqual(under, [], 'the page goes under the layers it opens out onto');
+  // The layers that don't move stay where they lie, the lowest on the mat, rather than being lifted to make room.
+  const still = [...half.keys()].filter((id) => !step.motion.moving.includes(id));
+  for (const id of still) assert.ok(close(height(half.get(id)), height(start.get(id))), `layer ${id} rose from ${height(start.get(id))} to ${height(half.get(id))}`);
+  assert.ok(close(Math.min(...still.map((id) => height(half.get(id)))), 0), 'the lowest layer is off the mat');
 });
 
 // The mark drawn along the crease between paper points a and b, as the paper lies before the step.
