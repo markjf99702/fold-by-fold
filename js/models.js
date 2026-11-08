@@ -139,7 +139,7 @@ function flapping(t) {
 // flapping bird and the frog.
 const SQUARE_BASE = [
     {
-      say: 'Colored side up. Fold the bottom corner up to the top corner, and unfold.',
+      say: 'Colored side up, turned like a diamond. Fold the bottom corner up to the top corner, and unfold.',
       do: (h) => h.crease(h.onto(K1, K3), { move: K1 }),
     },
     {
@@ -221,7 +221,7 @@ const BIRD_BASE = [
       ),
     },
     {
-      say: 'Fold the top triangle down over them and unfold.',
+      say: 'Fold the top triangle down over them, and unfold.',
       do: (h) => h.crease(h.through(P12, P41), { flap: [0.4, 0.4] }),
     },
     {
@@ -257,7 +257,7 @@ export const MODELS = [
     paper: { colorUp: false, turn: 45 },
     steps: [
       {
-        say: 'Start with the white side up, turned like a diamond. Fold the bottom corner up to the top corner.',
+        say: 'White side up, turned like a diamond. Fold the bottom corner up to the top corner.',
         do: (h) => h.valley(h.onto([1, 0], [0, 1]), { move: [1, 0] }),
       },
       {
@@ -276,7 +276,7 @@ export const MODELS = [
         do: (h) => h.valley(h.lineAt([0, h.at([0, 0])[1]], 0), { flap: [1, 0] }),
       },
       {
-        say: 'Fold the back layer of the top point down behind. Squeeze the sides and the cup opens.',
+        say: 'Fold the back layer of the top point down behind. That’s the cup: squeeze its sides and it opens.',
         do: (h) => h.mountain(h.lineAt([0, h.at([0, 0])[1]], 0), { flap: [0, 1] }),
       },
     ],
@@ -289,7 +289,7 @@ export const MODELS = [
     paper: { colorUp: false, size: [1, Math.SQRT2] },
     steps: [
       {
-        say: 'Start with a long sheet, white side up. Fold it in half the long way and unfold.',
+        say: 'Start with a long sheet, white side up. Fold it in half the long way, and unfold.',
         do: (h) => h.crease(h.onto([0, 0], [1, 0]), { move: [0, 0] }),
       },
       {
@@ -323,7 +323,7 @@ export const MODELS = [
         do: (h) => h.mountain(h.lineAt(h.at([0.5, Math.SQRT2]), 168.75), { flap: [0.9, 0.05] }),
       },
       {
-        say: 'Open both wings out flat, and hold it by the body underneath. Throw it gently, level or a little up.',
+        say: 'Open both wings out flat. That’s the plane. Hold it by the body underneath and throw it gently, level or a little up.',
         view: { yaw: -125, pitch: 24 },
         do: (h) => {
           const nose = h.at([0.5, Math.SQRT2]);
@@ -347,11 +347,11 @@ export const MODELS = [
     paper: { colorUp: false, turn: 45 },
     steps: [
       {
-        say: 'White side up, turned like a diamond. Fold the left corner to the right corner and unfold, to crease the middle.',
+        say: 'White side up, turned like a diamond. Fold the left corner to the right corner, and unfold, to crease the middle.',
         do: (h) => h.crease(h.onto([1, 1], [0, 0]), { move: [1, 1] }),
       },
       {
-        say: 'Fold the top corner down to the bottom corner and unfold.',
+        say: 'Fold the top corner down to the bottom corner, and unfold.',
         do: (h) => h.crease(h.onto([0, 1], [1, 0]), { move: [0, 1] }),
       },
       {
@@ -375,7 +375,7 @@ export const MODELS = [
         do: (h) => h.mountain(h.level(h.at([0, 0])[1] - 0.09), { move: [0, 0] }),
       },
       {
-        say: 'Fold the two side points behind as well. Turn it over to see the back, or keep this side: the heart is done.',
+        say: 'Fold the two side points behind as well. That’s the heart: keep this side, or turn it over to see the back.',
         do: (h) => h.together(
           (k) => k.mountain(h.upright(k.at([0, 0.375])[0] - 0.07), { move: [0, 0.375] }),
           (k) => k.mountain(h.upright(k.at([0.625, 1])[0] + 0.07), { move: [0.625, 1] }),
@@ -391,7 +391,7 @@ export const MODELS = [
     paper: { colorUp: false },
     steps: [
       {
-        say: 'White side up. Fold in half corner to corner and unfold.',
+        say: 'White side up. Fold in half corner to corner, and unfold.',
         do: (h) => h.crease(h.onto([0, 0], [1, 1]), { move: [0, 0] }),
       },
       {
@@ -425,11 +425,11 @@ export const MODELS = [
         do: (h) => h.crease(h.level(h.sheet().bounds().cy), { move: [0.25, 0.25] }),
       },
       {
-        say: 'Fold in half side to side and unfold. Now write colors on the outer flaps and numbers and fortunes inside.',
+        say: 'Fold in half side to side, and unfold. Now write colors on the outer flaps and numbers and fortunes inside.',
         do: (h) => h.crease(h.upright(h.sheet().bounds().cx), { move: [0.25, 0.25] }),
       },
       {
-        say: 'Turn it over, slide a thumb and finger under each of the four square flaps, and push the points up and together.',
+        say: 'Turn it over, slide a thumb and finger under each of the four square flaps, and push the points up and together. That’s the fortune teller.',
         do: (h) => h.turnOver(),
       },
     ],
@@ -540,7 +540,7 @@ export const MODELS = [
         do: (h) => h.valley(h.level(h.at([1, 0.5])[1]), { flap: [0.23, 0.77] }),
       },
       {
-        say: 'Fold the back layer of the bottom point up behind. The helmet is done.',
+        say: 'Fold the back layer of the bottom point up behind. That’s the helmet.',
         do: (h) => h.mountain(h.level(h.at([1, 0.5])[1]), { flap: [1, 0] }),
       },
     ],
@@ -639,7 +639,7 @@ export const MODELS = [
         ),
       },
       {
-        say: 'Lift the wings halfway back up, so they stand out from the body. Stand it up, and gently pull the wings apart to puff out the body. Your crane is done.',
+        say: 'Lift the wings halfway back up, so they stand out from the body. Stand it up, and gently pull the wings apart to puff out the body. That’s the crane.',
         view: { yaw: -120, pitch: 16, size: 0.62, lift: 0.22 },
         do: (h) => h.shape([
           (k) => k.bend(k.level(k.at(C)[1]), 90, { flap: [0.98, 0.9] }),
@@ -683,7 +683,7 @@ export const MODELS = [
         ),
       },
       {
-        say: 'Lift the wings back up halfway and stand it up. Now hold the bottom of the neck with one hand and gently pull the tail back and forth with the other: the wings flap.',
+        say: 'Lift the wings back up halfway and stand it up. That’s the flapping bird. Hold the bottom of the neck with one hand and gently pull the tail back and forth with the other: the wings flap.',
         name: 'Flap',
         view: { yaw: -158, pitch: 24, size: 0.64, lift: 0.2 },
         do: (h) => h.shape([
