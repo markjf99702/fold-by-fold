@@ -413,7 +413,7 @@ export function marks(step) {
 
 // Whether a step turns paper about a line running straight away from you as you usually see it (up the screen, to within
 // 8 degrees), so that halfway through, the paper that moves stands edge-on to you and all but vanishes: every turn over,
-// the frog's squash folds and pages, and a few more (39 steps of 138).
+// the frog's squash folds and pages, and a few more (39 steps of 144).
 export function edgeOn(step) {
   const { motion } = step;
   const lines = motion.kind === 'multi' ? motion.parts.filter((p) => !p.bend).map((p) => p.line)
