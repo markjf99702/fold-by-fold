@@ -329,8 +329,8 @@ function paint() {
       list.scrollTop += (b.top + b.bottom) / 2 - (l.top + list.clientTop + list.clientHeight / 2);
     }
   }
-  $('next').disabled = P.i === n - 1;
   const last = P.i === n - 1;
+  unavailable($('next'), last);
   let label = 'Play', icon = '<path d="M7 4.5v15l12.5-7.5z"/>';
   if (P.playing) { label = 'Pause'; icon = '<path d="M7 5h3.5v14H7zM13.5 5H17v14h-3.5z"/>'; }
   else if (P.t >= 1) {
@@ -355,10 +355,17 @@ function paint() {
 // date as a fold plays, too: on step 1 it comes on as soon as the paper moves.
 function paintControls() {
   const prev = $('prev');
-  prev.disabled = P.i === 0 && P.t === 0;
+  unavailable(prev, P.i === 0 && P.t === 0);
   const label = P.t > 0.02 ? 'Replay this fold' : 'Previous step';
   if (prev.title !== label) { prev.title = label; prev.setAttribute('aria-label', label); }
 }
+
+// Next on the last step and the back button at the very start say they're unavailable and do nothing, but they're not
+// turned off: a button turned off loses the focus, and pressing Enter on Next through a model lost your place at its end.
+function unavailable(b, off) {
+  if ((b.getAttribute('aria-disabled') === 'true') !== off) b.setAttribute('aria-disabled', off);
+}
+const isOff = (b) => b.getAttribute('aria-disabled') === 'true';
 
 // Words that run past their box on a short screen fade out at the bottom until they're scrolled to the end.
 const words = document.querySelector('.step-now');
@@ -665,9 +672,10 @@ $('toKey').addEventListener('click', () => {
 });
 $('play').addEventListener('click', primary);
 $('prev').addEventListener('click', () => {
+  if (isOff($('prev'))) return;
   if (P.t > 0.02) { P.t = 0; P.playing = false; paint(); } else go(P.i - 1);
 });
-$('next').addEventListener('click', () => go(P.i + 1, { play: true }));
+$('next').addEventListener('click', () => { if (!isOff($('next'))) go(P.i + 1, { play: true }); });
 $('speed').addEventListener('click', () => {
   prefs.slow = !prefs.slow;
   save();

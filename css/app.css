@@ -279,9 +279,9 @@ html:has(#player:not([hidden])) { overscroll-behavior-y: none; }
 }
 .ctl svg { width: 22px; height: 22px; fill: currentColor; stroke: currentColor; stroke-width: 1.5; stroke-linejoin: round; }
 .ctl.main { background: var(--accent); color: var(--accent-ink); min-width: 150px; font-size: 1.02rem; }
-.ctl:not(:disabled):active { background: var(--press); }
-.ctl.main:not(:disabled):active { background: color-mix(in srgb, var(--accent) 82%, #000); }
-.ctl:disabled { opacity: .35; cursor: default; }
+.ctl:not([aria-disabled="true"]):active { background: var(--press); }
+.ctl.main:not([aria-disabled="true"]):active { background: color-mix(in srgb, var(--accent) 82%, #000); }
+.ctl[aria-disabled="true"] { opacity: .35; cursor: default; }
 .speed {
   appearance: none; border: 1.5px solid var(--line); background: none; border-radius: 99px; height: 36px; padding: 0 12px;
   font-size: .85rem; font-weight: 700; cursor: pointer; color: var(--muted); position: relative;

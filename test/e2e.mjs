@@ -153,7 +153,7 @@ await page.click('#play');
 assert.equal(await page.textContent('#playLabel'), 'Pause');
 // Once the paper moves, the back button takes the fold back to its start, even on step 1.
 await page.waitForFunction(() => fold.state.t > 0.3, null, { timeout: 10000 });
-assert.deepEqual(await page.evaluate(() => { const b = document.getElementById('prev'); return [b.disabled, b.getAttribute('aria-label')]; }), [false, 'Replay this fold'], 'the back button is off while step 1 plays');
+assert.deepEqual(await page.evaluate(() => { const b = document.getElementById('prev'); return [b.getAttribute('aria-disabled'), b.getAttribute('aria-label')]; }), ['false', 'Replay this fold'], 'the back button is off while step 1 plays');
 await page.waitForFunction(() => fold.state.t >= 1, null, { timeout: 10000 });
 assert.equal(await page.textContent('#playLabel'), 'Next fold');
 await page.click('#play');
@@ -907,6 +907,31 @@ for (const hash of ['#%', '#crane-3%', '#%F0%9F']) {
   await p.focus('#scrub');
   await p.keyboard.press('ArrowLeft');
   assert.equal(await p.evaluate(() => fold.state.i), 4, 'the slider\'s arrow keys changed the step');
+  await p.context().close();
+}
+
+// Next and the back button keep the focus at the ends of a model. Going through a model with Enter on Next, the focus
+// fell to the page at the last step, as the button turned itself off under it; the back button did the same at the
+// first step. They say they're unavailable there instead, and pressing them does nothing.
+{
+  const p = await fresh('#plane-7', { viewport: { width: 1280, height: 800 }, deviceScaleFactor: 1, hasTouch: false });
+  await p.waitForFunction(() => fold.state.id === 'plane');
+  const last = (await p.evaluate(() => fold.state.steps)) - 1;
+  const now = (q) => p.evaluate((q) => [fold.state.i, document.activeElement.id, document.querySelector(q).getAttribute('aria-disabled')], q);
+  await p.focus('#next');
+  await p.keyboard.press('Enter');
+  await p.waitForTimeout(300); // a browser takes the focus off a button turned off with the next frame
+  assert.deepEqual(await now('#next'), [last, 'next', 'true'], 'Next lost the focus at the last step, or is not marked unavailable');
+  await p.evaluate((i) => fold.set(i, 0.5), last);
+  await p.keyboard.press('Enter');
+  assert.deepEqual(await p.evaluate(() => [fold.state.i, fold.state.t, fold.state.playing]), [last, 0.5, false], 'Next did something at the last step');
+  await p.evaluate(() => fold.set(1, 0));
+  await p.focus('#prev');
+  await p.keyboard.press('Enter');
+  await p.waitForTimeout(300);
+  assert.deepEqual(await now('#prev'), [0, 'prev', 'true'], 'the back button lost the focus at the first step, or is not marked unavailable');
+  await p.keyboard.press('Enter');
+  assert.deepEqual(await now('#prev'), [0, 'prev', 'true'], 'the back button did something at the first step');
   await p.context().close();
 }
 
