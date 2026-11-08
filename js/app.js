@@ -92,11 +92,12 @@ function renderHome() {
       btn.type = 'button';
       btn.className = 'model';
       btn.dataset.model = m.id;
+      // Only words in a button, no headings or paragraphs (a button holds phrasing content only), shown as blocks.
       btn.innerHTML = `
         <span class="thumb"></span>
-        <h3>${m.name}</h3>
-        <p class="meta"><span class="level">${m.level}</span><span class="count"></span></p>
-        <p class="blurb">${m.blurb}</p>`;
+        <span class="title">${m.name}</span>
+        <span class="meta"><span class="level">${m.level}</span><span class="count"></span></span>
+        <span class="blurb">${m.blurb}</span>`;
       btn.addEventListener('click', () => openFromHome(m.id));
       li.append(btn);
       list.append(li);

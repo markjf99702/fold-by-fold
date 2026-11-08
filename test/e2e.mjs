@@ -102,7 +102,7 @@ assert.equal(await page.evaluate(() => getComputedStyle(document.querySelector('
 await page.click('.swatch[aria-label="Indigo"]');
 
 // The cup opens on its first step.
-await page.click('.model:has(h3:text("Paper cup"))');
+await page.click('.model:has(.title:text("Paper cup"))');
 await page.waitForSelector('#player:not([hidden])');
 assert.equal(await page.evaluate(() => location.hash), '#cup');
 assert.match(await page.textContent('#stepCount'), /^Step 1 of \d+$/);
@@ -196,7 +196,7 @@ await page.waitForFunction(() => fold.state.id === 'helmet');
 assert.equal((await state()).i, 2);
 await page.click('#back');
 await page.waitForSelector('#home:not([hidden])');
-await page.click('.model:has(h3:text("Samurai helmet"))');
+await page.click('.model:has(.title:text("Samurai helmet"))');
 await page.waitForFunction(() => fold.state.id === 'helmet');
 assert.equal((await state()).i, 2, 'did not pick up where you left off');
 assert.equal(await page.getAttribute('#ticks li:nth-child(3) button', 'aria-current'), 'step', 'the step is not marked on the bar after reopening the model');
@@ -430,7 +430,7 @@ async function fresh(hash = '', { init, arg, ...opts } = {}) {
 // rewrite it), and it leaves the back arrow's way back to the gallery as it was.
 {
   const p = await fresh();
-  await p.click('.model:has(h3:text("Samurai helmet"))');
+  await p.click('.model:has(.title:text("Samurai helmet"))');
   await p.waitForSelector('#player:not([hidden])');
   assert.equal(await p.evaluate(() => location.hash), '#helmet');
   await p.evaluate(() => { location.hash = 'helmet-6'; });
@@ -462,7 +462,7 @@ async function fresh(hash = '', { init, arg, ...opts } = {}) {
 {
   const p = await fresh();
   const before = await p.evaluate(() => history.length);
-  await p.click('.model:has(h3:text("Paper cup"))');
+  await p.click('.model:has(.title:text("Paper cup"))');
   await p.waitForSelector('#player:not([hidden])');
   await p.click('#next');
   await p.waitForFunction(() => location.hash === '#cup-2', null, { timeout: 3000 });
@@ -512,7 +512,7 @@ async function fresh(hash = '', { init, arg, ...opts } = {}) {
     return [q, tall, wide];
   }), qs);
   const sizes = await reach(['.swatch:nth-child(3)', '.jd-foot a:last-child']);
-  await p.click('.model:has(h3:text("Crane"))');
+  await p.click('.model:has(.title:text("Crane"))');
   await p.waitForFunction(() => fold.state.id === 'crane');
   sizes.push(...await reach(['#speed', '#scrub', '#ticks li:nth-child(4) button']));
   // The slider, the ticks and the links are wide already; the swatches and Slow need the width too.
@@ -584,7 +584,7 @@ for (const [width, height, list] of [
 // in, the paper airplane's first step ('white side up') showed only the back of the paper, filling the view.
 {
   const p = await fresh('', { viewport: { width: 1280, height: 800 }, deviceScaleFactor: 1, hasTouch: false });
-  await p.click('.model:has(h3:text("Crane"))');
+  await p.click('.model:has(.title:text("Crane"))');
   await p.waitForFunction(() => fold.state.id === 'crane');
   const cam = () => p.evaluate(() => { const v = fold.view(); return [Math.round(v.cam.yaw), Math.round(v.cam.pitch), +v.zoom.toFixed(2)]; });
   const box = await p.locator('#gl').boundingBox();
@@ -597,7 +597,7 @@ for (const [width, height, list] of [
   assert.deepEqual(await cam(), [-132, -74, 0.35], 'the crane was not turned and zoomed');
   await p.click('#back');
   await p.waitForSelector('#home:not([hidden])');
-  await p.click('.model:has(h3:text("Paper airplane"))');
+  await p.click('.model:has(.title:text("Paper airplane"))');
   await p.waitForFunction(() => fold.state.id === 'plane');
   assert.deepEqual(await cam(), [-90, 58, 1], 'the plane opened at the angle and zoom the crane was left at');
   // Within a model the view holds from step to step.
@@ -627,7 +627,7 @@ for (const [width, height, list] of [
 {
   const p = await fresh();
   const before = await p.evaluate(() => history.length);
-  await p.click('.model:has(h3:text("Paper cup"))');
+  await p.click('.model:has(.title:text("Paper cup"))');
   await p.waitForSelector('#player:not([hidden])');
   await p.click('#back');
   await p.waitForSelector('#home:not([hidden])');
@@ -659,7 +659,7 @@ for (const [width, height, list] of [
   }), html);
   const frame = p.frames()[1];
   await frame.waitForSelector('#home:not([hidden])');
-  await frame.click('.model:has(h3:text("Paper cup"))');
+  await frame.click('.model:has(.title:text("Paper cup"))');
   await frame.waitForSelector('#player:not([hidden])', { timeout: 5000 }).catch(() => assert.fail('a card did nothing in a frame'));
   await frame.click('#back');
   await frame.waitForSelector('#home:not([hidden])', { timeout: 5000 }).catch(() => assert.fail('the back arrow did nothing in a frame'));
@@ -742,7 +742,7 @@ for (const [width, height, list] of [
   const idle = async () => { const a = await p.evaluate(() => frameCount); await p.waitForTimeout(1000); return (await p.evaluate(() => frameCount)) - a; };
   await p.waitForTimeout(500);
   assert.ok(await idle() <= 2, 'the gallery asks for frames while nothing moves');
-  await p.click('.model:has(h3:text("Heart"))');
+  await p.click('.model:has(.title:text("Heart"))');
   await p.waitForFunction(() => fold.state.id === 'heart');
   await p.waitForTimeout(1500); // the camera settles
   assert.ok(await idle() <= 2, 'a player left alone asks for frames');
@@ -794,7 +794,7 @@ for (const [width, height, list] of [
     window.setTimeout = function (fn, ms, ...rest) { if (ms === 10 * 60 * 1000) window.idle = fn; return later.call(this, fn, ms, ...rest); };
   } });
   const locks = (n) => p.waitForFunction((n) => locks.length >= n, n, { timeout: 2000 }).catch(() => {}).then(() => p.evaluate(() => locks.join(' ')));
-  await p.click('.model:has(h3:text("Paper cup"))');
+  await p.click('.model:has(.title:text("Paper cup"))');
   await p.waitForSelector('#player:not([hidden])');
   assert.equal(await locks(1), 'screen', 'opening a model did not keep the screen on');
   await p.tap('#gl');
@@ -1313,6 +1313,18 @@ for (const hash of ['#%', '#crane-3%', '#%F0%9F']) {
   await p.context().close();
 }
 
+// Each card holds only words and its picture, since a button may hold only phrasing content (HTML Living Standard,
+// 4.10.6 The button element): its name and words were a heading and paragraphs, which some browsers flatten. The
+// models have a heading of their own over them for screen readers, between the page's name and the key of marks.
+{
+  const p = await fresh();
+  await p.waitForSelector('#home:not([hidden])');
+  assert.equal(await p.locator('.model :is(h1, h2, h3, h4, p, div)').count(), 0, 'a card holds headings or paragraphs');
+  assert.equal(await p.getByRole('heading', { name: 'Models', level: 2 }).count(), 1, 'the models have no heading over them');
+  assert.equal(await p.getByRole('button', { name: 'Paper cup Easy 5 steps A cup that holds water for a minute or two.' }).count(), 1, 'the paper cup card\'s name runs its words together');
+  await p.context().close();
+}
+
 // The cards in a row line up: names, step counts and words at the same height across the row. On a wide screen,
 // and on a phone too, where a name on two lines (Paper airplane) sits beside one on one line (Paper cup), and with
 // a card saying which step you got to.
@@ -1326,7 +1338,7 @@ for (const [width, height] of [[1280, 800], [390, 844], [360, 780]]) {
     for (const card of document.querySelectorAll('.model')) {
       const top = Math.round(card.getBoundingClientRect().top);
       const at = (q) => Math.round(card.querySelector(q).getBoundingClientRect().top) - top;
-      (out[top] ||= []).push([at('h3'), at('.meta'), at('.blurb')]);
+      (out[top] ||= []).push([at('.title'), at('.meta'), at('.blurb')]);
     }
     return Object.values(out);
   });
@@ -1334,7 +1346,7 @@ for (const [width, height] of [[1280, 800], [390, 844], [360, 780]]) {
   for (const row of rows) assert.ok(row.every((card) => card.every((y, k) => y === row[0][k])), `the cards in a row don't line up at ${width} px: ${JSON.stringify(row)}`);
   if (wide) {
     // With a mouse, the hint under the paper says to scroll to zoom.
-    await p.click('.model:has(h3:text("Paper cup"))');
+    await p.click('.model:has(.title:text("Paper cup"))');
     await p.waitForSelector('#player:not([hidden])');
     assert.equal(await p.innerText('#hint'), 'Drag to turn the paper · scroll to zoom');
     // And scrolling on the paper zooms in, the square button looks straight down the way a diagram does, and a
@@ -1360,7 +1372,7 @@ for (const [width, height] of [[1280, 800], [390, 844], [360, 780]]) {
 {
   const p = await fresh();
   await p.evaluate(() => { history.scrollRestoration = 'manual'; });
-  const frog = '.model:has(h3:text-is("Frog"))';
+  const frog = '.model:has(.title:text-is("Frog"))';
   await p.locator(frog).scrollIntoViewIfNeeded();
   const y = await p.evaluate(() => scrollY);
   assert.ok(y > 300, `the gallery didn't scroll down (${y})`);
@@ -1430,7 +1442,7 @@ for (const [width, height] of [[1280, 800], [390, 844], [360, 780]]) {
     return r.left < 47 || r.right > innerWidth - 47;
   }), qs);
   assert.deepEqual(await under(['.mast', '.paper-pick', '.models', '.symbols', '.jd-foot']), [], 'the gallery runs under the sides of the screen');
-  await p.click('.model:has(h3:text("Paper cup"))');
+  await p.click('.model:has(.title:text("Paper cup"))');
   await p.waitForSelector('#player:not([hidden])');
   assert.deepEqual(await under(['#back', '#resetView', '#ticks', '.step-now', '.scrub', '#prev', '#speed']), [], 'the player runs under the sides of the screen');
   // Wide enough for the words beside the paper (a big phone), the panel makes room for the notch too.
@@ -1515,7 +1527,7 @@ for (const [width, height] of [[375, 553], [320, 460]]) {
   p.on('console', m => { if (m.type() === 'error') problems.push(m.text()); });
   await p.goto(file);
   await p.waitForSelector('#home:not([hidden])');
-  await p.click('.model:has(h3:text("Heart"))');
+  await p.click('.model:has(.title:text("Heart"))');
   await p.waitForSelector('#player:not([hidden])');
   await p.click('#play');
   await p.waitForFunction(() => fold.state.t >= 1, null, { timeout: 15000 }).catch(() => assert.fail('the single-file copy did not fold'));
