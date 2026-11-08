@@ -1325,6 +1325,27 @@ for (const hash of ['#%', '#crane-3%', '#%F0%9F']) {
   await p.context().close();
 }
 
+// Every tick on the bar stands out from the panel by at least 3 to 1 (WCAG 2.2, 1.4.11 Non-text Contrast), in light and
+// dark: each is a button, and its bar is all there is to see of it. The steps to come were 1.3 to 1, barely there.
+for (const colorScheme of ['light', 'dark']) {
+  const p = await fresh('#frog-12', { colorScheme });
+  await p.waitForFunction(() => fold.state.id === 'frog');
+  const ratios = await p.evaluate(() => {
+    // A colour as computed, rgb() or color(srgb), with any see-through part laid over what's under it.
+    const rgb = (s, under) => {
+      const m = s.match(/[\d.]+/g).map(Number), c = s.startsWith('color(') ? m.slice(0, 3).map((v) => v * 255) : m.slice(0, 3), a = m[3] ?? 1;
+      return c.map((v, k) => v * a + (under ? under[k] : 0) * (1 - a));
+    };
+    const lum = (c) => { const [r, g, b] = c.map((v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }); return 0.2126 * r + 0.7152 * g + 0.0722 * b; };
+    const ratio = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p); return +((x + 0.05) / (y + 0.05)).toFixed(2); };
+    const panel = rgb(getComputedStyle(document.querySelector('.panel')).backgroundColor);
+    const bar = (q) => ratio(rgb(getComputedStyle(document.querySelector(q), '::before').backgroundColor, panel), panel);
+    return { done: bar('#ticks li:nth-child(3) button'), current: bar('#ticks li:nth-child(12) button'), coming: bar('#ticks li:nth-child(20) button') };
+  });
+  assert.ok(Object.values(ratios).every((r) => r >= 3), `a tick is too faint against the panel in ${colorScheme}: ${JSON.stringify(ratios)}`);
+  await p.context().close();
+}
+
 // The cards in a row line up: names, step counts and words at the same height across the row. On a wide screen,
 // and on a phone too, where a name on two lines (Paper airplane) sits beside one on one line (Paper cup), and with
 // a card saying which step you got to.

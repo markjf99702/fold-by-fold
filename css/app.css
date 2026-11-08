@@ -30,6 +30,7 @@
   --chip: rgba(35, 32, 27, .07);
   --press: rgba(35, 32, 27, .15);
   --mat: #2f5a4e;
+  --tick: color-mix(in srgb, var(--ink) 50%, var(--bg)); /* a step to come on the bar of ticks, 3:1 against the panel */
   --display: 'Shippori Mincho B1', 'Hiragino Mincho ProN', 'Yu Mincho', Georgia, serif;
   --ui: 'Zen Kaku Gothic New', 'Hiragino Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
   --gutter: 16px;
@@ -48,6 +49,7 @@
     --chip: rgba(236, 230, 218, .08);
     --press: rgba(236, 230, 218, .17);
     --mat: #264a40;
+    --tick: color-mix(in srgb, var(--ink) 40%, var(--bg));
   }
 }
 :root[data-theme="dark"] {
@@ -63,6 +65,7 @@
   --chip: rgba(236, 230, 218, .08);
   --press: rgba(236, 230, 218, .17);
   --mat: #264a40;
+  --tick: color-mix(in srgb, var(--ink) 40%, var(--bg));
 }
 
 * { box-sizing: border-box; }
@@ -248,8 +251,10 @@ html:has(#player:not([hidden])) { overscroll-behavior-y: none; }
 .ticks button {
   appearance: none; border: 0; padding: 20px 0; width: 100%; background: none; cursor: pointer; display: block;
 }
-.ticks button::before { content: ''; display: block; height: 4px; border-radius: 2px; background: var(--line); }
-.ticks button.done::before { background: color-mix(in srgb, var(--accent) 45%, var(--line)); }
+/* Each tick is a button whose bar is all there is to see of it, so every bar stands out from the panel by 3:1 at
+   least (WCAG 2.2, 1.4.11): the steps to come in grey, the steps done in a lighter red than the step you're on. */
+.ticks button::before { content: ''; display: block; height: 4px; border-radius: 2px; background: var(--tick); }
+.ticks button.done::before { background: color-mix(in srgb, var(--accent) 75%, var(--bg)); }
 .ticks button[aria-current="step"]::before { background: var(--accent); height: 6px; margin-top: -1px; }
 
 /* Words too long for the room left scroll in their own box, fading at the bottom while there's more, so the
