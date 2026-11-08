@@ -972,6 +972,80 @@ for (const hash of ['#%', '#crane-3%', '#%F0%9F']) {
   await p.context().close();
 }
 
+// Zooming goes toward the point under the cursor or the fingers, so a small fold at a tip stays in sight as it grows:
+// the crane's head, about 20 px across on a phone, used to leave the screen as you zoomed in to see it. Two fingers
+// moving together slide the view along the table, and a double tap puts it back in the middle.
+{
+  // Where the tip of the crane's neck is on the screen, in CSS pixels on the canvas, and how big it looks.
+  const tip = (p) => p.evaluate(async () => {
+    const { MODELS } = await import('./js/models.js');
+    const { build } = await import('./js/build.js');
+    const { poses, corners } = await import('./js/motion.js');
+    window.crane21 ||= build(MODELS.find((m) => m.id === 'crane')).steps[20];
+    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+    const moving = new Set(crane21.motion.moving), v = fold.view();
+    const at = poses(crane21, 0).filter((it) => moving.has(it.facet.id)).flatMap((it) => corners(it)).map((q) => v.project(q));
+    const xs = at.map((q) => q[0]), ys = at.map((q) => q[1]);
+    return { x: xs.reduce((a, b) => a + b) / xs.length, y: ys.reduce((a, b) => a + b) / ys.length, size: Math.hypot(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys)) };
+  });
+  const near = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+  // The wheel, with the cursor over the tip.
+  {
+    const p = await fresh('#crane-21', { viewport: { width: 1280, height: 800 }, deviceScaleFactor: 1, hasTouch: false });
+    await p.waitForFunction(() => fold.state.id === 'crane');
+    const box = await p.locator('#gl').boundingBox();
+    const was = await tip(p);
+    await p.mouse.move(box.x + was.x, box.y + was.y);
+    for (let k = 0; k < 4; k++) await p.mouse.wheel(0, -200);
+    await p.waitForFunction(() => fold.view().zoom < 0.5, null, { timeout: 3000 }).catch(() => {});
+    await p.waitForTimeout(300);
+    const now = await tip(p);
+    assert.ok(now.size > was.size * 1.8, `the head did not get bigger under the wheel (${was.size.toFixed(0)} to ${now.size.toFixed(0)} px)`);
+    assert.ok(near(now, was) < 8, `the head moved ${near(now, was).toFixed(0)} px from under the cursor as it zoomed`);
+    await p.context().close();
+  }
+  // Two fingers spreading over the tip, on a phone.
+  {
+    const p = await fresh('#crane-21');
+    await p.waitForFunction(() => fold.state.id === 'crane');
+    const box = await p.locator('#gl').boundingBox();
+    const was = await tip(p);
+    const [x, y] = [box.x + was.x, box.y + was.y];
+    const cdp = await p.context().newCDPSession(p);
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: x - 15, y, id: 1 }, { x: x + 15, y, id: 2 }] });
+    for (let k = 1; k <= 8; k++) await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: x - 15 - k * 6, y, id: 1 }, { x: x + 15 + k * 6, y, id: 2 }] });
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    await p.waitForFunction(() => fold.view().zoom < 0.5, null, { timeout: 3000 }).catch(() => {});
+    await p.waitForTimeout(300);
+    const now = await tip(p);
+    assert.ok(now.size > was.size * 1.8, `the head did not get bigger under the fingers (${was.size.toFixed(0)} to ${now.size.toFixed(0)} px)`);
+    assert.ok(near(now, was) < 12, `the head moved ${near(now, was).toFixed(0)} px from under the fingers as they spread`);
+    // Two fingers moving together slide the view: the head follows them.
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: x - 40, y, id: 1 }, { x: x + 40, y, id: 2 }] });
+    for (let k = 1; k <= 6; k++) await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: x - 40 - k * 10, y: y + k * 5, id: 1 }, { x: x + 40 - k * 10, y: y + k * 5, id: 2 }] });
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    await p.waitForTimeout(300);
+    const slid = await tip(p);
+    assert.ok(near(slid, { x: now.x - 60, y: now.y + 30 }) < 12, `the head didn't follow two fingers across (${JSON.stringify([now, slid])})`);
+    // The view stays near the paper however far the fingers go.
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: 100, y: 200, id: 1 }, { x: 160, y: 200, id: 2 }] });
+    for (let k = 1; k <= 10; k++) await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: 100 + k * 100, y: 200 + k * 100, id: 1 }, { x: 160 + k * 100, y: 200 + k * 100, id: 2 }] });
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    await p.waitForTimeout(300);
+    const kept = await p.evaluate(() => { const v = fold.view(), { box, size } = v.framing, [x, y] = v.cam.target; return x >= box[0] - size * 0.11 && x <= box[2] + size * 0.11 && y >= box[1] - size * 0.11 && y <= box[3] + size * 0.11; });
+    assert.ok(kept, 'two fingers slid the view off the paper');
+    // A double tap puts the view back in the middle, unzoomed.
+    await p.waitForTimeout(400);
+    for (let k = 0; k < 2; k++) {
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: box.x + 100, y: box.y + 100 }] });
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    }
+    await p.waitForFunction(() => fold.view().zoom === 1 && fold.view().pan.every((v) => v === 0), null, { timeout: 3000 }).catch(() => {});
+    assert.deepEqual(await p.evaluate(() => [fold.view().zoom, ...fold.view().pan]), [1, 0, 0], 'a double tap did not put the view back in the middle');
+    await p.context().close();
+  }
+}
+
 // The frog's 34 ticks are too narrow to hit one with a finger, so a finger slides along the bar and the step under
 // it is picked as it goes; lifting it leaves that step, and a tap picks the tick tapped. A finger going up or down
 // from the bar scrolls instead. A mouse can drag along it too, and the ticks are still buttons for the keyboard.

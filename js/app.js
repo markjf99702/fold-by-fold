@@ -179,6 +179,7 @@ function openModel(id, i = null, { landed = false } = {}) {
     Object.assign(view.cam, { yaw: -90, pitch: 58 });
     view.goal.yaw = view.goal.pitch = null;
     view.zoom = 1;
+    view.pan = [0, 0];
   }
   aimedFor = null;
   P.b = built(id);
@@ -407,12 +408,13 @@ function frameCamera(snap) {
   // half the height the paper reaches, from the usual angle, so turning the paper round doesn't change its size.
   const v = aimedFor === s ? s.view : null;
   const size = Math.max(x1 - x0, y1 - y0, v?.size || 0, 0.55);
-  if (s.view) view.frame((x0 + x1) / 2, (y0 + y1) / 2, size, v?.lift || 0);
+  const box = [x0, y0, x1, y1];
+  if (s.view) view.frame((x0 + x1) / 2, (y0 + y1) / 2, size, v?.lift || 0, { box });
   else {
     const pts = reachOf(s);
     let top = 0;
     for (let k = 2; k < pts.length; k += 3) top = Math.max(top, pts[k]);
-    view.frame((x0 + x1) / 2, (y0 + y1) / 2, size, top / 2, { pts, yaw: -90, pitch: 58 });
+    view.frame((x0 + x1) / 2, (y0 + y1) / 2, size, top / 2, { box, fit: { pts, yaw: -90, pitch: 58 } });
   }
   if (snap) view.settle(1);
   dirty = true;
@@ -472,8 +474,13 @@ function wireCamera() {
       view.cam.pitch = Math.max(-80, Math.min(89.9, view.cam.pitch + (e.clientY - y) * 0.3));
       hideHint();
     } else if (pts.size === 2) {
+      // Two fingers: the view slides along the table with them, and zooms toward the point between them, so what's
+      // under the fingers stays under them (the crane's head, say, rather than the middle of the model).
+      const [ox, oy] = [...pts].find(([id]) => id !== e.pointerId)[1];
+      const r = c.getBoundingClientRect(), mx = (e.clientX + ox) / 2 - r.left, my = (e.clientY + oy) / 2 - r.top;
+      view.slide((x + ox) / 2 - r.left, (y + oy) / 2 - r.top, mx, my);
       const s = spread();
-      if (pinch && s) view.zoomBy(pinch / s);
+      if (pinch && s) view.zoomAt(pinch / s, mx, my);
       pinch = s;
     }
     dirty = true;
@@ -489,7 +496,13 @@ function wireCamera() {
     tap = null;
   });
   c.addEventListener('pointercancel', (e) => { up(e); tap = lastTap = null; });
-  c.addEventListener('wheel', (e) => { e.preventDefault(); view.zoomBy(Math.exp(e.deltaY * 0.0012)); dirty = true; }, { passive: false });
+  // The wheel zooms toward the point under the cursor.
+  c.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    const r = c.getBoundingClientRect();
+    view.zoomAt(Math.exp(e.deltaY * 0.0012), e.clientX - r.left, e.clientY - r.top);
+    dirty = true;
+  }, { passive: false });
   c.addEventListener('dblclick', () => { if (pointer === 'mouse') resetView(); });
   // The paper takes pinches for its own zoom. If the page itself has been zoomed in (by a pinch on the words, say),
   // a pinch on the paper zooms the page back out instead, since the paper may be most of what's on screen.
@@ -502,11 +515,12 @@ function wireCamera() {
   }
 }
 
-// Back to the usual view, or to the step's own once its fold has moved.
+// Back to the usual view, or to the step's own once its fold has moved, unzoomed and with the model in the middle.
 function resetView() {
   if (!view) return;
   const step = P.b.steps[P.i];
   view.zoom = 1;
+  view.pan = [0, 0];
   if (step.view && P.t > 0) aimFor(step);
   else { view.aim(-90, 58); if (aimedFor) { aimedFor = null; frameCamera(false); } }
   dirty = true;

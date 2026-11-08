@@ -172,9 +172,10 @@ export class View {
     // Camera: turned about the table (yaw), tilted up from it (pitch), and how far away.
     this.cam = { yaw: -90, pitch: 58, dist: 2.2, target: [0, 0, 0] };
     this.goal = { target: [0, 0, 0], yaw: null, pitch: null };
-    this.framing = { cx: 0, cy: 0, cz: 0, size: 1, fit: null };
+    this.framing = { cx: 0, cy: 0, cz: 0, size: 1, fit: null, box: [-0.5, -0.5, 0.5, 0.5] };
     this.placed = null;
     this.zoom = 1; // the viewer's own zoom, on top of the framing
+    this.pan = [0, 0]; // and the viewer's own move along the table
     this.items = [];
     this.marks = null;
     this.markAlpha = 0;
@@ -213,9 +214,10 @@ export class View {
   // up, fits across the narrower side of the view. With fit, every point the paper reaches during the step (fit.pts,
   // x, y, z in a row) fits as well, as the camera sees them from fit's yaw and pitch: the camera aims at their middle
   // and backs off as far as they need. That's worked out at one angle, not the camera's, so turning the paper never
-  // changes how big it is. The camera eases there as the view settles.
-  frame(cx, cy, size, cz = 0, fit = null) {
-    this.framing = { cx, cy, cz, size, fit };
+  // changes how big it is. box is the paper's outline on the table, [x0, y0, x1, y1], which keeps the viewer's pan
+  // on the paper. The camera eases there as the view settles.
+  frame(cx, cy, size, cz = 0, { fit = null, box = null } = {}) {
+    this.framing = { cx, cy, cz, size, fit, box: box || [cx - size / 2, cy - size / 2, cx + size / 2, cy + size / 2] };
     this.placed = null;
   }
 
@@ -257,6 +259,15 @@ export class View {
     return (this.placed = { aspect, target, dist });
   }
 
+  // Where the camera aims: the framing's aim, moved by the viewer's pan, as far as the paper's outline allows (with a
+  // margin of a tenth of its size). The pan never pushes the aim further off the paper than the framing has it.
+  aim3() {
+    const { target } = this.place();
+    const { box, size } = this.framing, m = size * 0.1;
+    const keep = (k, lo, hi) => Math.max(Math.min(target[k], lo - m), Math.min(Math.max(target[k], hi + m), target[k] + this.pan[k]));
+    return [keep(0, box[0], box[2]), keep(1, box[1], box[3]), target[2]];
+  }
+
   // Turn the camera to a yaw and pitch, gradually.
   aim(yaw, pitch) {
     // Go the short way round.
@@ -271,9 +282,54 @@ export class View {
     this.zoom = Math.max(0.35, Math.min(3, this.zoom * k));
   }
 
+  // Zooms by k toward the point of the table under (x, y), in CSS pixels on the canvas: the camera moves straight
+  // toward that point, so it stays where it is on the screen, under the fingers or the cursor.
+  zoomAt(k, x, y) {
+    const was = this.zoom;
+    this.zoomBy(k);
+    const s = this.zoom / was, T = this.cam.target, q = this.under(x, y);
+    this.cam.dist *= s;
+    this.panBy((q[0] - T[0]) * (1 - s), (q[1] - T[1]) * (1 - s));
+  }
+
+  // Slides the view along the table, so the point under (x0, y0) comes to (x1, y1).
+  slide(x0, y0, x1, y1) {
+    const a = this.under(x0, y0), b = this.under(x1, y1);
+    this.panBy(a[0] - b[0], a[1] - b[1]);
+  }
+
+  // Moves the pan, and the camera with it at once, as far as the paper's outline allows.
+  panBy(dx, dy) {
+    const was = this.aim3();
+    this.pan = [this.pan[0] + dx, this.pan[1] + dy];
+    const now = this.aim3(), { target } = this.place();
+    this.pan = [now[0] - target[0], now[1] - target[1]]; // only what the outline allowed, so it comes straight back
+    this.cam.target = v3.add(this.cam.target, [now[0] - was[0], now[1] - was[1], 0]);
+  }
+
+  // The point of the table, at the height the camera aims at, under (x, y) in CSS pixels on the canvas. Where the
+  // line from the eye misses it (along the horizon), the point that far along it that the aim is.
+  under(x, y) {
+    const { eye, side, up, ahead } = this.lens();
+    const w = this.canvas.clientWidth || 1, h = this.canvas.clientHeight || 1;
+    const ty = Math.tan(FOV / 2), tx = ty * (w / h);
+    const d = v3.add(ahead, v3.add(v3.mul(side, (2 * x / w - 1) * tx), v3.mul(up, (1 - 2 * y / h) * ty)));
+    const t = Math.abs(d[2]) > 1e-6 ? (this.cam.target[2] - eye[2]) / d[2] : -1;
+    return v3.add(eye, v3.mul(d, t > 0 && t < 4 * this.cam.dist ? t : this.cam.dist));
+  }
+
+  // The eye, and the camera's right, up and forward, as draw() uses them.
+  lens() {
+    const eye = this.eye();
+    const up0 = Math.abs(this.cam.pitch) > 89.5 ? [Math.cos((this.cam.yaw + 180) * Math.PI / 180), Math.sin((this.cam.yaw + 180) * Math.PI / 180), 0] : [0, 0, 1];
+    const back = v3.norm(v3.sub(eye, this.cam.target));
+    const side = v3.norm(v3.cross(up0, back));
+    return { eye, up0, side, up: v3.cross(back, side), ahead: v3.mul(back, -1) };
+  }
+
   // Eases the camera toward its goal; returns true once it's there.
   settle(k = 1) {
-    const goal = this.place().target;
+    const goal = this.aim3();
     this.cam.target = v3.lerp(this.cam.target, goal, k);
     const dist = this.place().dist * this.zoom;
     this.cam.dist += (dist - this.cam.dist) * k;
@@ -309,9 +365,8 @@ export class View {
     gl.clearColor(0, 0, 0, 0);
     gl.clearStencil(0);
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT | gl.STENCIL_BUFFER_BIT);
-    const eye = this.eye();
-    const up = Math.abs(this.cam.pitch) > 89.5 ? [Math.cos((this.cam.yaw + 180) * Math.PI / 180), Math.sin((this.cam.yaw + 180) * Math.PI / 180), 0] : [0, 0, 1];
-    const view = lookAt(eye, this.cam.target, up);
+    const { eye, up0 } = this.lens();
+    const view = lookAt(eye, this.cam.target, up0);
     const proj = perspective(FOV, W / H, 0.05, 50);
     const vp = mul4(proj, view);
     this.vp = vp;
