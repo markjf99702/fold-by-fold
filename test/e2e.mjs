@@ -1306,6 +1306,43 @@ for (const hash of ['#%', '#crane-3%', '#%F0%9F']) {
   }
 }
 
+// A pinch zooms and slides the view without turning it. As it ends, the finger left down after the other lifts drifts
+// a little, and it used to turn the paper, so each pinch ended with the view slightly twisted. One finger turns the
+// paper once it has moved a few pixels, from there on, as a drag.
+{
+  const p = await fresh('#crane-10');
+  await p.waitForFunction(() => fold.state.id === 'crane' && fold.view().goal.yaw === null);
+  await p.evaluate(() => { window.ups = 0; document.getElementById('gl').addEventListener('pointerup', () => ups++); });
+  const cdp = await p.context().newCDPSession(p);
+  const touch = (type, touchPoints) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints });
+  const cam = () => p.evaluate(() => { const v = fold.view(); return [v.cam.yaw, v.cam.pitch]; });
+  const [x, y] = await p.evaluate(() => { const r = document.getElementById('gl').getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; });
+  const before = await cam();
+  await touch('touchStart', [{ x: x - 40, y, id: 0 }]);
+  await touch('touchStart', [{ x: x - 40, y, id: 0 }, { x: x + 40, y, id: 1 }]);
+  for (let k = 1; k <= 10; k++) await touch('touchMove', [{ x: x - 40 - k * 6, y, id: 0 }, { x: x + 40 + k * 6, y, id: 1 }]);
+  await p.waitForFunction(() => fold.view().zoom < 0.8, null, { timeout: 3000 }).catch(() => assert.fail('a pinch did not zoom'));
+  await touch('touchEnd', [{ x: x - 100, y, id: 0 }]); // one finger lifts
+  for (let k = 1; k <= 4; k++) await touch('touchMove', [{ x: x + 100 - k * 3, y: y + k * 2, id: 1 }]); // the other drifts 12 px left
+  await touch('touchEnd', []);
+  await p.waitForFunction(() => ups === 2, null, { timeout: 3000 });
+  const after = await cam();
+  assert.ok(Math.abs(after[0] - before[0]) < 0.01 && Math.abs(after[1] - before[1]) < 0.01, `the end of a pinch turned the paper: yaw ${before[0]} to ${after[0]}, pitch ${before[1]} to ${after[1]}`);
+  // A finger that hardly moves leaves the paper as it is; one dragged 40 px turns it.
+  await touch('touchStart', [{ x, y, id: 2 }]);
+  for (let k = 1; k <= 3; k++) await touch('touchMove', [{ x: x + k * 2, y, id: 2 }]);
+  await touch('touchEnd', []);
+  await p.waitForFunction(() => ups === 3, null, { timeout: 3000 });
+  assert.ok(Math.abs((await cam())[0] - before[0]) < 0.01, 'a finger moved 6 px turned the paper');
+  await touch('touchStart', [{ x, y, id: 3 }]);
+  for (let k = 1; k <= 8; k++) await touch('touchMove', [{ x: x + k * 5, y, id: 3 }]);
+  await touch('touchEnd', []);
+  await p.waitForFunction(() => ups === 4, null, { timeout: 3000 });
+  const turned = before[0] - (await cam())[0];
+  assert.ok(turned > 8 && turned < 14, `a 40 px drag turned the paper ${turned.toFixed(1)} degrees`);
+  await p.context().close();
+}
+
 // The frog's 34 ticks are too narrow to hit one with a finger, so a finger slides along the bar and the step under
 // it is picked as it goes; lifting it leaves that step, and a tap picks the tick tapped. A finger going up or down
 // from the bar scrolls instead. A mouse can drag along it too, and the ticks are still buttons for the keyboard.

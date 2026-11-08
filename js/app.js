@@ -530,19 +530,27 @@ function wireCamera() {
   // A double tap puts the view back. It's picked out here from the taps themselves, since phones don't all report
   // a double tap to the page; a double click is left to the mouse. A tap is one finger that hardly moves.
   let tap = null, lastTap = null, pointer = 'mouse';
+  // One finger turns the paper once it has moved 8 px, and from there on, so a finger that only rests or taps leaves it
+  // where it is (a mouse turns it at once). After a pinch, the finger still down as the other lifts doesn't turn it at
+  // all, however it drifts, until both are off: each pinch ended with the view a little twisted.
+  let from = null; // where a lone finger went down, until it has moved far enough to turn the paper
+  let multi = false; // two fingers have been down since none were
   c.addEventListener('pointerdown', (e) => {
     c.setPointerCapture(e.pointerId);
     pts.set(e.pointerId, [e.clientX, e.clientY]);
-    if (pts.size === 2) pinch = spread();
+    if (pts.size === 2) { pinch = spread(); multi = true; }
     pointer = e.pointerType;
     tap = pointer !== 'mouse' && pts.size === 1 ? { id: e.pointerId, x: e.clientX, y: e.clientY } : null;
+    from = pointer !== 'mouse' && pts.size === 1 ? [e.clientX, e.clientY] : null;
   });
   c.addEventListener('pointermove', (e) => {
     if (!pts.has(e.pointerId)) return;
     const [x, y] = pts.get(e.pointerId);
     pts.set(e.pointerId, [e.clientX, e.clientY]);
     if (tap && Math.hypot(e.clientX - tap.x, e.clientY - tap.y) >= 10) tap = null;
-    if (pts.size === 1) {
+    if (pts.size === 1 && from) {
+      if (Math.hypot(e.clientX - from[0], e.clientY - from[1]) >= 8) from = null; // far enough: it turns from here on
+    } else if (pts.size === 1 && !multi) {
       if (e.clientX !== x || e.clientY !== y) view.goal.yaw = view.goal.pitch = null; // a drag takes over from a turn on its way
       view.cam.yaw -= (e.clientX - x) * 0.35;
       view.cam.pitch = Math.max(-80, Math.min(89.9, view.cam.pitch + (e.clientY - y) * 0.3));
@@ -556,10 +564,11 @@ function wireCamera() {
       const s = spread();
       if (pinch && s) view.zoomAt(pinch / s, mx, my);
       pinch = s;
+      hideHint();
     }
     redraw();
   });
-  const up = (e) => { pts.delete(e.pointerId); pinch = pts.size === 2 ? spread() : 0; };
+  const up = (e) => { pts.delete(e.pointerId); pinch = pts.size === 2 ? spread() : 0; if (!pts.size) multi = false; };
   c.addEventListener('pointerup', (e) => {
     up(e);
     if (tap?.id !== e.pointerId) { if (pointer !== 'mouse') lastTap = null; return; }
