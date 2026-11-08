@@ -607,6 +607,21 @@ for (const [width, height, list] of [
   await p.context().close();
 }
 
+// With reduced motion asked for, the camera jumps rather than swinging on its own: Play on the crane's last step turned
+// the whole scene 30 degrees and tilted it 42 over a second. The fold itself still plays at its own pace.
+{
+  const p = await fresh('#crane-23', { viewport: { width: 1280, height: 800 }, deviceScaleFactor: 1, hasTouch: false, reducedMotion: 'reduce' });
+  await p.waitForFunction(() => fold.state.id === 'crane');
+  const next = (what) => p.evaluate((what) => new Promise((done) => {
+    document.getElementById(what).click();
+    requestAnimationFrame(() => requestAnimationFrame(() => { const v = fold.view(); done([Math.round(v.cam.yaw), +v.cam.pitch.toFixed(1)]); }));
+  }), what);
+  assert.deepEqual(await next('play'), [-120, 16], 'with reduced motion, the camera swung to the crane\'s own angle');
+  assert.deepEqual(await p.evaluate(() => [fold.state.playing, fold.state.t < 1]), [true, true], 'with reduced motion, the fold did not play');
+  assert.deepEqual(await next('topView'), [-90, 89.9], 'with reduced motion, the camera glided to look straight down');
+  await p.context().close();
+}
+
 // The back arrow returns to the gallery the way the browser's Back would, so Back from the gallery leaves
 // instead of reopening the model. Opened straight from a link, it goes to the gallery without adding a page.
 {

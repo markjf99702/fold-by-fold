@@ -376,6 +376,10 @@ const chipFor = (step) => `${CHIP[symbol(step)]}<span>${step.name}</span>`;
 
 let dirty = true;
 let lastFrame = 0;
+// With reduced motion asked for, the camera never swings or glides on its own (to a step's own angle, between steps,
+// back to the usual view or straight down): it's where it's going at once. A fold still plays at its own pace once
+// Play is pressed, since that's the instruction.
+const still = matchMedia('(prefers-reduced-motion: reduce)');
 
 // Everywhere the paper goes during a step, for framing it: every corner at thirteen moments of the fold (among them a
 // quarter, half and three quarters of the way, where a fold stands up, a fold and unfold stands up and a turn over is
@@ -437,7 +441,7 @@ function loop(now) {
     dirty = true;
   }
   if (!view) return; // no 3D: the fold's time still runs for the words and slider, with nothing to draw
-  const settled = view.settle(1 - Math.pow(0.001, dt));
+  const settled = view.settle(still.matches ? 1 : 1 - Math.pow(0.001, dt));
   if (!settled) dirty = true;
   if (!dirty) return;
   dirty = false;
