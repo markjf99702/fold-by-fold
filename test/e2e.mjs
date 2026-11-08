@@ -1572,6 +1572,32 @@ for (const [width, height] of [[375, 553], [320, 460]]) {
   await p.context().close();
 }
 
+// On a tablet held upright, the words keep to a column in the middle, a little bigger, so a line runs about 60
+// characters rather than 80 to 100 across the whole width; the ticks, slider and buttons keep to it too. The paper
+// still has most of the screen at every step of the crane and the frog, the longest words included.
+{
+  const p = await fresh('#crane-19', { viewport: { width: 768, height: 1024 }, deviceScaleFactor: 1 });
+  await p.waitForFunction(() => fold.state.id === 'crane');
+  const col = await p.evaluate(() => ['#say', '#ticks', '.controls'].map((q) => { const b = document.querySelector(q).getBoundingClientRect(); return [Math.round(b.width), Math.round(b.left + b.right - innerWidth)]; }));
+  assert.deepEqual(col, [[576, 0], [576, 0], [576, 0]], 'on a tablet the words and controls don\'t keep to a column in the middle');
+  assert.equal(await p.evaluate(() => getComputedStyle(document.getElementById('say')).fontSize), '19.2px', 'on a tablet the words are no bigger');
+  for (const id of ['crane', 'frog']) {
+    await p.evaluate((id) => { location.hash = id; }, id);
+    await p.waitForFunction((id) => fold.state.id === id, id);
+    const short = await p.evaluate(() => {
+      const bad = [];
+      for (let i = 0; i < fold.state.steps; i++) {
+        fold.set(i, 0);
+        const stage = document.getElementById('stage').getBoundingClientRect(), play = document.getElementById('play').getBoundingClientRect();
+        if (stage.height < 0.6 * innerHeight || play.bottom > innerHeight) bad.push(`step ${i + 1}: paper ${Math.round(stage.height)} px, Play ${Math.round(play.top)}-${Math.round(play.bottom)}`);
+      }
+      return bad;
+    });
+    assert.deepEqual(short, [], `on a tablet the ${id}'s words crowd the paper or Play`);
+  }
+  await p.context().close();
+}
+
 // The single-file copy (npm run build) works straight from disk: it opens, folds a step, and asks for nothing.
 {
   execSync('node scripts/build.mjs', { cwd: root, stdio: 'pipe' });

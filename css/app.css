@@ -312,6 +312,14 @@ html:has(#player:not([hidden])) { overscroll-behavior-y: none; }
   .ctl { height: 44px; }
 }
 
+/* A tablet held upright: the words, slider and buttons keep to a column in the middle, so a line of words runs about
+   60 characters rather than 80 to 100 across the whole width, and the words are a little bigger, to read at arm's
+   length from the paper in your hands. */
+@media (min-width: 600px) and (max-width: 899px) and (orientation: portrait) {
+  .panel > * { width: 100%; max-width: 36rem; margin-inline: auto; }
+  .say { font-size: 1.2rem; }
+}
+
 /* A narrow phone: a long model name takes two lines rather than losing its end, and the bar draws in. Narrower
    still, Slow goes under the other buttons rather than off the edge. */
 @media (max-width: 359px) {
