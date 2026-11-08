@@ -52,7 +52,7 @@ async function at(page, i, t, aim) {
   const page = await open({ width: 390, height: 844 }, 2);
   await page.screenshot({ path: join(out, 'docs/phone-home.png') });
   await page.evaluate(() => { location.hash = 'crane'; });
-  await page.waitForSelector('#player:not([hidden])');
+  await page.waitForFunction(() => fold.state.id === 'crane');
   // The crane's first petal fold twice: the diagram's marks on the paper, then the fold happening.
   await at(page, PETAL, 0);
   await page.screenshot({ path: join(out, 'docs/phone-marks.png') });
@@ -64,7 +64,7 @@ async function at(page, i, t, aim) {
 // Link preview, 1200 x 630: a real fold, part way, on the cutting mat beside the name.
 {
   const page = await open({ width: 1200, height: 630 }, 1, '#crane');
-  await page.waitForSelector('#player:not([hidden])');
+  await page.waitForFunction(() => fold.state.id === 'crane');
   await page.addStyleTag({ content: `
     .player { display: block !important; position: relative; }
     .bar, .panel { display: none !important; }

@@ -104,6 +104,7 @@ await page.click('.swatch[aria-label="Indigo"]');
 // The cup opens on its first step.
 await page.click('.model:has(.title:text("Paper cup"))');
 await page.waitForSelector('#player:not([hidden])');
+await page.waitForFunction(() => fold.state.id === 'cup'); // folded, a frame or two after the player shows
 assert.equal(await page.evaluate(() => location.hash), '#cup');
 assert.match(await page.textContent('#stepCount'), /^Step 1 of \d+$/);
 assert.ok((await page.textContent('#say')).length > 10, 'no words for the step');
@@ -431,7 +432,7 @@ async function fresh(hash = '', { init, arg, ...opts } = {}) {
 {
   const p = await fresh();
   await p.click('.model:has(.title:text("Samurai helmet"))');
-  await p.waitForSelector('#player:not([hidden])');
+  await p.waitForFunction(() => fold.state.id === 'helmet');
   assert.equal(await p.evaluate(() => location.hash), '#helmet');
   await p.evaluate(() => { location.hash = 'helmet-6'; });
   await p.waitForFunction(() => fold.state.i === 5);
@@ -491,7 +492,7 @@ async function fresh(hash = '', { init, arg, ...opts } = {}) {
   const p = await fresh();
   const before = await p.evaluate(() => history.length);
   await p.click('.model:has(.title:text("Paper cup"))');
-  await p.waitForSelector('#player:not([hidden])');
+  await p.waitForFunction(() => fold.state.id === 'cup');
   await p.click('#next');
   await p.waitForFunction(() => location.hash === '#cup-2', null, { timeout: 3000 });
   await p.click('#back');
@@ -1554,7 +1555,7 @@ for (const [width, height] of [[1280, 800], [390, 844], [360, 780]]) {
   if (wide) {
     // With a mouse, the hint under the paper says to scroll to zoom.
     await p.click('.model:has(.title:text("Paper cup"))');
-    await p.waitForSelector('#player:not([hidden])');
+    await p.waitForFunction(() => fold.state.id === 'cup');
     assert.equal(await p.innerText('#hint'), 'Drag to turn the paper · scroll to zoom');
     // And scrolling on the paper zooms in, the square button looks straight down the way a diagram does, and a
     // double click puts the view back.
@@ -1766,6 +1767,52 @@ for (const [width, height] of [[375, 553], [320, 460]]) {
   await p.context().close();
 }
 
+// A model is folded the first time it's opened, and on a slow phone the frog took about a second, with nothing on the
+// screen meanwhile. The player shows at once instead, with the model's name, the step, its words and its ticks, and the
+// paper follows on the mat. Until it does, the keys and buttons do nothing, and going back drops the folding.
+{
+  const p = await fresh();
+  const cdp = await p.context().newCDPSession(p);
+  await cdp.send('Emulation.setCPUThrottlingRate', { rate: 6 });
+  await p.evaluate(() => {
+    document.querySelector('.model[data-model="frog"]').click();
+    history.pushState(null, '', location.pathname);
+    dispatchEvent(new HashChangeEvent('hashchange'));
+  });
+  await p.waitForTimeout(1500);
+  assert.deepEqual(await p.evaluate(() => [document.getElementById('home').hidden, fold.state.id, fold.built]), [false, null, []], 'going back before the frog was folded still opened it, or folded it');
+  const shown = await p.evaluate(() => new Promise((done) => {
+    const card = document.querySelector('.model[data-model="frog"]');
+    let t0 = 0;
+    card.addEventListener('click', () => { t0 = performance.now(); }, { capture: true, once: true });
+    requestAnimationFrame(function look() {
+      const $ = (id) => document.getElementById(id);
+      if (t0 && !$('player').hidden) done([performance.now() - t0, $('modelName').textContent, $('stepCount').textContent, $('say').textContent.slice(0, 20), $('ticks').children.length, fold.state.id]);
+      else requestAnimationFrame(look);
+    });
+    card.click();
+    for (const key of ['ArrowRight', ' ']) document.body.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true }));
+    for (const id of ['play', 'next']) document.getElementById(id).click();
+    document.querySelector('#ticks li:nth-child(5) button').click();
+  }));
+  assert.ok(shown[0] < 200, `the frog's player took ${Math.round(shown[0])} ms to show, on a phone a sixth as fast`);
+  assert.deepEqual(shown.slice(1), ['Frog', 'Step 1 of 34', 'Colored side up, tur', 34, null], 'the frog\'s player showed without its name, step, words or ticks, or only once it was folded');
+  await p.waitForFunction(() => fold.state.id === 'frog', null, { timeout: 30000 });
+  assert.deepEqual(await p.evaluate(() => [fold.state.i, fold.state.t, fold.state.playing, document.getElementById('glWait').hidden]), [0, 0, false, true], 'a key or button pressed while the frog was being folded did something, or the paper is still on its way');
+  await p.click('#play');
+  await p.waitForFunction(() => fold.state.t > 0, null, { timeout: 15000 }).catch(() => assert.fail('Play did nothing once the frog was folded'));
+  await p.context().close();
+  // A link straight to a step shows the player before folding the model too.
+  const q = await fresh('#frog-16', { init: () => requestAnimationFrame(function look() {
+    const player = document.getElementById('player');
+    if (player && !player.hidden) window.shell = [document.getElementById('stepCount').textContent, !!window.fold?.state.id];
+    else requestAnimationFrame(look);
+  }) });
+  await q.waitForFunction(() => fold.state.id === 'frog', null, { timeout: 30000 });
+  assert.deepEqual(await q.evaluate(() => [window.shell, fold.state.i]), [['Step 16 of 34', false], 15], 'a link to the frog showed nothing until it was folded');
+  await q.context().close();
+}
+
 // The single-file copy (npm run build) works straight from disk: it opens, folds a step, and asks for nothing.
 {
   execSync('node scripts/build.mjs', { cwd: root, stdio: 'pipe' });
@@ -1779,7 +1826,7 @@ for (const [width, height] of [[375, 553], [320, 460]]) {
   await p.goto(file);
   await p.waitForSelector('#home:not([hidden])');
   await p.click('.model:has(.title:text("Heart"))');
-  await p.waitForSelector('#player:not([hidden])');
+  await p.waitForFunction(() => fold.state.id === 'heart');
   await p.click('#play');
   await p.waitForFunction(() => fold.state.t >= 1, null, { timeout: 15000 }).catch(() => assert.fail('the single-file copy did not fold'));
   assert.deepEqual(asked, [], 'the single-file copy asked for files');

@@ -237,6 +237,13 @@ html:has(#player:not([hidden])) { overscroll-behavior-y: none; }
   .hint .touch { display: none; }
   .hint .mouse { display: inline; }
 }
+/* While a model is folded for the first time, the mat waits with a quiet word, which only shows if that takes a moment. */
+.gl-wait {
+  position: absolute; inset: 0; margin: 0; display: grid; place-items: center; background: var(--mat);
+  color: rgba(238, 243, 239, .8); font-size: .95rem; animation: wait .3s .2s both;
+}
+@keyframes wait { from { color: transparent; } }
+.gl-wait:not([hidden]) ~ .hint { opacity: 0; } /* nothing to turn yet */
 /* Where the paper can't be drawn, the mat is still there, saying why. */
 .gl-error {
   position: absolute; inset: 0; display: grid; place-items: center; align-content: center; gap: 14px; text-align: center; margin: 0;

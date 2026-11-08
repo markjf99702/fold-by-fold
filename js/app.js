@@ -149,7 +149,7 @@ function paintHome() {
 // ---------- Player ----------
 
 let view = null;
-const P = { b: null, id: null, i: 0, t: 0, playing: false, holding: false, clock: 0, t0: 0, pace: 1 };
+const P = { b: null, id: null, i: 0, t: 0, playing: false, holding: false, clock: 0, t0: 0, pace: 1, waiting: false };
 const HOLD = 850; // how long the marks show on the paper before Play moves it
 const pace = () => (prefs.slow ? 2.2 : 1); // Slow gives the marks and the fold a little over twice as long
 
@@ -160,10 +160,55 @@ function duration(step) {
   return base * P.pace;
 }
 
+// A model is folded the first time it's opened, which takes a slow phone most of a second for the crane or the frog. So
+// the player shows at once with all that needs no folding (the name, the step and its words, and the ticks) and the
+// paper still to come on the mat, and the folding waits until that has been drawn. Meanwhile the keys and buttons do
+// nothing (P.waiting), and going anywhere else drops it. A model opened before shows at once, folded.
+let opening = 0; // counts the models opened, so only the latest goes on to be shown once it's folded
 function openModel(id, i = null, { landed = false } = {}) {
   const m = MODELS.find((x) => x.id === id);
   if (!m) { location.hash = ''; return; }
+  const ticket = ++opening;
   show('player');
+  if (builtCache.has(id)) { ready(m, i, landed); return; }
+  outline(m, i);
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    if (ticket === opening && !$('player').hidden) ready(m, i, landed);
+  }));
+}
+
+// The player before its model is folded.
+function outline(m, i) {
+  P.waiting = true;
+  P.playing = false;
+  const n = m.steps.length;
+  const k = Math.max(0, Math.min(i ?? (latest().progress[m.id] || 0), n - 1));
+  $('modelName').textContent = m.name;
+  $('stepCount').textContent = `Step ${k + 1} of ${n}`;
+  $('chip').textContent = '\u00a0'; // the step's symbol and name come with the fold; till then, the line is kept
+  $('say').textContent = m.steps[k].say;
+  words.scrollTop = 0;
+  fadeWords();
+  renderSteps(m.steps);
+  $('ticks').children[k].firstChild.setAttribute('aria-current', 'step');
+  $('stepList').children[k].firstChild.setAttribute('aria-current', 'step');
+  [...$('ticks').children].forEach((li, j) => li.firstChild.classList.toggle('done', j < k));
+  unavailable($('prev'), k === 0);
+  unavailable($('next'), k === n - 1);
+  $('prev').setAttribute('aria-label', 'Previous step');
+  $('prev').title = 'Previous step (←)';
+  playButton('Play', PLAY);
+  scrubAt(0);
+  $('speed').setAttribute('aria-pressed', prefs.slow);
+  $('glWait').hidden = false;
+  document.title = `${m.name} · Fold by Fold`;
+}
+
+// The player with its model folded, at step i (or where you got to), from its start or with its fold landed.
+function ready(m, i, landed) {
+  const id = m.id;
+  P.waiting = false;
+  $('glWait').hidden = true;
   if (!view) {
     try {
       view = new View($('gl'));
@@ -214,7 +259,7 @@ function openModel(id, i = null, { landed = false } = {}) {
   P.b = built(id);
   P.id = id;
   $('modelName').textContent = m.name;
-  renderSteps();
+  renderSteps(P.b.steps);
   // A link's step becomes where you got to only in a model you haven't started. In one you have, your place stays
   // until you move on from the link's step yourself.
   const place = latest().progress[id] || 0;
@@ -224,17 +269,19 @@ function openModel(id, i = null, { landed = false } = {}) {
   document.title = `${m.name} · Fold by Fold`;
 }
 
-function renderSteps() {
+// The ticks and the list of steps. Before the model is folded a step's name may not be known yet (it can come from its
+// fold), so its tick is called by its number alone.
+function renderSteps(steps) {
   shown = null; // new lists, so the step is marked in them afresh
   const ticks = $('ticks'), list = $('stepList');
   ticks.innerHTML = '';
   list.innerHTML = '';
-  P.b.steps.forEach((s, i) => {
+  steps.forEach((s, i) => {
     const li = document.createElement('li');
     const b = document.createElement('button');
     b.type = 'button';
     b.tabIndex = -1; // Tab stops only at the step's own tick (see paint)
-    b.setAttribute('aria-label', `Step ${i + 1}: ${s.name}`);
+    b.setAttribute('aria-label', s.name ? `Step ${i + 1}: ${s.name}` : `Step ${i + 1}`);
     b.addEventListener('click', () => go(i));
     li.append(b);
     ticks.append(li);
@@ -267,6 +314,7 @@ function slideTo(x, first) {
 }
 
 function go(i, { play = false, snap = false, keep = true } = {}) {
+  if (P.waiting) return;
   P.i = Math.max(0, Math.min(i, P.b.steps.length - 1));
   P.t = 0;
   P.playing = false;
@@ -322,6 +370,7 @@ function pause() {
 }
 
 function primary() {
+  if (P.waiting) return;
   const last = P.i === P.b.steps.length - 1;
   // While the marks are still up before the fold moves, nothing seems to have happened yet, so a second press starts
   // the fold now. Pausing there would have stopped it before it began.
@@ -335,6 +384,7 @@ function primary() {
 // (its words, its place in the lists) is redone only when the step does.
 let shown = null; // the step whose words are up
 function paint() {
+  if (P.waiting) return;
   const step = P.b.steps[P.i];
   const n = P.b.steps.length;
   paintControls();
@@ -369,7 +419,7 @@ function paint() {
   }
   const last = P.i === n - 1;
   unavailable($('next'), last);
-  let label = 'Play', icon = '<path d="M7 4.5v15l12.5-7.5z"/>';
+  let label = 'Play', icon = PLAY;
   if (P.playing) { label = 'Pause'; icon = '<path d="M7 5h3.5v14H7zM13.5 5H17v14h-3.5z"/>'; }
   else if (P.t >= 1) {
     label = last ? 'Start again' : 'Next fold';
@@ -378,16 +428,20 @@ function paint() {
       ? '<path d="M4 12a8 8 0 1 0 2.4-5.7M4 4v4.5h4.5" fill="none" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>'
       : '<path d="M5 4.5v15l10-7.5zM17 5h2.5v14H17z"/>';
   } else if (P.t > 0) label = 'Carry on';
-  if ($('playLabel').textContent !== label) {
-    $('playLabel').textContent = label;
-    $('playIcon').innerHTML = icon;
-    $('play').title = `${label} (Space)`; // the buttons with a key of their own say so under a mouse
-  }
+  playButton(label, icon);
   scrubAt(P.t);
   $('speed').setAttribute('aria-pressed', prefs.slow);
   nameInAddress();
   document.querySelectorAll('#ticks button').forEach((b, k) => b.classList.toggle('done', k < P.i || (k === P.i && P.t >= 1)));
   redraw();
+}
+
+const PLAY = '<path d="M7 4.5v15l12.5-7.5z"/>';
+function playButton(label, icon) {
+  if ($('playLabel').textContent === label) return;
+  $('playLabel').textContent = label;
+  $('playIcon').innerHTML = icon;
+  $('play').title = `${label} (Space)`; // the buttons with a key of their own say so under a mouse
 }
 
 // A screen reader is told the step you land on, with its number, once the step has stayed put for a moment: a finger
@@ -397,7 +451,7 @@ let tellTimer = 0;
 function tell() {
   clearTimeout(tellTimer);
   tellTimer = setTimeout(() => {
-    if ($('player').hidden) return;
+    if ($('player').hidden || P.waiting) return;
     $('tell').textContent = `Step ${P.i + 1} of ${P.b.steps.length}. ${P.b.steps[P.i].say}`;
   }, 400);
 }
@@ -507,7 +561,7 @@ function frameCamera(snap) {
 
 function loop(now) {
   asked = 0;
-  if (!P.b || $('player').hidden) { lastFrame = 0; return; }
+  if (!P.b || P.waiting || $('player').hidden) { lastFrame = 0; return; }
   const dt = Math.min(0.1, (now - (lastFrame || now)) / 1000);
   lastFrame = now;
   const more = () => { if (!asked) asked = requestAnimationFrame(loop); };
@@ -628,7 +682,7 @@ function wireCamera() {
 
 // Back to the usual view, or to the step's own once its fold has moved, unzoomed and with the model in the middle.
 function resetView() {
-  if (!view) return;
+  if (!view || P.waiting) return;
   const step = P.b.steps[P.i];
   view.zoom = 1;
   view.pan = [0, 0];
@@ -703,7 +757,7 @@ function nameInAddress() {
   if (framed) return;
   clearTimeout(addressTimer);
   addressTimer = setTimeout(() => {
-    if ($('player').hidden || location.hash !== addressed) return; // gone somewhere else meanwhile
+    if ($('player').hidden || P.waiting || location.hash !== addressed) return; // gone somewhere else meanwhile
     const hash = '#' + P.id + (P.i || prefs.progress[P.id] > 0 ? '-' + (P.i + 1) : '');
     const landed = P.t >= 1;
     if (hash === addressed && !!history.state?.landed === landed) return;
@@ -729,6 +783,7 @@ function route() {
     openModel(m[1], m[2] ? +m[2] - 1 : null, { landed: !!m[2] && history.state?.landed === true });
     if (lost && !$('player').hidden) $('modelName').focus({ preventScroll: true });
   } else {
+    opening++; // a model still being folded isn't shown
     renderHome(); // first, so the cards are there to scroll back to
     show('home');
     document.title = 'Fold by Fold';
@@ -759,12 +814,14 @@ $('play').addEventListener('click', primary);
 // The back button, and the ← key: a fold that has moved goes back to its start, and from there to the step before. On
 // step 1 there's no step before, so a fold that has only just moved goes back to its start too.
 function stepBack() {
+  if (P.waiting) return;
   if (P.t > 0.02 || (P.i === 0 && P.t > 0)) { P.t = 0; P.playing = false; paint(); } else if (P.i > 0) go(P.i - 1);
 }
 $('prev').addEventListener('click', () => { if (!isOff($('prev'))) stepBack(); });
 $('next').addEventListener('click', () => { if (!isOff($('next'))) go(P.i + 1, { play: true }); });
 $('speed').addEventListener('click', () => {
   save({ slow: !prefs.slow });
+  $('speed').setAttribute('aria-pressed', prefs.slow);
   if (P.playing) {
     if (!P.holding) { P.t0 = P.t; P.clock = performance.now(); }
     P.pace = pace();
@@ -780,6 +837,7 @@ window.addEventListener('storage', (e) => {
   $('speed').setAttribute('aria-pressed', prefs.slow);
 });
 function scrubTo(v) {
+  if (P.waiting) { scrubAt(0); return; }
   P.t = v / 1000;
   P.playing = false;
   keepPlace(placeNow());
@@ -833,6 +891,7 @@ document.addEventListener('keydown', (e) => {
   // A key the paper or the slider has used already is theirs (the arrow keys turn the paper in focus).
   if ($('player').hidden || e.altKey || e.ctrlKey || e.metaKey || e.defaultPrevented) return;
   if (e.key === 'Escape') { $('back').click(); return; } // back to the gallery, as the back arrow goes
+  if (P.waiting) return; // the model is still being folded
   const onSlider = e.target.closest('input'); // the slider moves itself with the arrow keys
   if (e.key === ' ') {
     if (e.target.closest('button')) return; // a button with focus presses itself
