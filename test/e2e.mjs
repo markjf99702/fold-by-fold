@@ -143,11 +143,11 @@ await page.evaluate((n) => fold.set(n - 1, 1), steps);
 const indigo = await pixels((r, g, b) => b > r + 40 && b > g + 20);
 assert.ok(indigo > 0.02, `hardly any indigo paper on screen (${(indigo * 100).toFixed(1)}%)`);
 // The shadow and the paper's edges are drawn on the mat, not through to the page: with the page magenta, none
-// of it shows anywhere but where the mat's far side fades out, at the top.
-{
-  const tag = await page.addStyleTag({ content: 'body, .player, .stage { background: #f0f !important; }' });
-  await page.waitForTimeout(200);
-  const img = UPNG.decode(await page.locator('#gl').screenshot());
+// of it shows anywhere but where the mat's far side fades out, at the top. (In dark mode too, further down.)
+async function throughMat(p) {
+  const tag = await p.addStyleTag({ content: 'body, .player, .stage { background: #f0f !important; }' });
+  await p.waitForTimeout(200);
+  const img = UPNG.decode(await p.locator('#gl').screenshot());
   const px = new Uint8Array(UPNG.toRGBA8(img)[0]);
   let leaks = 0;
   for (let y = Math.round(img.height * 0.3); y < img.height; y++) {
@@ -156,8 +156,12 @@ assert.ok(indigo > 0.02, `hardly any indigo paper on screen (${(indigo * 100).to
       if (px[k] > px[k + 1] + 60 && px[k + 2] > px[k + 1] + 60) leaks++;
     }
   }
-  assert.equal(leaks, 0, `the page shows through the mat in ${leaks} pixels`);
   await tag.evaluate((el) => el.remove());
+  return leaks;
+}
+{
+  const leaks = await throughMat(page);
+  assert.equal(leaks, 0, `the page shows through the mat in ${leaks} pixels`);
 }
 await page.evaluate(() => fold.set(0, 0));
 
@@ -195,8 +199,9 @@ assert.equal(await page.getAttribute('#speed', 'aria-pressed'), 'true');
 // Every step can be shown at any moment without an error.
 for (let i = 0; i < steps; i++) for (const t of [0, 0.5, 1]) await page.evaluate(([i, t]) => fold.set(i, t), [i, t]);
 
-// The collapses, petal and squash folds, reverse folds and tucks draw at every moment too.
-for (const id of ['crane', 'flapping-bird', 'frog', 'jumping-frog', 'waterbomb']) {
+// So does every step of the other models: the collapses, petal and squash folds, reverse folds and tucks, the folds
+// made together, the models that stand up at the end, and the card that isn't square.
+for (const id of ['plane', 'heart', 'fortune-teller', 'jumping-frog', 'helmet', 'waterbomb', 'crane', 'flapping-bird', 'frog']) {
   await page.evaluate((id) => { location.hash = id; }, id);
   await page.waitForFunction((id) => fold.state.id === id, id);
   const n = (await state()).steps;
@@ -1623,6 +1628,10 @@ for (const colorScheme of ['light', 'dark']) {
   await p.waitForFunction(() => fold.state.id === 'crane');
   const mat = () => p.evaluate(() => [fold.view().matColor, fold.view().matLine].map((c) => '#' + c.map((x) => Math.round(x * 255).toString(16).padStart(2, '0')).join('')));
   assert.deepEqual(await mat(), ['#264a40', '#3e675b'], 'in dark mode the mat in 3D is not the page\'s dark mat');
+  // Nor does the page show through the dark mat, with the finished crane on it.
+  await p.evaluate(() => fold.set(fold.state.steps - 1, 1));
+  const leaks = await throughMat(p);
+  assert.equal(leaks, 0, `in dark mode the page shows through the mat in ${leaks} pixels`);
   await p.emulateMedia({ colorScheme: 'light' });
   await p.waitForFunction(() => fold.view().matColor[0] > 0.17, null, { timeout: 2000 }).catch(() => {});
   assert.deepEqual(await mat(), ['#2f5a4e', '#4d7a6c'], 'the mat in 3D did not follow the page to light mode');

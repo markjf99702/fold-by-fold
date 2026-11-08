@@ -1,5 +1,6 @@
 // The folding engine, without a browser:  node --test test/unit.test.mjs
 import { test } from 'node:test';
+import { readFileSync } from 'node:fs';
 import assert from 'node:assert/strict';
 import { Sheet, fold, turnOver, together, creases, isFlipped } from '../js/paper.js';
 import { apply, area, bisector, side, centroid, overlapArea, line, ccw, clip, inside as covers } from '../js/geom.js';
@@ -849,4 +850,40 @@ test('wherever the paper lies flat partway through a step, it could be real pape
   }
   assert.deepEqual(problems, []);
   assert.ok(checked > 300, `only ${checked} flat moments`);
+});
+
+// ---------- The page's own facts ----------
+const here = (f) => readFileSync(new URL(`../${f}`, import.meta.url));
+// A PNG's width and height, from its header.
+const pngSize = (f) => { const b = here(f); return [b.readUInt32BE(16), b.readUInt32BE(20)]; };
+
+test('a shared link shows the preview picture, from where the site lives, and every icon is the size it says', () => {
+  const html = here('index.html').toString();
+  const meta = (p) => html.match(new RegExp(`<meta property="${p}" content="([^"]*)"`))?.[1];
+  // Sites that show a link's preview fetch the picture themselves, so it needs the whole address.
+  assert.equal(meta('og:url'), 'https://junkdrawer.works/fold-by-fold/');
+  assert.equal(meta('og:image'), 'https://junkdrawer.works/fold-by-fold/og.png');
+  assert.deepEqual(pngSize('og.png'), [1200, 630], 'og.png is not 1200 x 630');
+  const { icons } = JSON.parse(here('manifest.webmanifest'));
+  const pngs = icons.filter((i) => i.type === 'image/png');
+  assert.ok(pngs.length >= 3);
+  for (const { src, sizes } of pngs) assert.equal(pngSize(src).join('x'), sizes, `${src} is not ${sizes}`);
+  const touch = html.match(/<link rel="apple-touch-icon" href="([^"]*)"/)[1];
+  assert.deepEqual(pngSize(touch), [180, 180], `${touch} is not 180 x 180`);
+});
+
+test('the README names the models there are, in the gallery\'s order, and how long they run', () => {
+  const readme = here('README.md').toString();
+  const words = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen', 'sixteen', 'seventeen', 'eighteen', 'nineteen'];
+  const tens = { 2: 'twenty', 3: 'thirty', 4: 'forty', 5: 'fifty' };
+  const say = (n) => (n < 20 ? words[n] : tens[Math.floor(n / 10)] + (n % 10 ? `-${words[n % 10]}` : ''));
+  const m = readme.match(/\*\*Pick a model\.\*\* (\w+) of them: ([^.]*), from (\S+) steps to ([\w-]+)\./);
+  assert.ok(m, 'the README no longer says which models there are');
+  const [, count, list, shortest, longest] = m;
+  assert.equal(count, say(MODELS.length).replace(/^\w/, (c) => c.toUpperCase()));
+  const named = list.split(/, | and /);
+  assert.equal(named.length, MODELS.length, `the README names ${named.length} models: ${named.join(' / ')}`);
+  MODELS.forEach((model, k) => assert.ok(named[k].toLowerCase().includes(model.name.toLowerCase()), `the README's model ${k + 1} is "${named[k]}", not the ${model.name}`));
+  const lengths = MODELS.map((model) => model.steps.length);
+  assert.deepEqual([shortest, longest], [say(Math.min(...lengths)), say(Math.max(...lengths))]);
 });
