@@ -68,8 +68,9 @@ function axisHeight(ids, zFrom, zTo, bend, sign) {
   return sum / ids.length;
 }
 
-// Poses for every facet of step.from at time t in [0, 1]: [{ facet, pose }].
-export function poses(step, t) {
+// Poses for every facet of step.from at time t in [0, 1]: [{ facet, pose }]. raw: as the fold turns them, before the
+// paper is lifted or tipped off the mat.
+export function poses(step, t, raw = false) {
   const { from, to, motion } = step;
   const z0 = from.levels(), z1 = to.levels();
   const e = ease(Math.min(1, Math.max(0, t)));
@@ -98,11 +99,11 @@ export function poses(step, t) {
       }
       out.push({ facet: f, pose });
     }
-    return lifted(out);
+    return raw ? out : lifted(out);
   }
 
-  if (motion.kind === 'mech') return lifted(motion.at(t));
-  if (motion.kind === 'reverse') return lifted(reversePoses(step, e, zFrom, zTo));
+  if (motion.kind === 'mech') return raw ? motion.at(t) : lifted(motion.at(t));
+  if (motion.kind === 'reverse') return raw ? reversePoses(step, e, zFrom, zTo) : lifted(reversePoses(step, e, zFrom, zTo));
 
   if (motion.kind === 'multi') {
     const partOf = new Map();
@@ -140,7 +141,7 @@ export function poses(step, t) {
       }
       out.push({ facet: f, pose });
     }
-    return lifted(out.concat(bridges));
+    return raw ? out.concat(bridges) : lifted(tipped(step, out.concat(bridges), t));
   }
 
   let angle, zMid = null;
@@ -173,7 +174,7 @@ export function poses(step, t) {
     if (motion.kind !== 'bend') pose.t[2] += (zLand(id) - (2 * H - zs)) * through;
     out.push({ facet: f, pose });
   }
-  return lifted(out);
+  return raw ? out : lifted(tipped(step, out, t));
 }
 
 // A point tucked into a pocket turns over about the pocket's mouth and goes in under the layers over the pocket. Stiff
@@ -264,8 +265,119 @@ const sub3 = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
 const cross3 = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
 const norm3 = (a) => { const l = Math.hypot(...a) || 1; return [a[0] / l, a[1] / l, a[2] / l]; };
 
-// Nothing goes through the table: if part of the paper would dip below it, lift the whole sheet, the way
-// you pick the paper up to fold something behind.
+// A fold behind swings its flap down under the model. Rather than the whole model rising off the mat to let it pass (by up
+// to half its size), it tips up on an edge as the flap swings under, the way you lift the paper to fold something behind
+// it, and lies down again as the flap lands. It lifts the side nearest you, resting on the far edge, so the flap is seen
+// swinging underneath. A flap on the far side, folded behind from the far edge, would go down through the mat that way,
+// so there the model lifts the flap's side instead, resting on the edge across from it. Either way it tips no further than
+// MOST_TIP, and if the flap needs more room than that, the model is lifted the rest of the way, as it was before. A step
+// that stands the model up moves it its own way.
+const MOST_TIP = 70 * Math.PI / 180;
+const TIP_RATE = 6; // the fastest the model tips, in radians per whole step
+const tips = new WeakMap();
+function tipped(step, items, t) {
+  const { motion } = step;
+  if (!tips.has(motion)) tips.set(motion, tipFor(step));
+  const tip = tips.get(motion);
+  if (!tip) return items;
+  const N = tip.angles.length - 1, x = Math.min(1, Math.max(0, t)) * N, k = Math.min(N - 1, Math.floor(x));
+  const a = tip.angles[k] + (tip.angles[k + 1] - tip.angles[k]) * (x - k);
+  if (!(a > 0)) return items;
+  const { p, d, u } = tip;
+  const angle = a * (d[0] * u[1] - d[1] * u[0]); // the way that lifts the side u points to
+  for (const it of items) {
+    if (it.pts) it.pts = it.pts.map((q) => rotateAbout({ r: [1, 0, 0, 0, 1, 0, 0, 0, 1], t: q.slice() }, p[0], p[1], 0, d[0], d[1], angle).t);
+    else it.pose = rotateAbout(it.pose, p[0], p[1], 0, d[0], d[1], angle);
+  }
+  return items;
+}
+
+// For the paper posed as items, how far tipping it about the line through p on the mat lifts it clear: the least angle
+// that lifts every point under the mat on the side u points to, as far as MOST_TIP, and the most it would still have to
+// be lifted after that.
+function tilt({ p, u }, items) {
+  const pts = items.flatMap((it) => corners(it)).map((q) => [(q[0] - p[0]) * u[0] + (q[1] - p[1]) * u[1], q[2]]);
+  let a = 0;
+  // Tipped by a, a point v out from the line and z up goes to z cos a + v sin a.
+  for (const [v, z] of pts) if (z < -1e-12 && v > 1e-9) a = Math.max(a, Math.atan2(-z, v));
+  a = Math.min(a, MOST_TIP);
+  let lift = 0;
+  for (const [v, z] of pts) lift = Math.max(lift, -(z * Math.cos(a) + v * Math.sin(a)));
+  return { a, lift };
+}
+
+// Which edge a step that folds behind tips the model on, and how far at each moment: { p, d, u, angles }, or null.
+function tipFor(step) {
+  const { from, motion } = step;
+  if (motion.roll || !['fold', 'foldUnfold', 'multi'].includes(motion.kind)) return null;
+  const parts = motion.kind === 'multi' ? motion.parts : [motion];
+  if (parts.some((q) => q.bend || q.reverse)) return null;
+  const behind = parts.filter((q) => q.sign < 0);
+  if (!behind.length) return null;
+  const moving = new Set(motion.moving || []);
+  const still = from.order.filter((id) => !moving.has(id)).flatMap((id) => from.world(id));
+  if (!still.length) return null;
+  // Resting on the edge of the paper that stays put, as far as it goes the other way from u.
+  const edge = (d, u) => {
+    let low = Infinity, p = null;
+    for (const q of still) { const v = q[0] * u[0] + q[1] * u[1]; if (v < low) { low = v; p = q; } }
+    return { p, d, u };
+  };
+  const ways = [edge([1, 0], [0, -1])]; // the far edge, lifting the near side
+  // The flaps' side of the line the first one folds on, if they're all folded on lines along it, on the same side.
+  const L = behind[0].line;
+  const sides = behind.map((q) => {
+    let c = [0, 0], n = 0;
+    for (const id of q.moving) for (const w of from.world(id)) { c = add(c, w); n++; }
+    return Math.abs(cross(q.line.d, L.d)) < 1e-6 ? Math.sign(side(L, mul(c, 1 / n))) : 0;
+  });
+  if (sides[0] && sides.every((x) => x === sides[0])) {
+    const s = sides[0];
+    ways.push(edge(L.d, [-L.d[1] * s, L.d[0] * s])); // the edge across from the flap, lifting the flap's side
+  }
+  const N = 80;
+  const raw = [];
+  for (let k = 0; k <= N; k++) raw.push(poses(step, k / N, true));
+  // The far edge if tipping on it clears the mat all through the fold; otherwise whichever leaves the least to lift.
+  let best = null;
+  for (const way of ways) {
+    const fits = raw.map((items) => tilt(way, items));
+    const lift = Math.max(...fits.map((f) => f.lift));
+    if (!best || lift < best.lift - 1e-9) best = { ...way, lift, fits };
+    if (lift < 1e-9) break;
+  }
+  if (best.fits.every((f) => f.a === 0)) return null;
+  // How far it tips: as far as the flap needs, at a pace it can keep, and flat as the fold starts and ends (and in the
+  // middle of a fold and unfold, where the flap lies folded), where the flap hardly moves and needs very little room: what
+  // little it needs there, the model is lifted. (A fold and unfold folds in half the time, and the smoothing below reaches
+  // 6 samples either way.)
+  const end = motion.kind === 'foldUnfold' ? 0.09 : 0.12;
+  const flat = (k) => k <= N * end || k >= N * (1 - end) || (motion.kind === 'foldUnfold' && Math.abs(k - N / 2) <= N * 0.085);
+  const want = best.fits.map((f, k) => (flat(k) ? 0 : f.a));
+  const most = TIP_RATE / N, angles = want.slice();
+  for (let k = 1; k <= N; k++) angles[k] = Math.max(angles[k], angles[k - 1] - most);
+  for (let k = N - 1; k >= 0; k--) angles[k] = Math.max(angles[k], angles[k + 1] - most);
+  // ...but never tipped where it has to lie flat: there it comes down at that pace, lifted instead as it needs.
+  const cap = want.map((_, k) => (flat(k) ? 0 : Infinity));
+  for (let k = 1; k <= N; k++) cap[k] = Math.min(cap[k], cap[k - 1] + most);
+  for (let k = N - 1; k >= 0; k--) cap[k] = Math.min(cap[k], cap[k + 1] + most);
+  // And smoothed, so it eases into each change of pace rather than turning a corner, without falling short of the room the
+  // flap needs.
+  let smooth = angles.map((_, k) => Math.min(Math.max(...angles.slice(Math.max(0, k - 6), k + 7)), cap[k]));
+  for (let pass = 0; pass < 2; pass++) {
+    smooth = smooth.map((_, k) => {
+      let sum = 0, w = 0;
+      for (let j = -3; j <= 3; j++) { const q = smooth[k + j]; if (q === undefined) continue; sum += q * (4 - Math.abs(j)); w += 4 - Math.abs(j); }
+      return sum / w;
+    });
+  }
+  smooth[0] = smooth[N] = 0;
+  if (motion.kind === 'foldUnfold') smooth[N / 2] = 0;
+  return { p: best.p, d: best.d, u: best.u, angles: smooth };
+}
+
+// Nothing goes through the table: if part of the paper would still dip below it, lift the whole sheet, the way you pick
+// the paper up.
 function lifted(items) {
   let low = 0;
   for (const it of items) for (const q of corners(it)) low = Math.min(low, q[2]);

@@ -851,6 +851,43 @@ test('random folds move smoothly, with no layer passing through another on the w
   assert.deepEqual(problems, []);
 });
 
+// A fold behind swings its flap down under the model. The model used to rise off the mat to let it pass, by up to half its
+// size, floating on the tip of the hanging flap; now it tips up on an edge and lies down again. Where tipping as far as it
+// goes doesn't make all the room (a flap as long as the paper it folds behind closes right on the edge the model rests
+// on), the model is lifted the rest of the way, but no more than half as far as it was.
+test('a fold behind tips the model up on an edge, rather than lifting it off the mat', () => {
+  const tipped = [];
+  for (const model of MODELS) {
+    for (const [i, step] of once(model).steps.entries()) {
+      const m = step.motion, parts = m.kind === 'multi' ? m.parts : [m];
+      if (!['fold', 'foldUnfold', 'multi'].includes(m.kind) || m.roll || parts.some((p) => p.bend || p.reverse)) continue;
+      if (!parts.some((p) => p.sign < 0)) continue;
+      const moving = new Set(m.moving);
+      let lift = 0, rise = 0;
+      for (let k = 0; k <= 40; k++) {
+        // How far lifting alone would have to raise it, and how far the lowest point of the paper that stays put rises now.
+        for (const it of poses(step, k / 40, true)) for (const q of corners(it)) lift = Math.max(lift, -q[2]);
+        let low = Infinity;
+        for (const it of poses(step, k / 40)) if (!moving.has(it.facet.id)) for (const q of corners(it)) low = Math.min(low, q[2]);
+        rise = Math.max(rise, low);
+      }
+      if (lift < 0.01) continue;
+      tipped.push(`${model.id} ${i + 1}`);
+      assert.ok(rise <= lift / 2, `${model.id} step ${i + 1} rises ${rise.toFixed(3)} off the mat, against ${lift.toFixed(3)} lifting it`);
+    }
+  }
+  for (const s of ['cup 5', 'plane 7', 'heart 7', 'heart 8', 'jumping-frog 3', 'helmet 10', 'waterbomb 3', 'crane 22', 'flapping-bird 19']) assert.ok(tipped.includes(s), `${s} doesn't fold behind`);
+  // The helmet's flap is on the side nearest you, so it lifts that side, resting on the far edge: the flap is seen swinging
+  // under it. (Where the flap is on the far side, that would put it through the mat, so the flap's side lifts instead.)
+  const helmet = once(MODELS.find((x) => x.id === 'helmet')).steps[9];
+  const still = poses(helmet, 0.5).filter((it) => !helmet.motion.moving.includes(it.facet.id));
+  // Each corner of the paper that stays put: where it lies on the mat as the step starts, and how high it is halfway.
+  const pts = still.flatMap((it) => it.facet.poly.map((q) => [apply(helmet.from.facets.get(it.facet.id).m, q)[1], transformPoint(it.pose, ...q)[2]]));
+  const ys = pts.map(([y]) => y), near = Math.min(...ys), far = Math.max(...ys);
+  const zAt = (y) => Math.max(...pts.filter(([w]) => Math.abs(w - y) < 1e-6).map(([, z]) => z));
+  assert.ok(zAt(near) > zAt(far) + 0.1, `the helmet tips up its near side (${zAt(near).toFixed(3)} against ${zAt(far).toFixed(3)})`);
+});
+
 // A point tucked into a pocket turns over about the pocket's mouth and goes in under the layers over it, which rise to make
 // room and settle again. The waterbomb's points passed through the side triangles on their way in.
 test('a point tucked into a pocket goes in without passing through the layers over it', () => {
