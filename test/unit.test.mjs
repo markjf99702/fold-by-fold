@@ -891,6 +891,19 @@ test('a fold line is drawn only where there is paper, even where the moving pape
   assert.deepEqual(off, [], 'the line runs over the table');
 });
 
+// A flap bent part way never lands, so it isn't tucked anywhere, though folded flat it would land under paper that stays
+// put. The lily's petals, bent out as it stands up, had their arrows broken like a tuck's.
+test('a flap bent part way is never marked as tucked into a pocket', () => {
+  const model = { id: 'bent', paper: { kind: 'Square' }, steps: [{
+    say: 'Bend the left edge up, most of the way over.',
+    do: (h) => h.shape([(k) => k.bend(k.upright(-0.25), 145, { move: [0.05, 0.5] })]),
+  }] };
+  const m = marks(build(model).steps[0]);
+  assert.equal(m.length, 1);
+  assert.equal(m[0].arrow.angle, 145);
+  assert.ok(!m[0].arrow.tuck, 'the bend is marked as a tuck');
+});
+
 test('a tuck is marked as one: its arrow breaks where the point goes in under the pocket', () => {
   const tucks = [];
   for (const model of MODELS) {

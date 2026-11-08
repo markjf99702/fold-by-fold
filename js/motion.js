@@ -437,10 +437,11 @@ function stepMarks(step) {
   const m = foldMarks(step);
   const { motion } = step;
   if (!m || !['fold', 'multi'].includes(motion.kind) || motion.folded) return m;
-  // A flap folded toward you that lands under a layer that stays put has been tucked into a pocket.
+  // A flap folded toward you that lands under a layer that stays put has been tucked into a pocket. One bent part way
+  // (the lily's petals opening) never lands at all.
   const moving = new Set(motion.moving || motion.parts.flatMap((p) => p.moving || []));
   for (const k of m) {
-    if (!k.arrow?.over || k.type !== 'valley') continue;
+    if (!k.arrow?.over || k.type !== 'valley' || k.arrow.angle !== 180) continue;
     const top = step.to.topAt(k.arrow.to.slice(0, 2));
     if (top && !moving.has(top.id)) k.arrow.tuck = true;
   }
