@@ -854,7 +854,7 @@ document.addEventListener('visibilitychange', () => {
 document.addEventListener('touchstart', () => {}, { passive: true });
 window.addEventListener('resize', redraw);
 
-// A hook for the tests and screenshot scripts.
+// A hook for the tests and screenshot scripts. index.html also looks for it, to tell that the page has started.
 window.fold = {
   get state() { return { id: P.id, i: P.i, t: P.t, playing: P.playing, steps: P.b ? P.b.steps.length : 0 }; },
   set(i, t) { P.i = i; P.t = t; P.playing = false; keepAim(); paint(); frameCamera(true); },
@@ -862,6 +862,7 @@ window.fold = {
   get built() { return [...builtCache.keys()]; }, // the models folded so far
 };
 
+$('boot')?.remove(); // the line saying the page is on its way (see index.html)
 route();
 
 if (!('single' in document.documentElement.dataset) && 'serviceWorker' in navigator) {

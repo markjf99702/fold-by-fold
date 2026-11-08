@@ -961,6 +961,30 @@ for (const hash of ['#%', '#crane-3%', '#%F0%9F']) {
   await p.context().close();
 }
 
+// If the page's script can't run, because a file didn't arrive or the browser is too old to read it, the page says so
+// rather than staying blank (a file that can't be read stands in for both here), fading in after a second. Once the
+// page starts, the line saying it's on its way is gone. With JavaScript off, only the line saying it's needed shows.
+{
+  const c = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, hasTouch: true, serviceWorkers: 'block' });
+  const p = await c.newPage();
+  await p.route('**/js/mech.js', (r) => r.fulfill({ status: 200, contentType: 'text/javascript', body: 'export const x = a?.b ?? ;' }));
+  await p.goto(base);
+  await p.waitForFunction(() => /^Fold by Fold couldn’t start in this browser\. Try reloading/.test(document.getElementById('boot')?.textContent), null, { timeout: 5000 })
+    .catch(() => assert.fail('a page whose script could not run said nothing'));
+  await p.waitForFunction(() => getComputedStyle(document.getElementById('boot')).opacity === '1', null, { timeout: 3000 }).catch(() => {});
+  assert.deepEqual(await p.evaluate(() => [document.getElementById('boot').checkVisibility(), getComputedStyle(document.getElementById('boot')).opacity]), [true, '1'], 'the word that the page could not start does not show');
+  await p.unroute('**/js/mech.js');
+  await p.reload();
+  await p.waitForSelector('#home:not([hidden])');
+  assert.equal(await p.evaluate(() => document.getElementById('boot')), null, 'the line saying the page is on its way stayed once it started');
+  await c.close();
+  const off = await browser.newContext({ viewport: { width: 390, height: 844 }, javaScriptEnabled: false, serviceWorkers: 'block' });
+  const q = await off.newPage();
+  await q.goto(base);
+  assert.deepEqual([await q.isVisible('#boot'), await q.isVisible('.noscript')], [false, true], 'with JavaScript off, the page does not say it needs it, or says it is getting ready');
+  await off.close();
+}
+
 // A link to a step past the end opens the last step, a step before the first opens the first, and a link that names
 // no model opens the gallery.
 {

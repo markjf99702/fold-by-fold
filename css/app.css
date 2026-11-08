@@ -83,6 +83,13 @@ body {
 button { font: inherit; color: inherit; }
 [hidden] { display: none !important; }
 .noscript { padding: 2rem; text-align: center; }
+/* While the page's script loads: faded in only after a second, so a quick start never shows it. */
+.boot {
+  margin: 0; min-height: 100dvh; display: grid; place-items: center; text-align: center; text-wrap: balance;
+  padding: 24px max(var(--gutter), calc(50% - 13em)); color: var(--muted);
+  animation: boot .4s 1s both;
+}
+@keyframes boot { from { opacity: 0; } }
 .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 :focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
 h1, h2, h3 { text-wrap: balance; }

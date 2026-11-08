@@ -24,6 +24,17 @@
   <noscript><p class="noscript">Fold by Fold needs JavaScript to fold the paper.</p></noscript>
 
   <main id="app">
+    <p class="boot" id="boot" hidden>Getting the paper ready…</p>
+    <script>
+      // A quiet line until the page's script starts, shown only if that takes a while. If the script can't load or
+      // run in this browser, the page says so, rather than staying blank: by the time the page has loaded, the script
+      // has run if it was going to.
+      document.getElementById('boot').hidden = false;
+      window.addEventListener('load', function () {
+        var boot = document.getElementById('boot');
+        if (!window.fold && boot) boot.textContent = 'Fold by Fold couldn’t start in this browser. Try reloading, or open it in an up-to-date Safari, Chrome, Firefox or Edge.';
+      });
+    </script>
     <section class="screen home" id="home" hidden>
       <header class="mast">
         <p class="eyebrow">Origami, step by step</p>
