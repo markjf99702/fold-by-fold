@@ -122,14 +122,14 @@
           <input type="range" id="scrub" min="0" max="1000" value="0">
         </label>
         <div class="controls">
-          <button type="button" class="ctl" id="prev" aria-label="Previous step" title="Previous step">
+          <button type="button" class="ctl" id="prev" aria-label="Previous step" title="Previous step (←)" aria-keyshortcuts="ArrowLeft">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5v14M18 5l-9 7 9 7z"/></svg>
           </button>
-          <button type="button" class="ctl main" id="play">
+          <button type="button" class="ctl main" id="play" title="Play (Space)" aria-keyshortcuts="Space">
             <svg viewBox="0 0 24 24" aria-hidden="true" id="playIcon"><path d="M7 4.5v15l12.5-7.5z"/></svg>
             <span id="playLabel">Play</span>
           </button>
-          <button type="button" class="ctl" id="next" aria-label="Next step" title="Next step">
+          <button type="button" class="ctl" id="next" aria-label="Next step" title="Next step (→)" aria-keyshortcuts="ArrowRight">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 5v14M6 5l9 7-9 7z"/></svg>
           </button>
           <button type="button" class="speed" id="speed" aria-pressed="false">Slow</button>

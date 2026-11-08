@@ -343,6 +343,7 @@ function paint() {
   if ($('playLabel').textContent !== label) {
     $('playLabel').textContent = label;
     $('playIcon').innerHTML = icon;
+    $('play').title = `${label} (Space)`; // the buttons with a key of their own say so under a mouse
   }
   scrubAt(P.t);
   $('speed').setAttribute('aria-pressed', prefs.slow);
@@ -357,7 +358,7 @@ function paintControls() {
   const prev = $('prev');
   unavailable(prev, P.i === 0 && P.t === 0);
   const label = P.t > 0.02 ? 'Replay this fold' : 'Previous step';
-  if (prev.title !== label) { prev.title = label; prev.setAttribute('aria-label', label); }
+  if (prev.getAttribute('aria-label') !== label) { prev.setAttribute('aria-label', label); prev.title = `${label} (←)`; }
 }
 
 // The slider says how far the fold has gone, for screen readers, rather than a number out of 1000.

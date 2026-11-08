@@ -964,6 +964,19 @@ for (const hash of ['#%', '#crane-3%', '#%F0%9F']) {
   await p.context().close();
 }
 
+// The buttons with a key of their own say so, over the button under a mouse and to screen readers: Space for Play,
+// whatever it's called just then, → for Next, and ← for the back button, which does what that key does.
+{
+  const p = await fresh('#plane-3', { viewport: { width: 1280, height: 800 }, deviceScaleFactor: 1, hasTouch: false });
+  await p.waitForFunction(() => fold.state.id === 'plane');
+  const keys = () => p.evaluate(() => ['play', 'next', 'prev'].map((id) => { const b = document.getElementById(id); return [b.title, b.getAttribute('aria-keyshortcuts')]; }));
+  assert.deepEqual(await keys(), [['Play (Space)', 'Space'], ['Next step (→)', 'ArrowRight'], ['Previous step (←)', 'ArrowLeft']], 'the buttons don\'t say their keys');
+  await p.evaluate(() => fold.set(2, 0.5));
+  assert.deepEqual(await keys(), [['Carry on (Space)', 'Space'], ['Next step (→)', 'ArrowRight'], ['Replay this fold (←)', 'ArrowLeft']], 'the buttons don\'t say their keys part way through a fold');
+  assert.equal(await p.getAttribute('#prev', 'aria-label'), 'Replay this fold');
+  await p.context().close();
+}
+
 // Space plays and pauses after a click anywhere on the player. Most browsers give a clicked button the focus, and
 // Space would press it again: the step clicked in the list, Next (on another step), Slow (off again). The slider
 // leaves Space alone too. A button the keyboard has put the focus on still presses itself.
