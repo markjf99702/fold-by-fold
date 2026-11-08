@@ -315,6 +315,16 @@ test('as a fold begins and as it lands, the paper seen from above keeps its colo
   assert.deepEqual(flashes, []);
 });
 
+test('every model says what paper to fold it from, and it is the paper the model starts as', () => {
+  for (const m of MODELS) {
+    const [w, h] = m.paper.size || [1, 1];
+    const long = Math.max(w, h) / Math.min(w, h);
+    // A square; a printer sheet (A4 is 1 : 1.41, US letter 1 : 1.29); an index card (3 x 5 inches).
+    const kind = long === 1 ? 'Square' : long > 1.25 && long < 1.45 ? 'Printer paper' : Math.abs(long - 5 / 3) < 1e-9 ? 'Index card' : null;
+    assert.equal(m.paper.kind, kind, `${m.id}'s card says ${m.paper.kind}, for a sheet ${w} x ${h}`);
+  }
+});
+
 test('js/finished.js has a picture for every model and nothing else', () => {
   assert.deepEqual(Object.keys(FINISHED), MODELS.map((m) => m.id), 'run node tools/make-thumbs.mjs');
 });

@@ -254,7 +254,7 @@ export const MODELS = [
     name: 'Paper cup',
     level: 'Easy',
     blurb: 'A cup that holds water for a minute or two.',
-    paper: { colorUp: false, turn: 45 },
+    paper: { kind: 'Square', colorUp: false, turn: 45 },
     steps: [
       {
         say: 'White side up, turned like a diamond. Fold the bottom corner up to the top corner.',
@@ -286,7 +286,7 @@ export const MODELS = [
     name: 'Paper airplane',
     level: 'Easy',
     blurb: 'The classic dart, from a sheet of printer paper. It flies straight and far.',
-    paper: { colorUp: false, size: [1, Math.SQRT2] },
+    paper: { kind: 'Printer paper', colorUp: false, size: [1, Math.SQRT2] },
     steps: [
       {
         say: 'Start with a long sheet, white side up. Fold it in half the long way, and unfold.',
@@ -344,7 +344,7 @@ export const MODELS = [
     name: 'Heart',
     level: 'Easy',
     blurb: 'A flat heart with a colored front, for a card or a note.',
-    paper: { colorUp: false, turn: 45 },
+    paper: { kind: 'Square', colorUp: false, turn: 45 },
     steps: [
       {
         say: 'White side up, turned like a diamond. Fold the left corner to the right corner, and unfold, to crease the middle.',
@@ -388,7 +388,7 @@ export const MODELS = [
     name: 'Fortune teller',
     level: 'Easy',
     blurb: 'The cootie catcher from the schoolyard. Two rounds of corners to the middle.',
-    paper: { colorUp: false },
+    paper: { kind: 'Square', colorUp: false },
     steps: [
       {
         say: 'White side up. Fold in half corner to corner, and unfold.',
@@ -439,7 +439,7 @@ export const MODELS = [
     name: 'Jumping frog',
     level: 'Easy',
     blurb: 'From an index card. Press on its back, slide your finger off, and it hops.',
-    paper: { colorUp: false, size: [1, CARD] },
+    paper: { kind: 'Index card', colorUp: false, size: [1, CARD] },
     steps: [
       {
         say: 'Start with an index card standing up tall. Fold the top left corner down to the right edge, and unfold.',
@@ -501,7 +501,7 @@ export const MODELS = [
     name: 'Samurai helmet',
     level: 'Medium',
     blurb: 'The kabuto, with two horns and a brim. Big enough to wear if you start with newspaper.',
-    paper: { colorUp: false, turn: 45 },
+    paper: { kind: 'Square', colorUp: false, turn: 45 },
     steps: [
       {
         say: 'White side up, turned like a diamond. Fold the top corner down to the bottom corner.',
@@ -550,7 +550,7 @@ export const MODELS = [
     name: 'Waterbomb',
     level: 'Medium',
     blurb: 'The paper balloon. It folds flat, and then you blow it up.',
-    paper: { colorUp: false },
+    paper: { kind: 'Square', colorUp: false },
     steps: [
       {
         say: 'White side up. Fold the bottom right corner up to the top left corner, and unfold.',
@@ -591,7 +591,7 @@ export const MODELS = [
     name: 'Crane',
     level: 'Tricky',
     blurb: 'The traditional orizuru. The collapse, petal folds and reverse folds are the steps drawings make hardest.',
-    paper: { colorUp: true, turn: 45 },
+    paper: { kind: 'Square', colorUp: true, turn: 45 },
     steps: [
       ...BIRD_BASE,
       {
@@ -653,7 +653,7 @@ export const MODELS = [
     name: 'Flapping bird',
     level: 'Medium',
     blurb: 'The crane’s cousin. Hold it by the neck, pull the tail, and the wings flap.',
-    paper: { colorUp: true, turn: 45 },
+    paper: { kind: 'Square', colorUp: true, turn: 45 },
     steps: [
       ...BIRD_BASE,
       {
@@ -698,7 +698,7 @@ export const MODELS = [
     name: 'Frog',
     level: 'Tricky',
     blurb: 'The traditional frog with four legs. Squash folds, petal folds and a lot of reverse folds.',
-    paper: { colorUp: true, turn: 45 },
+    paper: { kind: 'Square', colorUp: true, turn: 45 },
     steps: [
       ...SQUARE_BASE,
       {

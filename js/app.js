@@ -108,7 +108,7 @@ function renderHome() {
       btn.innerHTML = `
         <span class="thumb"></span>
         <span class="title">${m.name}</span>
-        <span class="meta"><span class="level">${m.level}</span><span class="count"></span></span>
+        <span class="meta"><span class="level">${m.level}</span><span class="kind">${m.paper.kind}</span><span class="count"></span></span>
         <span class="blurb">${m.blurb}</span>`;
       btn.addEventListener('click', () => openFromHome(m.id));
       li.append(btn);
