@@ -587,8 +587,8 @@ async function fresh(hash = '', { init, arg, ...opts } = {}) {
 }
 
 // On a phone the small things to tap reach the 44 px a finger needs (Apple's guidelines, and WCAG 2.2's enhanced
-// target size), past the room they take: a swatch, the footer links, Slow, the slider, the bar of ticks and the fold's
-// name, which opens the key to the marks.
+// target size), past the room they take: a swatch, the footer links, Slow, Aa, the slider, the bar of ticks and the
+// fold's name, which opens the key to the marks.
 {
   const p = await fresh();
   await p.waitForSelector('#home:not([hidden])');
@@ -605,9 +605,9 @@ async function fresh(hash = '', { init, arg, ...opts } = {}) {
   const sizes = await reach(['.swatch:nth-child(3)', '.jd-foot a:last-child']);
   await p.click('.model:has(.title:text("Crane"))');
   await p.waitForFunction(() => fold.state.id === 'crane');
-  sizes.push(...await reach(['#speed', '#scrub', '#ticks li:nth-child(4) button', '#chip']));
-  // The slider, the ticks, the fold's name and the links are wide already; the swatches and Slow need the width too.
-  const small = sizes.filter(([q, tall, wide]) => tall < 44 || (/swatch|speed/.test(q) && wide < 44));
+  sizes.push(...await reach(['#speed', '#bigWords', '#scrub', '#ticks li:nth-child(4) button', '#chip']));
+  // The slider, the ticks, the fold's name and the links are wide already; the swatches, Slow and Aa need the width too.
+  const small = sizes.filter(([q, tall, wide]) => tall < 44 || (/swatch|speed|bigWords/.test(q) && wide < 44));
   assert.deepEqual(small, [], 'too small to tap: [what, px tall, px wide]');
   await p.context().close();
 }
@@ -1156,25 +1156,25 @@ for (const reduce of [false, true]) {
 }
 
 // When the last fold lands the model is finished: the bar says so, the last tick fills in, and the buttons offer to
-// start again or go back to all the models, Next and Slow making way. The camera eases round to see the model at an
+// start again or go back to all the models, Next, Slow and Aa making way. The camera eases round to see the model at an
 // angle, its own for a model that stands up, and a double tap comes back to it. Starting again puts it all back.
 {
   const p = await fresh('#cup-5');
   await p.waitForFunction(() => fold.state.id === 'cup');
   const end = () => p.evaluate(() => [document.getElementById('stepCount').textContent, document.getElementById('playLabel').textContent,
-    ...['allModels', 'next', 'speed'].map((id) => document.getElementById(id).offsetParent !== null), document.querySelector('#ticks li:last-child button').classList.contains('done')]);
+    ...['allModels', 'next', 'speed', 'bigWords'].map((id) => document.getElementById(id).offsetParent !== null), document.querySelector('#ticks li:last-child button').classList.contains('done')]);
   const aim = () => p.evaluate(() => { const v = fold.view(); return [Math.round(v.goal.yaw ?? v.cam.yaw), Math.round(v.goal.pitch ?? v.cam.pitch)]; });
-  assert.deepEqual(await end(), ['Step 5 of 5', 'Play', false, true, true, false]);
+  assert.deepEqual(await end(), ['Step 5 of 5', 'Play', false, true, true, true, false]);
   await p.click('#play');
   await p.waitForFunction(() => fold.state.t >= 1, null, { timeout: 15000 });
-  assert.deepEqual(await end(), ['Finished · 5 steps', 'Start again', true, false, false, true], 'the finished cup does not say so, or offer to go back to all the models');
+  assert.deepEqual(await end(), ['Finished · 5 steps', 'Start again', true, false, false, false, true], 'the finished cup does not say so, or offer to go back to all the models');
   assert.deepEqual(await aim(), [-120, 34], 'the camera did not turn to see the finished cup at an angle');
   assert.equal(await p.textContent('#tell'), 'Finished. 5 steps.', 'a screen reader is not told the cup is finished');
   await p.evaluate(() => { const v = fold.view(); v.goal.yaw = v.goal.pitch = null; v.cam.yaw = -40; v.cam.pitch = 70; });
   await p.click('#resetView');
   assert.deepEqual(await aim(), [-120, 34], 'putting the view back did not come back to the finished cup\'s angle');
   await p.click('#play');
-  assert.deepEqual(await end(), ['Step 1 of 5', 'Play', false, true, true, false], 'starting again left the cup finished');
+  assert.deepEqual(await end(), ['Step 1 of 5', 'Play', false, true, true, true, false], 'starting again left the cup finished');
   assert.deepEqual(await aim(), [-90, 58], 'starting again left the camera turned');
   // The crane stands up at the end, already seen from its own angle, and keeps it.
   await p.evaluate(() => { location.hash = 'crane-23'; });
@@ -1512,6 +1512,77 @@ for (const hash of ['#%', '#crane-3%', '#%F0%9F']) {
   assert.deepEqual(await p.evaluate(() => [...document.querySelectorAll('#skip button')].map((b) => b.textContent)), ['Know the bird base? Skip to step 16']);
   await p.click('#skip button');
   assert.equal(await p.evaluate(() => fold.state.i), 15, 'skipping the bird base didn\'t go to step 16');
+  await p.context().close();
+}
+
+// Aa, beside Slow on a phone or tablet, makes the step's words about a third bigger (17 px to 22 px on a phone) and the
+// fold's name a little bigger, to read with the phone on the table at arm's length. It's off to start with, filled in
+// like Slow while it's on, and remembered as Slow is. The words' box grows with the words, keeping one height through a
+// model; on a small phone the longest words scroll in it, fading where they're cut off, with Play still on the screen.
+// With a mouse there's no Aa: the computer's own zoom does it well.
+{
+  const p = await fresh('#crane');
+  await p.waitForFunction(() => fold.state.id === 'crane');
+  const look = () => p.evaluate(() => {
+    const css = (q) => getComputedStyle(document.querySelector(q));
+    return { pressed: document.getElementById('bigWords').getAttribute('aria-pressed'), fill: css('#bigWords').backgroundColor === css('#play').backgroundColor, words: css('#say').fontSize, name: parseFloat(css('#chip').fontSize) };
+  });
+  const off = await look();
+  assert.deepEqual(off, { pressed: 'false', fill: false, words: '16.8px', name: 12.48 }, 'Aa isn\'t off to start with');
+  assert.equal(await p.getByRole('button', { name: 'Aa: bigger words' }).count(), 1, 'Aa isn\'t named for what it does');
+  await p.tap('#bigWords');
+  await p.waitForFunction(() => !document.querySelector('#bigWords:active')); // the finger's press shows a moment
+  const on = await look();
+  assert.deepEqual([on.pressed, on.fill, on.words], ['true', true, '22px'], 'Aa didn\'t make the words bigger, or isn\'t filled in while it\'s on');
+  assert.ok(on.name > off.name * 1.1, 'Aa didn\'t make the fold\'s name bigger');
+  assert.equal(await p.evaluate(() => JSON.parse(localStorage.getItem('fold-by-fold.v1')).big), true, 'Aa wasn\'t saved');
+  const steady = () => p.evaluate(() => {
+    const out = { stage: new Set(), cut: [] };
+    const w = document.querySelector('.step-now');
+    for (let i = 0; i < fold.state.steps; i++) {
+      fold.set(i, 0);
+      out.stage.add(Math.round(document.getElementById('stage').getBoundingClientRect().height));
+      if (w.scrollHeight > w.clientHeight + 1 && !w.classList.contains('more')) out.cut.push(i + 1);
+    }
+    return { stage: out.stage.size, cut: out.cut };
+  });
+  assert.deepEqual(await steady(), { stage: 1, cut: [] }, 'with Aa on, the paper changes size from step to step, or words are cut off without fading');
+  await p.reload();
+  await p.waitForFunction(() => fold.state.id === 'crane');
+  assert.deepEqual((await look()).words, '22px', 'Aa was forgotten on a reload');
+  // The frog's longest words on a small phone: they scroll in their box, fading at the bottom, and Play stays in view.
+  await p.setViewportSize({ width: 320, height: 568 });
+  await p.evaluate(() => { location.hash = 'frog-17'; });
+  await p.waitForFunction(() => fold.state.id === 'frog');
+  await p.waitForTimeout(200);
+  assert.deepEqual(await p.evaluate(() => {
+    const w = document.querySelector('.step-now'), play = document.getElementById('play').getBoundingClientRect();
+    return [w.scrollHeight > w.clientHeight, w.classList.contains('more'), play.bottom <= innerHeight, document.getElementById('stage').getBoundingClientRect().height >= 0.4 * innerHeight - 1];
+  }), [true, true, true, true], 'on a 320 px phone with Aa on, the frog\'s longest words don\'t scroll in their box, or crowd out Play or the paper');
+  await p.context().close();
+  const d = await fresh('#crane', { viewport: { width: 1280, height: 800 }, deviceScaleFactor: 1, hasTouch: false, init: () => localStorage.setItem('fold-by-fold.v1', '{"big":true}') });
+  await d.waitForFunction(() => fold.state.id === 'crane');
+  assert.deepEqual(await d.evaluate(() => [getComputedStyle(document.getElementById('bigWords')).display, getComputedStyle(document.getElementById('say')).fontSize]), ['none', '16.8px'], 'with a mouse, Aa shows, or makes the words bigger');
+  await d.context().close();
+}
+
+// With Aa beside Slow, the row of buttons fits on one line wherever the words are under or beside the paper: phones from
+// 320 px up, held upright or sideways, and a tablet held sideways, where the panel beside the paper is 380 px wide.
+for (const [width, height] of [[390, 844], [360, 780], [320, 568], [844, 390], [667, 375], [568, 320], [1024, 768], [768, 1024]]) {
+  const p = await fresh('#crane-10', { viewport: { width, height }, deviceScaleFactor: 1 });
+  await p.waitForFunction(() => fold.state.id === 'crane');
+  const r = await p.evaluate(() => {
+    const panel = document.querySelector('.panel'), cs = getComputedStyle(panel), pb = panel.getBoundingClientRect();
+    const [left, right] = [pb.left + parseFloat(cs.paddingLeft), pb.right - parseFloat(cs.paddingRight)];
+    const boxes = ['#prev', '#play', '#next', '#speed', '#bigWords'].map((q) => document.querySelector(q).getBoundingClientRect());
+    const mid = (b) => (b.top + b.bottom) / 2;
+    return {
+      inside: boxes.every((b) => b.left >= left - 0.5 && b.right <= right + 0.5 && b.width > 0),
+      row: boxes.every((b) => Math.abs(mid(b) - mid(boxes[0])) < 1),
+      apart: boxes.every((b, k) => k === 0 || b.left >= boxes[k - 1].right + 4),
+    };
+  });
+  assert.deepEqual(r, { inside: true, row: true, apart: true }, `at ${width}x${height} the buttons with Aa don't fit on one row`);
   await p.context().close();
 }
 

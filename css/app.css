@@ -417,22 +417,24 @@ html:has(#player:not([hidden])) { overscroll-behavior-y: none; }
 .ctl:not([aria-disabled="true"]):active { background: var(--press); }
 .ctl.main:not([aria-disabled="true"]):active { background: color-mix(in srgb, var(--accent) 82%, #000); }
 .ctl[aria-disabled="true"] { opacity: .35; cursor: default; }
-.speed {
+/* Slow, and Aa beside it: switches, drawn as small pills. */
+.toggle {
   appearance: none; border: 1.5px solid var(--line); background: none; border-radius: 99px; height: 36px; padding: 0 12px;
-  font-size: .85rem; font-weight: 700; cursor: pointer; color: var(--muted); position: relative;
+  font-size: .85rem; font-weight: 700; cursor: pointer; color: var(--muted); position: relative; flex: none;
 }
-.speed::before { content: ''; position: absolute; inset: -5.5px -4px; }
-.speed:active { background: var(--chip); }
+.toggle::before { content: ''; position: absolute; inset: -5.5px -4px; }
+.toggle:active { background: var(--chip); }
 /* On, it's filled in like Play, so it shows from across the table; off, it's the plain outline. */
-.speed[aria-pressed="true"] { border-color: var(--accent); background: var(--accent); color: var(--accent-ink); }
-.speed[aria-pressed="true"]:active { background: color-mix(in srgb, var(--accent) 82%, #000); border-color: transparent; }
+.toggle[aria-pressed="true"] { border-color: var(--accent); background: var(--accent); color: var(--accent-ink); }
+.toggle[aria-pressed="true"]:active { background: color-mix(in srgb, var(--accent) 82%, #000); border-color: transparent; }
+#bigWords { padding: 0 10px; min-width: 38px; } /* with Slow's reach past its edges, a finger's 44 px */
 /* Narrow phones, and the panel beside the paper on a phone held sideways (further down): the buttons draw in a
    little so the row fits, and Play keeps one width for every label. */
 @media (max-width: 379px), (min-width: 560px) and (max-width: 899px) and (orientation: landscape) and (max-height: 500px) {
   .controls { gap: 6px; }
   .ctl { min-width: 46px; padding: 0 10px; }
   .ctl.main { min-width: 128px; padding: 0 8px; }
-  .speed { padding: 0 10px; }
+  .toggle { padding: 0 10px; }
 }
 
 /* A short phone held upright: the panel draws in so the words keep two lines or so beside the paper's 40%. */
@@ -447,6 +449,43 @@ html:has(#player:not([hidden])) { overscroll-behavior-y: none; }
 @media (min-width: 600px) and (max-width: 899px) and (orientation: portrait) {
   .panel > * { width: 100%; max-width: 36rem; margin-inline: auto; }
   .say { font-size: 1.2rem; }
+}
+
+/* Aa, beside Slow, makes the words bigger, to read from the table with the phone at arm's length: the step's words a
+   third bigger and the fold's name a little bigger. Only on phones and tablets: with a mouse, the computer's own zoom
+   does it well, where a phone's shrinks the paper and the buttons too. The words' box grows with them (app.js measures
+   it again), and the longest words scroll in it on a small phone.
+   With Aa, the row has five buttons, and they draw in to fit the panel's width (the panel is the container): at 358 px
+   (a 390 px phone) a little, narrower (a 360 px phone, or beside the paper held sideways) more, and at 288 px (a 320 px
+   phone) Play's words a little smaller too. Narrower still, Slow and Aa go under the others rather than off the edge. */
+@media (hover: hover) and (pointer: fine) { #bigWords { display: none; } }
+.panel { container: panel / inline-size; }
+@media not all and (hover: hover) and (pointer: fine) {
+  .big-words .say { font-size: 1.375rem; }
+  .big-words .chip { font-size: .9rem; }
+  .big-words .skip button { font-size: 1rem; }
+  @media (min-width: 600px) and (max-width: 899px) and (orientation: portrait) { .big-words .say { font-size: 1.575rem; } }
+  @media (min-width: 300px) {
+    @container panel (min-width: 356px) {
+      .controls { gap: 8px; }
+      .ctl { min-width: 48px; padding: 0 12px; }
+      .ctl.main { min-width: 132px; padding: 0 10px; }
+    }
+    @container panel (max-width: 355.98px) {
+      .controls { gap: 6px; flex-wrap: wrap; row-gap: 8px; }
+      .ctl { min-width: 44px; padding: 0 8px; }
+      .ctl.main { min-width: 116px; padding: 0 8px; }
+      .toggle { padding: 0 10px; }
+      #bigWords { padding: 0 8px; }
+    }
+    @container panel (max-width: 315.98px) {
+      .controls { gap: 5px; }
+      .ctl { min-width: 40px; padding: 0 6px; }
+      .ctl.main { min-width: 100px; padding: 0 5px; gap: 6px; font-size: .95rem; }
+      .toggle { padding: 0 8px; }
+      #bigWords { padding: 0 7px; min-width: 36px; }
+    }
+  }
 }
 
 /* A narrow phone: a long model name takes two lines rather than losing its end, and the bar draws in. Narrower

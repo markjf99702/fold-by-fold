@@ -40,6 +40,7 @@ function load() {
     ...saved,
     paper: PAPERS.some((p) => p.id === saved.paper) ? saved.paper : 'vermilion',
     slow: saved.slow === true,
+    big: saved.big === true, // Aa: bigger words
     progress,
     folded,
   };
@@ -53,8 +54,8 @@ function latest() {
   if (saved !== null) Object.assign(prefs, load());
   return prefs;
 }
-// Saves one change: { paper }, { slow }, or { progress: { [model]: step } } with { folded: { [model]: true } } for a
-// model finished.
+// Saves one change: { paper }, { slow }, { big }, or { progress: { [model]: step } } with { folded: { [model]: true } }
+// for a model finished.
 function save(change) {
   latest();
   const { progress, folded, ...rest } = change;
@@ -220,7 +221,7 @@ function outline(m, i) {
   scrubAt(0);
   $('speed').setAttribute('aria-pressed', prefs.slow);
   $('allModels').hidden = true; // whatever the model before ended on
-  $('next').hidden = $('speed').hidden = false;
+  $('next').hidden = $('speed').hidden = $('bigWords').hidden = false;
   $('glWait').hidden = false;
   document.title = `${m.name} · Fold by Fold`;
 }
@@ -495,11 +496,11 @@ function paint() {
   const last = P.i === n - 1;
   unavailable($('next'), last);
   // Once the last fold has landed, the model is finished: the bar says so, and the buttons offer to start again or go
-  // back to all the models. Next and Slow make way, having nothing more to do.
+  // back to all the models. Next, Slow and Aa make way, having nothing more to do.
   const end = finished();
   const count = end ? `Finished · ${n} steps` : `Step ${P.i + 1} of ${n}`;
   if ($('stepCount').textContent !== count) $('stepCount').textContent = count;
-  if ($('allModels').hidden === end) { $('allModels').hidden = !end; $('next').hidden = $('speed').hidden = end; }
+  if ($('allModels').hidden === end) { $('allModels').hidden = !end; $('next').hidden = $('speed').hidden = $('bigWords').hidden = end; }
   let label = 'Play', icon = PLAY;
   if (P.playing) { label = 'Pause'; icon = '<path d="M7 5h3.5v14H7zM13.5 5H17v14h-3.5z"/>'; }
   else if (P.t >= 1) {
@@ -1116,13 +1117,25 @@ $('speed').addEventListener('click', () => {
   }
   paint();
 });
-// What another tab saves shows here too: the paper and places in the gallery, and Slow. A fold playing keeps its pace
+// Aa makes the step's words about a third bigger and the fold's name a little bigger, to read from the table with the
+// phone at arm's length, and is remembered as Slow is. It's on phones and tablets only (css/app.css). The words' box is
+// measured again at the new size.
+function bigWords() {
+  $('player').classList.toggle('big-words', prefs.big);
+  $('bigWords').setAttribute('aria-pressed', prefs.big);
+  roomForWords();
+  fadeWords();
+}
+$('bigWords').addEventListener('click', () => { save({ big: !prefs.big }); bigWords(); });
+bigWords();
+// What another tab saves shows here too: the paper and places in the gallery, Slow and Aa. A fold playing keeps its pace
 // until it next starts, and a model open keeps its paper.
 window.addEventListener('storage', (e) => {
   if (e.key !== KEY) return;
   latest();
   if (!$('home').hidden) paintHome();
   $('speed').setAttribute('aria-pressed', prefs.slow);
+  if ($('player').classList.contains('big-words') !== prefs.big) bigWords();
 });
 function scrubTo(v) {
   if (P.waiting) { scrubAt(0); return; }
