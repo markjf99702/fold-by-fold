@@ -563,12 +563,20 @@ $('ticks').addEventListener('pointerup', (e) => {
 $('ticks').addEventListener('pointercancel', (e) => { if (e.pointerId === sliding?.id) sliding = null; });
 $('topView').addEventListener('click', () => { if (view) { view.aim(-90, 89.9); dirty = true; } });
 $('resetView').addEventListener('click', resetView);
+// Most browsers give a button the focus when it's clicked, and Space would then press it again: after Next, it went
+// on another step instead of pausing. So a mouse or a finger doesn't leave the focus on the player's buttons, and
+// takes it off whatever had it, the way a click does; Space is then Play and Pause. The keyboard's focus is as it was.
+$('player').addEventListener('mousedown', (e) => {
+  if (!e.target.closest('button')) return;
+  e.preventDefault();
+  if (e.currentTarget.contains(document.activeElement)) document.activeElement.blur();
+});
 document.addEventListener('keydown', (e) => {
   // With Alt, Ctrl or Cmd held the keys are the browser's (Alt+← is Back).
   if ($('player').hidden || e.altKey || e.ctrlKey || e.metaKey) return;
   const onSlider = e.target.closest('input'); // the slider moves itself with the arrow keys
   if (e.key === ' ') {
-    if (onSlider || e.target.closest('button')) return; // a button with focus presses itself
+    if (e.target.closest('button')) return; // a button with focus presses itself
     e.preventDefault();
     primary();
   } else if (e.key === 'ArrowRight' && !onSlider) {

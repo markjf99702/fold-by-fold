@@ -621,6 +621,58 @@ for (const hash of ['#%', '#crane-3%', '#%F0%9F']) {
   await p.context().close();
 }
 
+// Space plays and pauses after a click anywhere on the player. Most browsers give a clicked button the focus, and
+// Space would press it again: the step clicked in the list, Next (on another step), Slow (off again). The slider
+// leaves Space alone too. A button the keyboard has put the focus on still presses itself.
+{
+  const p = await fresh('#plane-3', { viewport: { width: 1280, height: 800 }, deviceScaleFactor: 1, hasTouch: false });
+  await p.waitForFunction(() => fold.state.id === 'plane');
+  const now = () => p.evaluate(() => [fold.state.i, fold.state.playing]);
+  const moving = () => p.waitForFunction(() => fold.state.t > 0, null, { timeout: 5000 });
+  await p.click('#stepList li:nth-child(5) button');
+  await p.keyboard.press(' ');
+  assert.deepEqual(await now(), [4, true], 'Space after a click on the list of steps did not play');
+  await moving();
+  await p.click('#next');
+  await moving();
+  await p.keyboard.press(' ');
+  assert.deepEqual(await now(), [5, false], 'Space after a click on Next did not pause on that step');
+  await p.click('#speed');
+  await p.keyboard.press(' ');
+  assert.deepEqual(await now(), [5, true], 'Space after a click on Slow did not play');
+  assert.equal(await p.getAttribute('#speed', 'aria-pressed'), 'true', 'Space after a click on Slow turned it off again');
+  const bar = await p.locator('#scrub').boundingBox();
+  await p.mouse.click(bar.x + bar.width / 2, bar.y + bar.height / 2);
+  await p.keyboard.press(' ');
+  assert.deepEqual(await now(), [5, true], 'Space after a click on the slider did not carry on');
+  // The focus put on Next with the keyboard goes when Play is clicked, as a click takes it anywhere.
+  await p.evaluate(() => fold.set(2, 0));
+  await p.focus('#next');
+  await p.click('#play');
+  await moving();
+  await p.keyboard.press(' ');
+  assert.deepEqual(await now(), [2, false], 'Space after a click on Play pressed the button the keyboard had been on');
+  await p.focus('#next');
+  await p.keyboard.press(' ');
+  assert.deepEqual(await now(), [3, true], 'Space did not press Next with the focus on it from the keyboard');
+  // In a narrower window, with the bar of ticks in place of the list, the same goes for a click on a tick, and a click
+  // leaves nothing with the focus. The ticks and the list still pick a step from a tap, too.
+  await p.setViewportSize({ width: 800, height: 800 });
+  await p.click('#ticks li:nth-child(7) button');
+  assert.equal((await now())[0], 6, 'a click on a tick did not pick its step');
+  await p.keyboard.press(' ');
+  assert.deepEqual(await now(), [6, true], 'Space after a click on a tick did not play');
+  assert.equal(await p.evaluate(() => document.activeElement === document.body), true, 'a click left the focus on the player');
+  await p.context().close();
+  const t = await fresh('#plane-3', { viewport: { width: 1280, height: 800 }, deviceScaleFactor: 1 });
+  await t.waitForFunction(() => fold.state.id === 'plane');
+  await t.tap('#stepList li:nth-child(6) button');
+  await t.waitForFunction(() => fold.state.i === 5, null, { timeout: 2000 }).catch(() => assert.fail('a tap on the list of steps did not pick its step'));
+  await t.tap('#next');
+  await t.waitForFunction(() => fold.state.i === 6 && fold.state.playing, null, { timeout: 2000 }).catch(() => assert.fail('a tap on Next did not play the next step'));
+  await t.context().close();
+}
+
 // Scrubbing on a phone does only what the slider changes: the list of steps, hidden there, isn't scrolled to the step
 // on every move (on a slow phone that was most of the cost). On a wide screen the list still follows the step.
 {
