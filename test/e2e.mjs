@@ -570,6 +570,19 @@ async function fresh(hash = '', { init, arg, ...opts } = {}) {
   await p.context().close();
 }
 
+// Two quick presses of Play still fold. The second comes while the marks are up and the paper hasn't moved yet, so it
+// looks as if the first did nothing: it starts the fold then, rather than pausing it before it begins.
+{
+  const p = await fresh('#plane-2');
+  await p.waitForFunction(() => fold.state.id === 'plane');
+  await p.click('#play');
+  await p.waitForTimeout(200);
+  await p.click('#play');
+  await p.waitForFunction(() => fold.state.t > 0.1, null, { timeout: 5000 }).catch(() => assert.fail('two quick presses of Play left the paper where it was'));
+  assert.equal(await p.textContent('#playLabel'), 'Pause');
+  await p.context().close();
+}
+
 // A damaged or hand-edited save can't break the player: whatever makes no sense is left out.
 for (const junk of ['{"progress":null}', '{"progress":"x"}', '{"progress":{"crane":4.5},"paper":"plaid","slow":"yes"}']) {
   const p = await fresh('#crane', { init: (v) => localStorage.setItem('fold-by-fold.v1', v), arg: junk });

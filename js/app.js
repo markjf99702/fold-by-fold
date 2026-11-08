@@ -272,7 +272,10 @@ function pause() {
 
 function primary() {
   const last = P.i === P.b.steps.length - 1;
-  if (P.playing) pause();
+  // While the marks are still up before the fold moves, nothing seems to have happened yet, so a second press starts
+  // the fold now. Pausing there would have stopped it before it began.
+  if (P.playing && P.holding) { P.holding = false; P.clock = performance.now(); P.t0 = P.t; paint(); }
+  else if (P.playing) pause();
   else if (P.t >= 1) { if (last) go(0); else go(P.i + 1, { play: true }); }
   else start();
 }
