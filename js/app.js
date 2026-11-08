@@ -29,15 +29,19 @@ function load() {
   try { saved = JSON.parse(localStorage.getItem(KEY)); } catch { /* nothing readable saved */ }
   const plain = (o) => o !== null && typeof o === 'object' && !Array.isArray(o);
   if (!plain(saved)) saved = {};
-  const progress = {};
+  const progress = {}, folded = {};
   if (plain(saved.progress)) {
     for (const [id, i] of Object.entries(saved.progress)) if (Number.isInteger(i) && i >= 0) progress[id] = i;
+  }
+  if (plain(saved.folded)) {
+    for (const [id, done] of Object.entries(saved.folded)) if (done === true) folded[id] = true;
   }
   return {
     ...saved,
     paper: PAPERS.some((p) => p.id === saved.paper) ? saved.paper : 'vermilion',
     slow: saved.slow === true,
     progress,
+    folded,
   };
 }
 const prefs = load();
@@ -49,11 +53,14 @@ function latest() {
   if (saved !== null) Object.assign(prefs, load());
   return prefs;
 }
-// Saves one change: { paper }, { slow } or { progress: { [model]: step } }.
+// Saves one change: { paper }, { slow }, or { progress: { [model]: step } } with { folded: { [model]: true } } for a
+// model finished.
 function save(change) {
   latest();
-  if (change.progress) Object.assign(prefs.progress, change.progress);
-  else Object.assign(prefs, change);
+  const { progress, folded, ...rest } = change;
+  Object.assign(prefs, rest);
+  if (progress) Object.assign(prefs.progress, progress);
+  if (folded) Object.assign(prefs.folded, folded);
   try { localStorage.setItem(KEY, JSON.stringify(prefs)); } catch { /* private window */ }
 }
 const paperColor = () => (PAPERS.find((p) => p.id === prefs.paper) || PAPERS[0]).color;
@@ -132,14 +139,14 @@ function pickPaper(id) {
 }
 
 // Shows where you got to in each model, and the chosen paper: on the swatches, and in the pictures of the finished
-// models. A model you've begun says which step you're on in place of how many steps it has; on its last step, that
-// you've reached it, not that it's folded.
+// models. A model you've begun says which step you're on in place of how many steps it has, and one you've finished
+// says so, until you begin it again.
 let thumbsIn = null;
 function paintHome() {
   for (const card of document.querySelectorAll('#models .model')) {
     const n = MODELS.find((m) => m.id === card.dataset.model).steps.length;
     const i = Math.min(prefs.progress[card.dataset.model] || 0, n - 1);
-    card.querySelector('.count').textContent = i > 0 ? `Step ${i + 1} of ${n}` : `${n} steps`;
+    card.querySelector('.count').textContent = i > 0 ? `Step ${i + 1} of ${n}` : prefs.folded[card.dataset.model] ? 'Folded' : `${n} steps`;
   }
   for (const b of $('swatches').children) {
     const on = b.dataset.paper === prefs.paper;
@@ -275,10 +282,12 @@ function ready(m, i, landed) {
   renderSteps(P.b.steps);
   // A link's step becomes where you got to only in a model you haven't started. In one you have, your place stays
   // until you move on from the link's step yourself.
+  // A step opened with its fold landed (a reload, say) has saved the place after it already, or, in a model finished,
+  // step 1, so it isn't saved again on the way.
   const place = latest().progress[id] || 0;
   const link = i !== null && place > 0;
-  go(i ?? Math.min(place, P.b.steps.length - 1), { snap: true, keep: !link });
-  if (landed) { P.t = 1; keepAim(); paint(); frameCamera(true); }
+  go(i ?? Math.min(place, P.b.steps.length - 1), { snap: true, keep: !link && !landed });
+  if (landed) { P.t = 1; if (!link) keepPlace(placeNow()); keepAim(); paint(); frameCamera(true); }
   document.title = `${m.name} · Fold by Fold`;
 }
 
@@ -374,15 +383,17 @@ function keepAim() {
 }
 
 // Saves where you got to in this model. Folding a step makes it your place (Play, or the slider), and once its fold
-// lands, the step after, so coming back starts from the paper as it now is. Just going to a step saves it only if it's
-// further on: looking back at an earlier one keeps your place.
+// lands, the step after, so coming back starts from the paper as it now is. Once the last fold lands the model is
+// finished: that's remembered, and its place goes back to step 1, to fold it again. Just going to a step saves it only
+// if it's further on: looking back at an earlier one keeps your place.
 function keepPlace(i = P.i, { further = false } = {}) {
   const was = latest().progress[P.id]; // another tab may have gone further meanwhile
-  if (was === i || (further && was > i)) return;
-  save({ progress: { [P.id]: i } });
+  const done = finished() && !prefs.folded[P.id];
+  if (!done && (was === i || (further && was > i))) return;
+  save({ progress: { [P.id]: i }, ...(done && { folded: { [P.id]: true } }) });
 }
-// The place for the fold as it is: the step after once this one's fold has landed, except on the last step.
-const placeNow = () => (P.t >= 1 && P.i < P.b.steps.length - 1 ? P.i + 1 : P.i);
+// The place for the fold as it is: the step after once this one's fold has landed, and step 1 once the last one has.
+const placeNow = () => (P.t < 1 ? P.i : P.i < P.b.steps.length - 1 ? P.i + 1 : 0);
 
 // Plays the fold from where it is. From its start, the paper waits until its marks have been up for a moment (HOLD),
 // counted from when they came up: pressed straight after going to a step, the marks still show before the paper

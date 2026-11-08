@@ -445,11 +445,14 @@ async function fresh(hash = '', { init, arg, ...opts } = {}) {
   assert.equal(await saved(), 6, 'the slider at its end did not move your place on');
   await scrub(500);
   assert.equal(await saved(), 5, 'the slider back from its end left your place on the next step');
-  // The last step is where you got to once you're on it, folded or not.
+  // The last step is where you got to once you're on it. Folded, the crane is finished, and your place is step 1 again;
+  // back from there, it's the last step again.
   await p.evaluate(() => { location.hash = 'crane-23'; });
   await p.waitForFunction(() => fold.state.i === 22);
   await scrub(1000);
-  assert.equal(await saved(), 22, 'the last step folded saved a step past the end');
+  assert.deepEqual(await p.evaluate(() => [JSON.parse(localStorage.getItem('fold-by-fold.v1')).progress.crane, JSON.parse(localStorage.getItem('fold-by-fold.v1')).folded]), [0, { crane: true }], 'the last step folded did not finish the crane');
+  await scrub(500);
+  assert.equal(await saved(), 22, 'the slider back from the end did not make the last step your place again');
   await p.context().close();
 }
 
@@ -489,19 +492,18 @@ async function fresh(hash = '', { init, arg, ...opts } = {}) {
 // Step 1 is named by the model alone (#cup) only while it's where you got to: a bare name opens at your place, so once
 // that's further on, step 1 is #cup-1. A reload on step 1 stays there, from its start or folded as it was left.
 {
-  const p = await fresh('#cup-5');
+  const p = await fresh('#cup-3');
   await p.waitForFunction(() => fold.state.id === 'cup');
   const scrub = (v) => p.locator('#scrub').evaluate((el, v) => { el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); }, v);
   await scrub(1000);
-  assert.equal(await p.textContent('#playLabel'), 'Start again');
-  await p.click('#play');
+  await p.evaluate(() => document.querySelector('#ticks button').click());
   await p.waitForFunction(() => location.hash === '#cup-1', null, { timeout: 3000 }).catch(() => assert.fail('step 1 with your place further on is not named #cup-1'));
   await p.reload();
   await p.waitForFunction(() => fold.state.id === 'cup');
   assert.deepEqual(await p.evaluate(() => [fold.state.i, fold.state.t]), [0, 0], 'a reload on step 1 went to your place');
   await p.click('#back');
   await p.waitForSelector('#home:not([hidden])');
-  assert.equal(await p.textContent('.model[data-model="cup"] .count'), 'Step 5 of 5', 'starting again lost your place');
+  assert.equal(await p.textContent('.model[data-model="cup"] .count'), 'Step 4 of 5', 'looking back at step 1 lost your place');
   // A model's first fold landing makes step 2 your place; a reload shows step 1 folded, as it was left.
   await p.click('.model[data-model="frog"]');
   await p.waitForFunction(() => fold.state.id === 'frog');
@@ -511,6 +513,35 @@ async function fresh(hash = '', { init, arg, ...opts } = {}) {
   await p.reload();
   await p.waitForFunction(() => fold.state.id === 'frog');
   assert.deepEqual(await p.evaluate(() => [fold.state.i, fold.state.t]), [0, 1], 'a reload after step 1 landed did not show it folded');
+  await p.context().close();
+}
+
+// A model finished is remembered: its card says Folded, and it opens at step 1 again. A reload of the finished model
+// shows it finished, and keeps it so; folding it again, the card says where you've got to.
+{
+  const p = await fresh('#cup-5');
+  await p.waitForFunction(() => fold.state.id === 'cup');
+  const saved = () => p.evaluate(() => { const s = JSON.parse(localStorage.getItem('fold-by-fold.v1')); return [s.progress.cup, s.folded.cup ?? false]; });
+  assert.deepEqual(await saved(), [4, false]);
+  await p.click('#play');
+  await p.waitForFunction(() => fold.state.t >= 1, null, { timeout: 15000 });
+  assert.deepEqual(await saved(), [0, true], 'the finished cup was not remembered, or its place not put back to step 1');
+  await p.waitForFunction(() => location.hash === '#cup-5' && history.state?.landed, null, { timeout: 3000 }).catch(() => assert.fail('the address did not name the finished cup'));
+  await p.reload();
+  await p.waitForFunction(() => fold.state.id === 'cup');
+  assert.deepEqual(await p.evaluate(() => [fold.state.i, fold.state.t, document.getElementById('stepCount').textContent]), [4, 1, 'Finished · 5 steps'], 'a reload did not show the cup finished');
+  assert.deepEqual(await saved(), [0, true], 'a reload of the finished cup made its last step your place');
+  await p.click('#allModels');
+  await p.waitForSelector('#home:not([hidden])');
+  assert.equal(await p.textContent('.model[data-model="cup"] .count'), 'Folded', 'the finished cup\'s card does not say it is folded');
+  await p.click('.model[data-model="cup"]');
+  await p.waitForFunction(() => fold.state.id === 'cup');
+  assert.deepEqual(await p.evaluate(() => [fold.state.i, fold.state.t, location.hash]), [0, 0, '#cup'], 'the finished cup did not open at step 1');
+  await p.click('#play');
+  await p.waitForFunction(() => fold.state.t >= 1, null, { timeout: 15000 });
+  await p.click('#back');
+  await p.waitForSelector('#home:not([hidden])');
+  assert.equal(await p.textContent('.model[data-model="cup"] .count'), 'Step 2 of 5', 'folding the cup again, its card does not say where you got to');
   await p.context().close();
 }
 
@@ -1166,13 +1197,13 @@ for (const reduce of [false, true]) {
 }
 
 // A damaged or hand-edited save can't break the player: whatever makes no sense is left out.
-for (const junk of ['{"progress":null}', '{"progress":"x"}', '{"progress":{"crane":4.5},"paper":"plaid","slow":"yes"}']) {
+for (const junk of ['{"progress":null}', '{"progress":"x"}', '{"progress":{"crane":4.5},"paper":"plaid","slow":"yes"}', '{"folded":"x"}', '{"folded":{"crane":1,"cup":"yes"}}']) {
   const p = await fresh('#crane', { init: (v) => localStorage.setItem('fold-by-fold.v1', v), arg: junk });
   await p.waitForFunction(() => fold.state.id === 'crane');
   assert.match(await p.textContent('#stepCount'), /^Step 1 of \d+$/, `the crane didn't open with ${junk} saved`);
   assert.ok((await p.textContent('#say')).length > 10, `no words for the step with ${junk} saved`);
   const kept = await p.evaluate(() => JSON.parse(localStorage.getItem('fold-by-fold.v1')));
-  assert.deepEqual([kept.paper, kept.slow, kept.progress.crane], ['vermilion', false, 0], `${junk} was kept as it was`);
+  assert.deepEqual([kept.paper, kept.slow, kept.progress.crane, kept.folded], ['vermilion', false, 0, {}], `${junk} was kept as it was`);
   await p.context().close();
 }
 
