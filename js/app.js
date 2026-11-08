@@ -201,6 +201,7 @@ function outline(m, i) {
   const k = Math.max(0, Math.min(i ?? (latest().progress[m.id] || 0), n - 1));
   $('modelName').textContent = m.name;
   $('stepCount').textContent = `Step ${k + 1} of ${n}`;
+  $('stepNum').textContent = k + 1;
   $('chip').textContent = '\u00a0'; // the step's symbol and name come with the fold; till then, the line is kept
   $('say').textContent = m.steps[k].say;
   words.scrollTop = 0;
@@ -439,6 +440,7 @@ function paint() {
   if (step !== shown) {
     shown = step;
     P.shownAt = performance.now(); // its marks fade in from now
+    $('stepNum').textContent = P.i + 1;
     $('chip').innerHTML = chipFor(step);
     $('say').textContent = step.say;
     tell();

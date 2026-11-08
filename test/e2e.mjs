@@ -1409,6 +1409,29 @@ for (const hash of ['#%', '#crane-3%', '#%F0%9F']) {
   await p.context().close();
 }
 
+// Each step's number shows in large type just before its symbol and name, the way origami books number their diagrams:
+// in the models' own typeface, about twice the size of the name. It's there before the model is folded too. A screen
+// reader, told the step by the bar and the list, doesn't hear it twice.
+{
+  const p = await fresh('#frog-16', { init: () => requestAnimationFrame(function look() {
+    const player = document.getElementById('player');
+    if (player && !player.hidden) window.shell = document.getElementById('stepNum').textContent;
+    else requestAnimationFrame(look);
+  }) });
+  await p.waitForFunction(() => fold.state.id === 'frog', null, { timeout: 30000 });
+  assert.equal(await p.evaluate(() => window.shell), '16', 'the step\'s number didn\'t show until the frog was folded');
+  const look = () => p.evaluate(() => {
+    const n = document.getElementById('stepNum'), chip = document.getElementById('chip');
+    const [a, b] = [n, chip].map((e) => e.getBoundingClientRect());
+    const size = (e) => parseFloat(getComputedStyle(e).fontSize);
+    return { text: n.textContent, hidden: n.getAttribute('aria-hidden'), font: getComputedStyle(n).fontFamily.split(',')[0], ratio: +(size(n) / size(chip)).toFixed(1), before: a.right <= b.left && Math.abs((a.top + a.bottom) / 2 - (b.top + b.bottom) / 2) < 3 };
+  });
+  assert.deepEqual(await look(), { text: '16', hidden: 'true', font: '"Shippori Mincho B1"', ratio: 2, before: true }, 'the step\'s number isn\'t in large type just before its name');
+  await p.click('#next');
+  assert.equal((await look()).text, '17', 'the step\'s number didn\'t follow the step');
+  await p.context().close();
+}
+
 // The paper turns and zooms from the keyboard too: with it in focus, the arrow keys turn it the way a drag does and
 // + and - zoom, and they don't step through the model meanwhile. A mouse pressed on the paper doesn't leave the focus
 // there, so after a drag the arrow keys step again. Escape goes back to the gallery, as the back arrow does.
