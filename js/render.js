@@ -1,7 +1,7 @@
 // Draws the paper in WebGL: two-sided sheets with a little paper grain, the edges of every layer,
 // a cutting mat with the paper's shadow on it, and the diagram marks (fold lines and arrows).
 
-import { corners } from './motion.js';
+import { corners, LAYER } from './motion.js';
 
 const PAPER_VS = `
 attribute vec3 aPos; attribute vec3 aNormal; attribute vec2 aUv;
@@ -368,7 +368,9 @@ export class View {
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT | gl.STENCIL_BUFFER_BIT);
     const { eye, up0 } = this.lens();
     const view = lookAt(eye, this.cam.target, up0);
-    const proj = perspective(FOV, W / H, 0.05, 50);
+    // The near plane keeps to the camera's distance, so the depth stays fine enough to tell layers apart that are a
+    // fraction of a millimetre thick.
+    const proj = perspective(FOV, W / H, 0.05 * this.cam.dist, 50);
     const vp = mul4(proj, view);
     this.vp = vp;
     const below = eye[2] < 0;
@@ -470,10 +472,11 @@ export class View {
     for (const a of [loc.aPos, loc.aNormal, loc.aUv]) gl.disableVertexAttribArray(a);
   }
 
-  // The edges of every facet, as thin strips lying on both faces of the paper.
+  // The edges of every facet, as thin strips lying on both faces of the paper, a third of a layer off each face, so
+  // the strips of layers lying on each other stay apart.
   drawEdges(vp) {
     const data = [];
-    const w = 0.0016;
+    const w = 0.0011, lift = LAYER / 3;
     for (const it of this.items) {
       if (it.bridge) continue;
       const c = corners(it);
@@ -484,7 +487,7 @@ export class View {
         const dir = v3.norm(v3.sub(b, a));
         const side = v3.mul(v3.norm(v3.cross(n, dir)), w);
         for (const s of [1, -1]) {
-          const off = v3.mul(n, 0.0006 * s);
+          const off = v3.mul(n, lift * s);
           const a1 = v3.add(v3.add(a, side), off), a2 = v3.add(v3.sub(a, side), off);
           const b1 = v3.add(v3.add(b, side), off), b2 = v3.add(v3.sub(b, side), off);
           for (const q of [a1, b1, b2, a1, b2, a2]) data.push(q[0], q[1], q[2], 0.1, 0.08, 0.06, 0.34, 0);

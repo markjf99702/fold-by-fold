@@ -8,7 +8,7 @@ import {
   apply, det, dot, sub, side, reflectPoint, centroid, area, add, mul, line, intersect, norm, cross, lerp, inside, overlapArea, sharedSegment,
 } from './geom.js';
 
-export const LAYER = 0.0035; // thickness of one layer of paper, in sheet widths
+export const LAYER = 0.0015; // thickness of one layer of paper, in sheet widths (about 0.2 mm on a 15 cm sheet)
 
 export const ease = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
 
