@@ -1555,6 +1555,20 @@ for (const colorScheme of ['light', 'dark']) {
   await p.context().close();
 }
 
+// The cutting mat in 3D is the green of the page's own mat, the one behind the gallery's pictures and in the box shown
+// where the paper can't be drawn: in dark mode that's darker, and the mat brightened as a model opened. It follows the
+// mode as it changes.
+{
+  const p = await fresh('#crane', { colorScheme: 'dark' });
+  await p.waitForFunction(() => fold.state.id === 'crane');
+  const mat = () => p.evaluate(() => [fold.view().matColor, fold.view().matLine].map((c) => '#' + c.map((x) => Math.round(x * 255).toString(16).padStart(2, '0')).join('')));
+  assert.deepEqual(await mat(), ['#264a40', '#3e675b'], 'in dark mode the mat in 3D is not the page\'s dark mat');
+  await p.emulateMedia({ colorScheme: 'light' });
+  await p.waitForFunction(() => fold.view().matColor[0] > 0.17, null, { timeout: 2000 }).catch(() => {});
+  assert.deepEqual(await mat(), ['#2f5a4e', '#4d7a6c'], 'the mat in 3D did not follow the page to light mode');
+  await p.context().close();
+}
+
 // The cards in a row line up: names, step counts and words at the same height across the row. On a wide screen,
 // and on a phone too, where a name on two lines (Paper airplane) sits beside one on one line (Paper cup), and with
 // a card saying which step you got to.

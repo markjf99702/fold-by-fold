@@ -212,6 +212,7 @@ function ready(m, i, landed) {
   if (!view) {
     try {
       view = new View($('gl'));
+      matFromPage();
       wireCamera();
       // The stage changes size with the words beside or under it, not only with the window.
       if ('ResizeObserver' in window) new ResizeObserver(redraw).observe($('gl'));
@@ -535,6 +536,18 @@ const CHIP = {
 const chipFor = (step) => `${CHIP[symbol(step)]}<span>${step.name}</span>`;
 
 // ---------- Drawing and the camera ----------
+
+// The cutting mat in 3D is the green of the page's own mat (the gallery's pictures, and the box where the paper can't
+// be drawn), which is darker in dark mode: the green brightened as a model opened. Again when the mode changes.
+function matFromPage() {
+  if (!view) return;
+  const css = getComputedStyle(document.documentElement);
+  const [mat, line] = ['--mat', '--mat-line'].map((k) => css.getPropertyValue(k).trim());
+  if (![mat, line].every((c) => /^#[0-9a-f]{6}$/i.test(c))) return;
+  view.setMat(mat, line);
+  redraw();
+}
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', matFromPage);
 
 // A frame is drawn only when something has changed: the page asks for the next one while a fold plays or its marks
 // are up, while the camera is on its way somewhere, or after redraw(). Otherwise the browser is left alone, rather

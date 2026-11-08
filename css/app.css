@@ -30,6 +30,7 @@
   --chip: rgba(35, 32, 27, .07);
   --press: rgba(35, 32, 27, .15);
   --mat: #2f5a4e;
+  --mat-line: #4d7a6c; /* the cutting mat's grid, in 3D */
   --tick: color-mix(in srgb, var(--ink) 50%, var(--bg)); /* a step to come on the bar of ticks, 3:1 against the panel */
   --display: 'Shippori Mincho B1', 'Hiragino Mincho ProN', 'Yu Mincho', Georgia, serif;
   --ui: 'Zen Kaku Gothic New', 'Hiragino Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
@@ -49,6 +50,7 @@
     --chip: rgba(236, 230, 218, .08);
     --press: rgba(236, 230, 218, .17);
     --mat: #264a40;
+    --mat-line: #3e675b;
     --tick: color-mix(in srgb, var(--ink) 40%, var(--bg));
   }
 }
@@ -65,6 +67,7 @@
   --chip: rgba(236, 230, 218, .08);
   --press: rgba(236, 230, 218, .17);
   --mat: #264a40;
+  --mat-line: #3e675b;
   --tick: color-mix(in srgb, var(--ink) 40%, var(--bg));
 }
 
