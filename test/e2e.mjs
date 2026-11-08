@@ -847,6 +847,49 @@ for (const [width, height, list] of [
   await p.context().close();
 }
 
+// Two tabs (or the installed copy beside a tab) keep what each other saved: the paper, Slow and each model's place.
+// Each one saves only what it changed, on top of what's saved now, and one showing the gallery or a model takes in
+// what the other saved as it happens.
+{
+  const a = await fresh('#crane');
+  await a.waitForFunction(() => fold.state.id === 'crane');
+  for (let k = 0; k < 3; k++) await a.click('#next');
+  const b = await a.context().newPage();
+  b.on('pageerror', e => problems.push(e.message));
+  await b.goto(base);
+  await b.waitForSelector('#home:not([hidden])');
+  await b.click('.swatch[aria-label="Indigo"]');
+  await b.click('.model[data-model="frog"]');
+  await b.waitForFunction(() => fold.state.id === 'frog');
+  for (let k = 0; k < 2; k++) await b.click('#next');
+  await b.click('#speed');
+  await a.waitForFunction(() => document.getElementById('speed').getAttribute('aria-pressed') === 'true', null, { timeout: 3000 }).catch(() => assert.fail('Slow turned on in another tab is not shown on'));
+  await a.click('#next');
+  const saved = () => a.evaluate(() => JSON.parse(localStorage.getItem('fold-by-fold.v1')));
+  const s = await saved();
+  assert.deepEqual([s.paper, s.slow, s.progress.crane, s.progress.frog], ['indigo', true, 4, 2], `one tab lost what another saved: ${JSON.stringify(s)}`);
+  const c = await a.context().newPage();
+  await c.goto(base);
+  await c.waitForSelector('#home:not([hidden])');
+  assert.equal(await c.getAttribute('.swatch[aria-label="Indigo"]', 'aria-checked'), 'true', 'a new tab lost the paper picked in another');
+  assert.deepEqual(await c.evaluate(() => ['crane', 'frog'].map((id) => document.querySelector(`.model[data-model="${id}"] .count`).textContent)), ['Step 5 of 23', 'Step 3 of 34'], 'a new tab lost a place saved in another');
+  await c.close();
+  // The gallery in one tab shows what's picked and folded in another.
+  await a.click('#back');
+  await a.waitForSelector('#home:not([hidden])');
+  await b.click('#back');
+  await b.waitForSelector('#home:not([hidden])');
+  await b.click('.swatch[aria-label="Marigold"]');
+  await b.click('.model[data-model="frog"]');
+  await b.waitForFunction(() => fold.state.id === 'frog');
+  await b.click('#next');
+  await a.waitForFunction(() => document.querySelector('.swatch[aria-label="Marigold"]').getAttribute('aria-checked') === 'true'
+    && document.querySelector('.model .thumb polygon[fill="#e3a034"]')
+    && document.querySelector('.model[data-model="frog"] .count').textContent === 'Step 4 of 34', null, { timeout: 3000 })
+    .catch(() => assert.fail('the gallery did not show the paper picked, or the place reached, in another tab'));
+  await a.context().close();
+}
+
 // Two quick presses of Play still fold. The second comes while the marks are up and the paper hasn't moved yet, so it
 // looks as if the first did nothing: it starts the fold then, rather than pausing it before it begins.
 {

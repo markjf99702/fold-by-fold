@@ -41,7 +41,19 @@ function load() {
   };
 }
 const prefs = load();
-function save() {
+// Another tab, or the installed copy beside a tab, can save meanwhile, so what's saved is read again before a change
+// goes on top of it: that tab's paper, Slow and places stay. With nothing saved, or no way to save, prefs stays as it is.
+function latest() {
+  let saved = null;
+  try { saved = localStorage.getItem(KEY); } catch { /* storage blocked */ }
+  if (saved !== null) Object.assign(prefs, load());
+  return prefs;
+}
+// Saves one change: { paper }, { slow } or { progress: { [model]: step } }.
+function save(change) {
+  latest();
+  if (change.progress) Object.assign(prefs.progress, change.progress);
+  else Object.assign(prefs, change);
   try { localStorage.setItem(KEY, JSON.stringify(prefs)); } catch { /* private window */ }
 }
 const paperColor = () => (PAPERS.find((p) => p.id === prefs.paper) || PAPERS[0]).color;
@@ -107,8 +119,7 @@ function renderHome() {
 }
 
 function pickPaper(id) {
-  prefs.paper = id;
-  save();
+  save({ paper: id });
   paintHome();
 }
 
@@ -138,14 +149,15 @@ function paintHome() {
 // ---------- Player ----------
 
 let view = null;
-const P = { b: null, id: null, i: 0, t: 0, playing: false, holding: false, clock: 0, t0: 0 };
+const P = { b: null, id: null, i: 0, t: 0, playing: false, holding: false, clock: 0, t0: 0, pace: 1 };
 const HOLD = 850; // how long the marks show on the paper before Play moves it
 const pace = () => (prefs.slow ? 2.2 : 1); // Slow gives the marks and the fold a little over twice as long
 
+// How long a step's fold takes at the pace it was started at (P.pace).
 function duration(step) {
   const k = step.motion.kind;
   const base = k === 'mech' ? 3400 : k === 'reverse' ? 2800 : k === 'foldUnfold' ? 2600 : k === 'turnOver' ? 1900 : k === 'turn' ? 1300 : 2100;
-  return base * pace();
+  return base * P.pace;
 }
 
 function openModel(id, i = null, { landed = false } = {}) {
@@ -192,8 +204,9 @@ function openModel(id, i = null, { landed = false } = {}) {
   renderSteps();
   // A link's step becomes where you got to only in a model you haven't started. In one you have, your place stays
   // until you move on from the link's step yourself.
-  const link = i !== null && prefs.progress[id] > 0;
-  go(i ?? Math.min(prefs.progress[id] || 0, P.b.steps.length - 1), { snap: true, keep: !link });
+  const place = latest().progress[id] || 0;
+  const link = i !== null && place > 0;
+  go(i ?? Math.min(place, P.b.steps.length - 1), { snap: true, keep: !link });
   if (landed) { P.t = 1; keepAim(); paint(); frameCamera(true); }
   document.title = `${m.name} · Fold by Fold`;
 }
@@ -271,10 +284,9 @@ function keepAim() {
 // lands, the step after, so coming back starts from the paper as it now is. Just going to a step saves it only if it's
 // further on: looking back at an earlier one keeps your place.
 function keepPlace(i = P.i, { further = false } = {}) {
-  const was = prefs.progress[P.id];
+  const was = latest().progress[P.id]; // another tab may have gone further meanwhile
   if (was === i || (further && was > i)) return;
-  prefs.progress[P.id] = i;
-  save();
+  save({ progress: { [P.id]: i } });
 }
 // The place for the fold as it is: the step after once this one's fold has landed, except on the last step.
 const placeNow = () => (P.t >= 1 && P.i < P.b.steps.length - 1 ? P.i + 1 : P.i);
@@ -285,6 +297,7 @@ function start() {
   aimFor(P.b.steps[P.i]);
   P.playing = true;
   P.holding = P.t === 0;
+  P.pace = pace();
   P.clock = performance.now();
   P.t0 = P.t;
   paint();
@@ -488,7 +501,7 @@ function loop(now) {
   const step = P.b.steps[P.i];
   if (P.playing) {
     if (P.holding) {
-      if (now - P.clock >= HOLD * pace()) { P.holding = false; P.clock = now; }
+      if (now - P.clock >= HOLD * P.pace) { P.holding = false; P.clock = now; }
     } else {
       P.t = Math.min(1, P.t0 + (now - P.clock) / duration(step));
       scrubAt(P.t);
@@ -727,10 +740,20 @@ function stepBack() {
 $('prev').addEventListener('click', () => { if (!isOff($('prev'))) stepBack(); });
 $('next').addEventListener('click', () => { if (!isOff($('next'))) go(P.i + 1, { play: true }); });
 $('speed').addEventListener('click', () => {
-  prefs.slow = !prefs.slow;
-  save();
-  if (P.playing && !P.holding) { P.t0 = P.t; P.clock = performance.now(); }
+  save({ slow: !prefs.slow });
+  if (P.playing) {
+    if (!P.holding) { P.t0 = P.t; P.clock = performance.now(); }
+    P.pace = pace();
+  }
   paint();
+});
+// What another tab saves shows here too: the paper and places in the gallery, and Slow. A fold playing keeps its pace
+// until it next starts, and a model open keeps its paper.
+window.addEventListener('storage', (e) => {
+  if (e.key !== KEY) return;
+  latest();
+  if (!$('home').hidden) paintHome();
+  $('speed').setAttribute('aria-pressed', prefs.slow);
 });
 function scrubTo(v) {
   P.t = v / 1000;
