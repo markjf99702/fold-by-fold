@@ -484,6 +484,7 @@ let opened = null; // the card opened from the gallery, and how wide the screen 
 function show(id) {
   if (id !== 'home' && !$('home').hidden) homeY = window.scrollY;
   for (const s of document.querySelectorAll('.screen')) s.hidden = s.id !== id;
+  keepAwake(id !== 'home');
   if (id !== 'home') { window.scrollTo(0, 0); return; }
   const card = opened && document.querySelector(`#models .model[data-model="${opened.id}"]`);
   if (card && opened.width !== innerWidth) card.scrollIntoView({ block: 'center' });
@@ -491,6 +492,35 @@ function show(id) {
   card?.focus({ preventScroll: true });
   opened = null;
 }
+
+// Folding along leaves long gaps between taps, with paper in both hands, so while a model is open the screen stays on,
+// until ten minutes after the last touch or key: a phone left open still goes to sleep. The browser lets go whenever
+// the page is out of sight, so it's asked again when the page is back. Where there's no way to keep it on, or the
+// browser says no, the screen sleeps as usual.
+const AWAKE = 10 * 60 * 1000;
+let awake = null; // the lock keeping the screen on, or the promise of one
+let awakeTimer = 0;
+function keepAwake(on) {
+  if (!('wakeLock' in navigator)) return;
+  clearTimeout(awakeTimer);
+  if (!on) {
+    const was = awake;
+    awake = null;
+    Promise.resolve(was).then((lock) => lock?.release()).catch(() => {});
+    return;
+  }
+  awakeTimer = setTimeout(() => keepAwake(false), AWAKE);
+  if (awake || document.visibilityState !== 'visible') return;
+  const asked = awake = (async () => {
+    const lock = await navigator.wakeLock.request('screen');
+    if (awake !== asked) { lock.release().catch(() => {}); return null; } // let go of while it was being asked for
+    awake = lock;
+    lock.addEventListener('release', () => { if (awake === lock) awake = null; });
+    return lock;
+  })().catch(() => { if (awake === asked) awake = null; return null; });
+}
+$('player').addEventListener('pointerdown', () => keepAwake(true), { passive: true });
+document.addEventListener('keydown', () => { if (!$('player').hidden) keepAwake(true); });
 
 // In a frame on another page (a viewer showing the single-file copy, say) the address may not be the page's own
 // to rewrite, and going back can take the frame somewhere else entirely, so there a card and the back arrow just
@@ -595,9 +625,11 @@ document.addEventListener('keydown', (e) => {
 });
 window.addEventListener('hashchange', route);
 // A fold runs by the clock, and nothing is drawn while the page is out of sight, so locking the phone or switching to
-// another app mid-fold brought you back to it already over. It pauses instead, to carry on from where it was.
+// another app mid-fold brought you back to it already over. It pauses instead, to carry on from where it was. Back in
+// sight with a model open, the screen is kept on again.
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'hidden' && P.playing) pause();
+  if (document.visibilityState === 'hidden') { if (P.playing) pause(); }
+  else if (!$('player').hidden) keepAwake(true);
 });
 // Safari on an iPhone shows a button as pressed (:active) under a finger only once the page listens for touches.
 document.addEventListener('touchstart', () => {}, { passive: true });

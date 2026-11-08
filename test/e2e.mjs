@@ -609,6 +609,44 @@ async function fresh(hash = '', { init, arg, ...opts } = {}) {
   await p.context().close();
 }
 
+// While a model is open the screen is kept on: asked for on opening it, and let go of back in the gallery or ten
+// minutes after the last touch or key (the next touch asks again). The browser lets go itself while the page is out of
+// sight, so it's asked again when the page is back. (Headless Chromium says no to the real thing, so it's stood in for.)
+{
+  const p = await fresh('', { init: () => {
+    window.locks = [];
+    Object.defineProperty(navigator, 'wakeLock', { configurable: true, value: { request: async (type) => {
+      locks.push(type);
+      const lock = window.lock = new EventTarget();
+      lock.release = async () => { if (!lock.released) { lock.released = true; locks.push('release'); lock.dispatchEvent(new Event('release')); } };
+      return lock;
+    } } });
+    const later = window.setTimeout;
+    window.setTimeout = function (fn, ms, ...rest) { if (ms === 10 * 60 * 1000) window.idle = fn; return later.call(this, fn, ms, ...rest); };
+  } });
+  const locks = (n) => p.waitForFunction((n) => locks.length >= n, n, { timeout: 2000 }).catch(() => {}).then(() => p.evaluate(() => locks.join(' ')));
+  await p.click('.model:has(h3:text("Paper cup"))');
+  await p.waitForSelector('#player:not([hidden])');
+  assert.equal(await locks(1), 'screen', 'opening a model did not keep the screen on');
+  await p.tap('#gl');
+  await p.evaluate(() => idle());
+  assert.equal(await locks(2), 'screen release', 'ten minutes with nothing touched did not let the screen sleep');
+  await p.tap('#gl');
+  assert.equal(await locks(3), 'screen release screen', 'a touch after that did not keep the screen on again');
+  await p.evaluate(() => {
+    Object.defineProperty(document, 'visibilityState', { value: 'hidden', configurable: true });
+    lock.release();
+    document.dispatchEvent(new Event('visibilitychange'));
+    delete document.visibilityState;
+    document.dispatchEvent(new Event('visibilitychange'));
+  });
+  assert.equal(await locks(5), 'screen release screen release screen', 'back in sight, the screen was not kept on again');
+  await p.click('#back');
+  await p.waitForSelector('#home:not([hidden])');
+  assert.equal(await locks(6), 'screen release screen release screen release', 'back in the gallery, the screen was still kept on');
+  await p.context().close();
+}
+
 // Slow gives the marks longer on the paper before a fold moves, and the fold itself a little over twice as long
 // (2.2 times), and it's remembered.
 {
