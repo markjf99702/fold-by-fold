@@ -2,7 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Sheet, fold, turnOver, together, creases, isFlipped } from '../js/paper.js';
-import { apply, area, bisector, side, centroid, overlapArea, line, ccw, inside as covers } from '../js/geom.js';
+import { apply, area, bisector, side, centroid, overlapArea, line, ccw, clip, inside as covers } from '../js/geom.js';
 import { build } from '../js/build.js';
 import { poses, marks, symbol, corners, transformPoint, LAYER } from '../js/motion.js';
 import { MODELS } from '../js/models.js';
@@ -616,4 +616,237 @@ test('a tuck is marked as one: its arrow breaks where the point goes in under th
     }
   }
   assert.deepEqual(tucks, ['waterbomb 8: 2', 'waterbomb 13: 2']);
+});
+
+// ---------- Random folds ----------
+// Sequences of plain folds the models could ask for, from a fixed seed, so a run is the same every time. Each one is
+// either refused in the engine's own words or folds into paper that could be real, moves without anything passing
+// through anything, and is marked where the paper is.
+function random(seed) {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6D2B79F5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+const FOLDS = ['valley', 'mountain', 'crease', 'flap valley', 'flap mountain', 'turn over', 'turn'];
+function randomStep(r) {
+  // Paper points, mostly on a grid of eighths, where folds meet corners and each other's ends.
+  const point = () => (r() < 0.8 ? [Math.round(r() * 8) / 8, Math.round(r() * 8) / 8] : [+r().toFixed(3), +r().toFixed(3)]);
+  const kind = FOLDS[Math.floor(r() * FOLDS.length)];
+  const a = point();
+  let b = point();
+  while (a[0] === b[0] && a[1] === b[1]) b = point();
+  const c = point();
+  const say = `${kind} ${JSON.stringify([a, b, c])}`;
+  switch (kind) {
+    case 'valley': return { say, do: (h) => h.valley(h.onto(a, b), { move: a }) };
+    case 'mountain': return { say, do: (h) => h.mountain(h.onto(a, b), { move: a }) };
+    case 'crease': return { say, do: (h) => h.crease(h.onto(a, b), { move: a }) };
+    case 'flap valley': return { say, do: (h) => h.valley(h.through(a, b), { flap: c }) };
+    case 'flap mountain': return { say, do: (h) => h.mountain(h.through(a, b), { flap: c }) };
+    case 'turn over': { const how = r() < 0.5 ? 'side' : 'end'; return { say: `turn over ${how}`, do: (h) => h.turnOver(how) }; }
+    default: { const deg = [45, 90, -90, 180][Math.floor(r() * 4)]; return { say: `turn ${deg}`, do: (h) => h.turn(deg) }; }
+  }
+}
+// What the engine says when it won't make a fold.
+const REFUSED = [/^No facet holds paper point/, /^The flap to fold is not on the moving side/, /^Nothing on the moving side/, /^Layer \d+ is in the way/];
+let randomRuns = null;
+function randomFolds() {
+  if (randomRuns) return randomRuns;
+  const r = random(1);
+  randomRuns = { built: [], refused: 0, unexplained: [] };
+  for (let n = 0; n < 300; n++) {
+    const len = 1 + Math.floor(r() * 6);
+    // A square, a square white side up turned like a diamond, and a 3 x 5 card.
+    const paper = r() < 0.7 ? {} : r() < 0.5 ? { colorUp: false, turn: 45 } : { size: [1, 5 / 3] };
+    const steps = Array.from({ length: len }, () => randomStep(r));
+    const id = `random ${n} ${JSON.stringify(paper)}`;
+    try {
+      randomRuns.built.push(build({ id, paper, steps }));
+    } catch (e) {
+      const said = String(e?.message).slice(id.length).replace(/^ step \d+: /, '');
+      if (e instanceof Error && REFUSED.some((re) => re.test(said))) randomRuns.refused++;
+      else randomRuns.unexplained.push(`${id}: ${e?.stack || e}`);
+    }
+  }
+  return randomRuns;
+}
+
+test('random folds are refused in the engine\'s own words, or fold into real paper, land where they say, and are marked on the paper', () => {
+  const { built, refused, unexplained } = randomFolds();
+  assert.deepEqual(unexplained, []);
+  assert.ok(built.length > 200 && refused > 5, `${built.length} built, ${refused} refused`);
+  const onPaper = (sheet, q) => sheet.order.some((id) => covers(sheet.world(id), q, 1e-6));
+  const flatAt = (sheet, id) => { const f = sheet.facets.get(id); return f.poly.map((q) => [...apply(f.m, q), sheet.levels().get(id) * LAYER]); };
+  const problems = [];
+  for (const b of built) {
+    const a0 = paperArea(b.start);
+    for (const [i, step] of b.steps.entries()) {
+      const where = `${b.model.id} step ${i + 1} (${step.say})`, { motion } = step;
+      const fail = (what) => problems.push(`${where}: ${what}`);
+      if (!close(paperArea(step.to), a0)) fail('loses paper');
+      for (const [when, sheet] of [['as it starts', step.from], ['as it ends', step.to], ['folded before it unfolds', motion.folded]]) {
+        for (const x of sheet ? crossings(sheet) : []) fail(`${when}, ${x}`);
+      }
+      for (const t of [0, 0.25, 0.5, 0.75, 1]) {
+        for (const it of poses(step, t)) {
+          for (const p of corners(it)) {
+            if (!p.every(Number.isFinite)) fail(`at t=${t} a corner is at ${p}`);
+            else if (p[2] <= -1e-9) fail(`goes under the table at t=${t}`);
+          }
+        }
+      }
+      for (const [t, sheet] of [[0, step.from], [1, motion.kind === 'foldUnfold' ? step.from : step.to]]) {
+        const off = poses(step, t).find((it) => !corners(it).every((p, k) => closePt(p, flatAt(sheet, it.facet.id)[k], 1e-6)));
+        if (off) fail(`at t=${t} facet ${off.facet.id} isn't where the fold puts it`);
+      }
+      if (i + 1 < b.steps.length) {
+        const end = new Map(poses(step, 1).map((it) => [it.facet.id, it]));
+        for (const it of poses(b.steps[i + 1], 0)) {
+          const c = centroid(it.facet.poly);
+          const moved = [c, ...it.facet.poly.map((p) => [p[0] + (c[0] - p[0]) * 0.02, p[1] + (c[1] - p[1]) * 0.02])].some((q) => {
+            const was = end.get(it.facet.id) || [...end.values()].find((e) => covers(e.facet.poly, q, 1e-9));
+            return !was || !closePt(transformPoint(was.pose, ...q), transformPoint(it.pose, ...q), 1e-6);
+          });
+          if (moved) { fail('the next step starts with the paper somewhere else'); break; }
+        }
+      }
+      if (motion.kind !== 'fold' && motion.kind !== 'foldUnfold') continue;
+      const ms = marks(step) || [];
+      if (!ms.length) fail('has no marks');
+      symbol(step);
+      const landing = motion.kind === 'foldUnfold' ? motion.folded : step.to;
+      for (const m of ms) {
+        // Folds of two pieces along one line share the line, drawn once.
+        const [p, q] = m.line || [];
+        for (let s = 0.15; p && s <= 0.85 + 1e-9; s += 0.05) {
+          if (!onPaper(step.from, [p[0] + (q[0] - p[0]) * s, p[1] + (q[1] - p[1]) * s])) { fail('its line runs off the paper'); break; }
+        }
+        if (!m.arrow) continue;
+        const f = m.arrow.from.slice(0, 2), t = m.arrow.to.slice(0, 2);
+        if (!motion.moving.some((id) => covers(step.from.world(id), f, 1e-6))) fail(`its arrow starts off the paper that moves, at ${f}`);
+        if (!onPaper(landing, t)) fail(`its arrow ends off the paper, at ${t}`);
+      }
+    }
+  }
+  assert.deepEqual(problems, []);
+});
+
+test('random folds move smoothly, with no layer passing through another on the way', () => {
+  const problems = [];
+  for (const b of randomFolds().built) {
+    for (const [i, step] of b.steps.entries()) {
+      const where = `${b.model.id} step ${i + 1} (${step.say})`;
+      for (const s of snaps(step)) problems.push(`${where} snaps over at ${s}`);
+      const x = passingThrough(step);
+      if (x) problems.push(`${where}: ${x}`);
+    }
+  }
+  assert.deepEqual(problems, []);
+});
+
+// Where two layers pass through each other in the air, at moments a twentieth of the step apart: each one's edge
+// pierces the other more than 4 layers deep on both sides, along more than 0.02 of paper.
+function passingThrough(step) {
+  for (let k = 1; k < 20; k++) {
+    const items = poses(step, k / 20).filter((it) => !it.bridge).map((it) => {
+      const pts = corners(it), axes = [0, 1, 2];
+      return { id: it.facet.id, poly: it.facet.poly, pose: it.pose, pts, lo: axes.map((a) => Math.min(...pts.map((p) => p[a]))), hi: axes.map((a) => Math.max(...pts.map((p) => p[a]))) };
+    });
+    for (let a = 0; a < items.length; a++) {
+      for (let c = a + 1; c < items.length; c++) {
+        const A = items[a], B = items[c];
+        if (![0, 1, 2].every((x) => A.lo[x] <= B.hi[x] + 1e-4 && B.lo[x] <= A.hi[x] + 1e-4)) continue;
+        if (pierces(A, B) && pierces(B, A)) return `at t=${k / 20} facets ${A.id} and ${B.id} pass through each other`;
+      }
+    }
+  }
+  return null;
+}
+
+// Whether facet A goes right through facet B's plane, deep enough on both sides, where B is: the stretch of A that lies
+// in B's plane, kept a little inside both facets' edges (where folds meet, layers touch), and long enough.
+function pierces(A, B, { depth = 4 * LAYER, chord = 0.02, margin = 0.006 } = {}) {
+  const n = [B.pose.r[2], B.pose.r[5], B.pose.r[8]], o = B.pose.t;
+  const d = A.pts.map((x) => n[0] * (x[0] - o[0]) + n[1] * (x[1] - o[1]) + n[2] * (x[2] - o[2]));
+  const hi = Math.max(...d), lo = Math.min(...d);
+  if (hi <= 1e-4 || lo >= -1e-4 || Math.min(hi, -lo) < depth) return false;
+  // Where A's edges cross B's plane, on A's paper.
+  const across = [];
+  for (let k = 0; k < d.length; k++) {
+    const j = (k + 1) % d.length, p = d[k], q = d[j];
+    if ((p > 0 && q < 0) || (p < 0 && q > 0)) {
+      const s = p / (p - q);
+      across.push([A.poly[k][0] + (A.poly[j][0] - A.poly[k][0]) * s, A.poly[k][1] + (A.poly[j][1] - A.poly[k][1]) * s]);
+    } else if (p === 0) across.push(A.poly[k]);
+  }
+  if (across.length < 2) return false;
+  const inA = shrunk(A.poly, margin), onA = inA.length && segmentIn(across[0], across.at(-1), inA);
+  if (!onA) return false;
+  // The same stretch on B's paper, inside B.
+  const toB = (q) => {
+    const x = transformPoint(A.pose, ...q), r = B.pose.r, v = [x[0] - o[0], x[1] - o[1], x[2] - o[2]];
+    return [r[0] * v[0] + r[3] * v[1] + r[6] * v[2], r[1] * v[0] + r[4] * v[1] + r[7] * v[2]];
+  };
+  const inB = shrunk(B.poly, margin), onB = inB.length && segmentIn(toB(onA[0]), toB(onA[1]), inB);
+  return !!onB && Math.hypot(onB[1][0] - onB[0][0], onB[1][1] - onB[0][1]) >= chord;
+}
+
+// A convex polygon with every edge moved in by m.
+function shrunk(poly, m) {
+  const p = ccw(poly);
+  let out = p;
+  for (let i = 0; i < p.length && out.length; i++) {
+    const a = p[i], b = p[(i + 1) % p.length], dx = b[0] - a[0], dy = b[1] - a[1], len = Math.hypot(dx, dy);
+    if (len > 1e-12) out = clip(out, { p: [a[0] - (dy / len) * m, a[1] + (dx / len) * m], d: [dx / len, dy / len] }, true);
+  }
+  return out;
+}
+
+// The part of the segment p-q inside a convex ccw polygon, or null.
+function segmentIn(p, q, poly) {
+  let t0 = 0, t1 = 1;
+  const d = [q[0] - p[0], q[1] - p[1]];
+  for (let i = 0; i < poly.length; i++) {
+    const a = poly[i], b = poly[(i + 1) % poly.length], e = [b[0] - a[0], b[1] - a[1]];
+    const fp = e[0] * (p[1] - a[1]) - e[1] * (p[0] - a[0]), fd = e[0] * d[1] - e[1] * d[0];
+    if (Math.abs(fd) < 1e-15) { if (fp < 0) return null; continue; }
+    if (fd > 0) t0 = Math.max(t0, -fp / fd); else t1 = Math.min(t1, -fp / fd);
+    if (t0 > t1) return null;
+  }
+  return [[p[0] + d[0] * t0, p[1] + d[1] * t0], [p[0] + d[0] * t1, p[1] + d[1] * t1]];
+}
+
+// ---------- Flat moments in the middle of a step ----------
+test('wherever the paper lies flat partway through a step, it could be real paper', () => {
+  // Halfway through the frog's leg reverse folds, where the page lies turned open, a fold passes through the layers
+  // under it: that is the question put to Mark of paper passing through a thick stack mid-fold.
+  const thick = new Set(['frog 27', 'frog 28', 'frog 30', 'frog 31']);
+  const problems = [];
+  let checked = 0;
+  for (const model of MODELS) {
+    for (const [i, step] of once(model).steps.entries()) {
+      if (thick.has(`${model.id} ${i + 1}`)) continue;
+      for (let k = 1; k < 200; k++) {
+        const items = poses(step, k / 200).filter((it) => !it.bridge);
+        if (!items.every(({ pose: { r } }) => Math.abs(r[2]) + Math.abs(r[5]) + Math.abs(r[6]) + Math.abs(r[7]) < 1e-12)) continue;
+        // The paper as it lies at that moment, stacked by height.
+        const facets = new Map(), z = new Map();
+        for (const it of items) {
+          const { r, t } = it.pose;
+          facets.set(it.facet.id, { id: it.facet.id, poly: it.facet.poly, m: { a: r[0], b: r[1], c: r[3], d: r[4], e: t[0], f: t[1] } });
+          z.set(it.facet.id, corners(it).reduce((sum, p) => sum + p[2], 0) / it.facet.poly.length);
+        }
+        const x = crossings(new Sheet(facets, [...facets.keys()].sort((p, q) => z.get(p) - z.get(q))));
+        if (x.length) problems.push(`${model.id} step ${i + 1} at t=${k / 200}: ${x[0]}`);
+        checked++;
+      }
+    }
+  }
+  assert.deepEqual(problems, []);
+  assert.ok(checked > 300, `only ${checked} flat moments`);
 });
