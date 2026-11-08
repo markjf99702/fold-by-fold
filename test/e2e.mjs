@@ -1639,7 +1639,8 @@ for (const colorScheme of ['light', 'dark']) {
 
 // The cards in a row line up: names, step counts and words at the same height across the row. On a wide screen,
 // and on a phone too, where a name on two lines (Paper airplane) sits beside one on one line (Paper cup), and with
-// a card saying which step you got to.
+// a card saying which step you got to. The line under a name starts level too (how hard it is), where it wraps in
+// one card (Easy · Printer paper, then the steps) and not in the next.
 for (const [width, height] of [[1280, 800], [390, 844], [360, 780]]) {
   const wide = width >= 700;
   const p = await fresh('', { viewport: { width, height }, ...(wide ? { deviceScaleFactor: 1, hasTouch: false } : {}), init: () => localStorage.setItem('fold-by-fold.v1', '{"progress":{"plane":2,"crane":9}}') });
@@ -1650,7 +1651,7 @@ for (const [width, height] of [[1280, 800], [390, 844], [360, 780]]) {
     for (const card of document.querySelectorAll('.model')) {
       const top = Math.round(card.getBoundingClientRect().top);
       const at = (q) => Math.round(card.querySelector(q).getBoundingClientRect().top) - top;
-      (out[top] ||= []).push([at('.title'), at('.meta'), at('.blurb')]);
+      (out[top] ||= []).push([at('.title'), at('.meta'), at('.meta > .level'), at('.blurb')]);
     }
     return Object.values(out);
   });

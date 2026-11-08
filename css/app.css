@@ -174,8 +174,9 @@ h1 {
 .model .title { display: block; font-family: var(--display); font-weight: 800; font-size: 1.3rem; line-height: 1.2; overflow-wrap: break-word; text-wrap: balance; }
 @media (max-width: 359px) { .model .title { font-size: 1.15rem; } } /* two across on a 320 px phone, Waterbomb and all */
 /* The level, the paper to fold it from and the steps, with a dot between them. Where the line wraps, the dot that
-   would start the new line sits outside the box and is cut off, so a line never starts with one. */
-.model .meta { font-size: .82rem; color: var(--muted); display: flex; flex-wrap: wrap; column-gap: 14px; align-items: center; overflow: hidden; }
+   would start the new line sits outside the box and is cut off, so a line never starts with one. Beside a card whose
+   line wraps, a line that doesn't stays at the top, level with its neighbour's first. */
+.model .meta { font-size: .82rem; color: var(--muted); display: flex; flex-wrap: wrap; column-gap: 14px; align-items: center; align-content: flex-start; overflow: hidden; }
 .model .meta > * + *::before { content: '·'; content: '·' / ''; display: inline-block; width: 14px; margin-left: -14px; text-align: center; }
 .model .level { font-weight: 700; color: var(--accent); }
 .model .blurb { display: block; font-size: .88rem; line-height: 1.45; }
