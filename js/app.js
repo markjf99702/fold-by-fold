@@ -171,15 +171,28 @@ function openModel(id, i = null, { landed = false } = {}) {
       // The stage changes size with the words beside or under it, not only with the window.
       if ('ResizeObserver' in window) new ResizeObserver(redraw).observe($('gl'));
       // A phone can take the 3D away from a page and give it back a moment later. If it doesn't come back, the
-      // stage would be a blank box, so say what to do. A fold playing stops where it is rather than running on out
-      // of sight.
+      // stage would be a blank box, so say what to do, with a button to do it: a copy installed on a phone has no
+      // reload of its own. The address names the step, so a reload comes back to it. Meanwhile the buttons that turn
+      // the view go, and a fold playing stops where it is rather than running on out of sight.
       let lost = 0;
+      const turning = (on) => { $('topView').hidden = $('resetView').hidden = !on; };
       $('gl').addEventListener('webglcontextlost', () => {
         if (P.playing) pause();
         clearTimeout(lost);
-        lost = setTimeout(() => { $('glError').textContent = 'The 3D view stopped. Reload the page to bring the paper back.'; $('glError').hidden = false; }, 3000);
+        lost = setTimeout(() => {
+          const words = document.createElement('span');
+          words.textContent = 'The 3D view stopped. Reload the page to bring the paper back.';
+          const reload = document.createElement('button');
+          reload.type = 'button';
+          reload.className = 'reload';
+          reload.textContent = 'Reload';
+          reload.addEventListener('click', () => location.reload());
+          $('glError').replaceChildren(words, reload);
+          $('glError').hidden = false;
+          turning(false);
+        }, 3000);
       });
-      $('gl').addEventListener('webglcontextrestored', () => { clearTimeout(lost); $('glError').hidden = true; redraw(); }); // after the view has rebuilt
+      $('gl').addEventListener('webglcontextrestored', () => { clearTimeout(lost); $('glError').hidden = true; turning(true); redraw(); }); // after the view has rebuilt
     } catch {
       // No 3D here: say so and put away what only works in 3D. The words, slider and buttons still work.
       $('glError').hidden = false;

@@ -752,9 +752,20 @@ for (const [width, height, list] of [
   const stopped = await p.evaluate(() => [fold.state.playing, fold.state.t < 1]);
   assert.deepEqual(stopped, [false, true], 'the fold ran on while the 3D was gone');
   assert.equal(await p.textContent('#playLabel'), 'Carry on');
-  assert.equal(await p.textContent('#glError'), 'The 3D view stopped. Reload the page to bring the paper back.');
+  assert.equal(await p.textContent('#glError span'), 'The 3D view stopped. Reload the page to bring the paper back.');
+  // It has a button to reload, since a copy installed on a phone has no reload of its own, and the buttons that turn
+  // the view go while there's nothing to turn; they come back with the 3D.
+  assert.equal(await p.isVisible('#glError button.reload'), true, 'no Reload button where the 3D stopped');
+  for (const q of ['#topView', '#resetView']) assert.equal(await p.isVisible(q), false, `${q} is still up with the 3D stopped`);
   await p.evaluate(() => lose.restoreContext());
   await p.waitForSelector('#glError', { state: 'hidden', timeout: 4000 }).catch(() => assert.fail('the word that the 3D stopped stayed after it came back'));
+  for (const q of ['#topView', '#resetView']) assert.equal(await p.isVisible(q), true, `${q} did not come back with the 3D`);
+  // Reload reloads the page, on the step it was on.
+  await p.evaluate(() => lose.loseContext());
+  await p.waitForSelector('#glError:not([hidden])', { timeout: 6000 });
+  await Promise.all([p.waitForEvent('load'), p.click('#glError .reload')]);
+  await p.waitForFunction(() => window.fold?.state.id === 'heart');
+  assert.deepEqual(await p.evaluate(() => [fold.state.i, document.getElementById('glError').hidden]), [3, true], 'Reload did not come back to the step');
   await p.context().close();
 }
 

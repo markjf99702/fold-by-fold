@@ -232,9 +232,17 @@ html:has(#player:not([hidden])) { overscroll-behavior-y: none; }
 }
 /* Where the paper can't be drawn, the mat is still there, saying why. */
 .gl-error {
-  position: absolute; inset: 0; display: grid; place-items: center; text-align: center; margin: 0;
+  position: absolute; inset: 0; display: grid; place-items: center; align-content: center; gap: 14px; text-align: center; margin: 0;
   padding: 24px max(24px, calc(50% - 13em)); background: var(--mat); color: #eef3ef; text-wrap: balance;
 }
+/* Reload, when the 3D has stopped: drawn like Slow, in the mat's light ink, and as big as a finger past its edges. */
+.gl-error .reload {
+  appearance: none; border: 1.5px solid rgba(238, 243, 239, .55); background: none; border-radius: 99px; height: 36px; padding: 0 16px;
+  font-size: .85rem; font-weight: 700; cursor: pointer; color: inherit; position: relative;
+}
+.gl-error .reload::before { content: ''; position: absolute; inset: -5.5px -4px; }
+.gl-error .reload:active { background: rgba(238, 243, 239, .14); }
+.gl-error .reload:focus-visible { outline-color: #eef3ef; }
 
 .panel {
   grid-area: panel;
