@@ -568,12 +568,13 @@ async function fresh(hash = '', { init, arg, ...opts } = {}) {
 }
 
 // The camera frames a step's whole fold, not just where it starts and ends: turning the model over stands the paper on
-// its edge, and a fold behind lifts the model to make room under it, and neither runs off the stage part way. On a
+// its edge, a fold behind lifts the model to make room under it, and the fortune teller rises and turns over as it
+// opens, and none of them runs off the stage part way. On a
 // wide screen, a phone held sideways and a phone held upright, a quarter, half and three quarters of the way through.
 for (const [width, height, list] of [
-  [1280, 800, ['crane-3', 'crane-22', 'fortune-teller-8', 'waterbomb-9', 'helmet-10', 'frog-36']],
-  [844, 390, ['crane-3', 'crane-22', 'fortune-teller-8', 'waterbomb-9', 'helmet-10', 'frog-36']],
-  [390, 844, ['fortune-teller-8', 'crane-22']],
+  [1280, 800, ['crane-3', 'crane-22', 'fortune-teller-8', 'fortune-teller-9', 'waterbomb-9', 'helmet-10', 'frog-36']],
+  [844, 390, ['crane-3', 'crane-22', 'fortune-teller-8', 'fortune-teller-9', 'waterbomb-9', 'helmet-10', 'frog-36']],
+  [390, 844, ['fortune-teller-8', 'fortune-teller-9', 'crane-22']],
 ]) {
   const p = await fresh('#cup', { viewport: { width, height }, deviceScaleFactor: 1 });
   await p.waitForFunction(() => fold.state.id === 'cup');

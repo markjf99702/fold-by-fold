@@ -137,6 +137,16 @@ function waterbombSide(at, first, last = 'Tuck each one into the pocket under th
   ];
 }
 
+// The fortune teller opened, its four corners tilted up `theta` degrees round its middle. Its eight creases meet there 45
+// degrees apart and open evenly: with the diagonals out to the corners rising at theta, the middle lines rise at the
+// angle phi that keeps the paper between them flat, cos 45 = cos theta cos phi cos 45 + sin theta sin phi. The middle
+// lines then close by twice theta and the diagonals by twice phi, in degrees.
+function opened(theta) {
+  const t = theta * Math.PI / 180, a = Math.cos(t) * Math.SQRT1_2, b = Math.sin(t);
+  const phi = Math.atan2(b, a) - Math.acos(Math.min(1, Math.SQRT1_2 / Math.hypot(a, b)));
+  return { middles: 2 * theta, diagonals: 2 * phi * 180 / Math.PI };
+}
+
 // The wings of the flapping bird: up to halfway while it stands up, then three flaps, ending halfway.
 const ease = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
 function flapping(t) {
@@ -439,8 +449,32 @@ export const MODELS = [
         do: (h) => h.crease(h.upright(h.sheet().bounds().cx), { move: [0.25, 0.25] }),
       },
       {
-        say: 'Turn it over, slide a thumb and finger under each of the four square flaps, and push the points up and together. That’s the fortune teller.',
+        say: 'Turn it over, so the four square flaps are on top.',
         do: (h) => h.turnOver(),
+      },
+      {
+        say: 'Slide a thumb and finger under each of the four square flaps, and push them together: the middle rises and the four points meet. Turn it points up, and that’s the fortune teller.',
+        name: 'Open it',
+        view: { yaw: -120, pitch: 28, size: 0.55, lift: 0.12 },
+        do: (h) => {
+          // It opens to 65 degrees in the first three quarters of the step, evenly all round: each crease keeps to the
+          // angle the others leave it.
+          const mid = h.at([0.5, 0.5]), end = opened(65), at = (t) => opened(65 * ease(Math.min(1, t / 0.75)));
+          const crease = (q, which) => ({ a: mid, b: h.at(q), fold: (which === 'middles' ? -1 : 1) * end[which], schedule: (t) => at(t)[which] / end[which] });
+          return h.standUp({
+            name: 'Open it',
+            root: [0.4, 0.3],
+            level: [[0.25, 0.25], [0.75, 0.25], [0.75, 0.75], [0.25, 0.75]],
+            creases: [
+              // From above, with the squares on top: the middle lines, folded in half twice, stand up as mountains, and
+              // the diagonals between them go down as valleys.
+              ...[[0.5, 0.25], [0.75, 0.5], [0.5, 0.75], [0.25, 0.5]].map((q) => crease(q, 'middles')),
+              ...[[0.25, 0.25], [0.75, 0.25], [0.75, 0.75], [0.25, 0.75]].map((q) => crease(q, 'diagonals')),
+            ],
+            // It rises with its points down, the way your fingers push them; then it turns over, points up.
+            roll: { line: { p: mid, d: [1, 0] }, angle: 180, schedule: (t) => ease(Math.min(1, Math.max(0, (t - 0.4) / 0.48))) },
+          });
+        },
       },
     ],
   },

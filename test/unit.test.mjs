@@ -426,7 +426,7 @@ test('js/finished.js has a picture for every model and nothing else', () => {
 
 test('a model that ends standing up is pictured standing, seen from where the player ends it', () => {
   const standers = MODELS.filter((m) => once(m).steps.at(-1).view).map((m) => m.id);
-  assert.deepEqual(standers, ['plane', 'crane', 'flapping-bird']);
+  assert.deepEqual(standers, ['plane', 'fortune-teller', 'crane', 'flapping-bird']);
   for (const id of standers) {
     const b = once(MODELS.find((m) => m.id === id));
     const last = b.steps.at(-1);
@@ -592,6 +592,28 @@ test('frog: each petal fold comes after a step that creases the face along the s
       assert.ok(guide.motion.parts.some((p) => Math.abs(side(p.line, a)) < 1e-9 && Math.abs(side(p.line, c)) < 1e-9), `frog step ${i + 1}: no crease along ${sp.a}-${sp.b}`);
     }
     assert.match(petal.say + guide.say, /crease/i, `frog steps ${i}-${i + 1} don't say the creases guide it`);
+  }
+});
+
+test('fortune teller: its last step opens it into its four points, up and together, with the squares outside', () => {
+  const b = once(MODELS.find((m) => m.id === 'fortune-teller'));
+  const last = b.steps.at(-1);
+  assert.ok(last.motion.stands && last.view, 'the fortune teller ends flat');
+  const end = poses(last, 1);
+  const at = (q) => { const id = last.from.facetAt(q).id; return transformPoint(end.find((it) => it.facet.id === id).pose, ...q); };
+  // The paper's middle at the bottom, the four corners round it at the top, level and the same way out from the middle.
+  const mid = at([0.5, 0.5]), points = [[0.25, 0.25], [0.75, 0.25], [0.75, 0.75], [0.25, 0.75]].map(at);
+  for (const p of points) {
+    assert.ok(p[2] > mid[2] + 0.25, `a point is ${(p[2] - mid[2]).toFixed(3)} above the middle`);
+    assert.ok(close(p[2], points[0][2], 1e-6), 'the points are not level');
+    const out = Math.hypot(p[0] - mid[0], p[1] - mid[1]);
+    assert.ok(out > 0.1 && out < 0.2, `a point is ${out.toFixed(3)} out from the middle, not near the others`);
+  }
+  // The colored squares, where you write the colors, face out.
+  for (const q of [[0.1, 0.05], [0.95, 0.9], [0.05, 0.9], [0.9, 0.1]]) {
+    const it = end.find((x) => x.facet.id === last.from.facetAt(q).id), p = transformPoint(it.pose, ...q);
+    const front = [it.pose.r[2], it.pose.r[5], it.pose.r[8]];
+    assert.ok(front[0] * (p[0] - mid[0]) + front[1] * (p[1] - mid[1]) > 0, `the colored square at ${q} faces in`);
   }
 });
 
