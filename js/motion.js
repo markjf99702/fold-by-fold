@@ -254,13 +254,13 @@ export function marks(step) {
 }
 
 // The symbol a diagram's key gives a step: the kind of line it draws (both kinds, for a collapse or a petal
-// fold), or the move for one that turns the whole model.
-export function symbol(step) {
+// fold), or the move for one that turns the whole model. m: the step's marks, if they're to hand.
+export function symbol(step, m) {
   const k = step.motion.kind;
   if (k === 'turnOver') return 'turnOver';
   if (k === 'turn') return 'rotate';
   if (step.unfold) return 'unfold';
-  const types = new Set((marks(step) || []).map((m) => m.type));
+  const types = new Set(((m === undefined ? marks(step) : m) || []).map((mk) => mk.type));
   return types.size > 1 ? 'both' : types.has('mountain') ? 'mountain' : 'valley';
 }
 

@@ -215,8 +215,9 @@ function ready(m, i, landed) {
       view = new View($('gl'));
       matFromPage();
       wireCamera();
-      // The stage changes size with the words beside or under it, not only with the window.
-      if ('ResizeObserver' in window) new ResizeObserver(redraw).observe($('gl'));
+      // The stage changes size with the words beside or under it, not only with the window: the view draws the paper
+      // at its new size at once, and then the camera settles to it.
+      view.onresize = redraw;
       // A phone can take the 3D away from a page and give it back a moment later. If it doesn't come back, the
       // stage would be a blank box, so say what to do, with a button to do it: a copy installed on a phone has no
       // reload of its own. The address names the step, so a reload comes back to it. Meanwhile the buttons that turn
@@ -536,7 +537,7 @@ const CHIP = {
   rotate: '<svg viewBox="0 0 34 12" aria-hidden="true"><path d="M20.7 2.9A4.8 4.8 0 1 0 21.5 7.6"/><path d="M23.1 9.7L22 6.1l-3.1 2.1"/></svg>',
   unfold: '<svg viewBox="0 0 34 12" aria-hidden="true"><path d="M6 10C6 3 22 2 24 6.5"/><path class="hollow" d="M20.4 6.6l5.2 3.3.3-6.1z"/></svg>',
 };
-const chipFor = (step) => `${CHIP[symbol(step)]}<span>${step.name}</span>`;
+const chipFor = (step) => `${CHIP[symbol(step, marksOf(step))]}<span>${step.name}</span>`;
 
 // ---------- Drawing and the camera ----------
 
@@ -567,6 +568,18 @@ function redraw() {
 // Play is pressed, since that's the instruction.
 const still = matchMedia('(prefers-reduced-motion: reduce)');
 
+// Each step's marks, worked out once: they depend only on the step, and the loop asks for them in every frame, as the
+// framing and the step's symbol do when it's shown. Frozen, since they're shared: one changed would change everywhere.
+const marked = new WeakMap();
+const frozen = (x) => {
+  if (x && typeof x === 'object' && !Object.isFrozen(x)) { Object.freeze(x); Object.values(x).forEach(frozen); }
+  return x;
+};
+function marksOf(step) {
+  if (!marked.has(step)) marked.set(step, frozen(marks(step)));
+  return marked.get(step);
+}
+
 // Everywhere the paper goes during a step, for framing it: every corner at thirteen moments of the fold (among them a
 // quarter, half and three quarters of the way, where a fold stands up, a fold and unfold stands up and a turn over is
 // at its highest), and the symbol beside the model. Points a two-hundredth of the sheet apart count once. Worked out
@@ -577,7 +590,7 @@ function reachOf(step) {
     const seen = new Map();
     const add = (q) => { const k = q.map((x) => Math.round(x * 200)).join(); if (!seen.has(k)) seen.set(k, q); };
     for (let k = 0; k <= 12; k++) for (const it of poses(step, k / 12)) corners(it).forEach(add);
-    for (const m of marks(step) || []) (m.path || []).forEach(add);
+    for (const m of marksOf(step) || []) (m.path || []).forEach(add);
     reach.set(step, Float32Array.from([...seen.values()].flat()));
   }
   return reach.get(step);
@@ -589,7 +602,7 @@ function frameCamera(snap) {
   const a = s.from.bounds(), b = s.to.bounds();
   let x0 = Math.min(a.x0, b.x0), x1 = Math.max(a.x1, b.x1), y0 = Math.min(a.y0, b.y0), y1 = Math.max(a.y1, b.y1);
   // A symbol beside the model (turning it over or around) is in the picture too.
-  for (const m of marks(s) || []) {
+  for (const m of marksOf(s) || []) {
     for (const [x, y] of m.path || []) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
   }
   // A step that stands the model up says how big it gets and how high to look, once its fold moves; until then the
@@ -637,7 +650,7 @@ function loop(now) {
   if (!dirty) return;
   dirty = false;
   const alpha = P.t <= 0 ? marksIn : Math.max(0, 1 - P.t * 5);
-  view.show(poses(step, P.t), marks(step), alpha);
+  view.show(poses(step, P.t), alpha > 0.01 ? marksOf(step) : null, alpha); // none to draw while they're faded out
   view.draw();
 }
 

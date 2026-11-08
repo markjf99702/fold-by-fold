@@ -164,6 +164,21 @@ export function hexToRgb(h) {
   return [((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255];
 }
 
+// The floats for one buffer, written into one array kept from frame to frame (grown when a frame needs more), rather
+// than gathered into a new one every frame for the garbage collector to clear away: a pause, on a slow phone.
+class Floats {
+  constructor() { this.a = new Float32Array(1 << 14); this.length = 0; }
+  start() { this.length = 0; return this; }
+  // One vertex: where it is, then five more (a normal and a paper point, or a colour and how far along a line).
+  vertex(x, y, z, p, q, r, s, t) {
+    if (this.length + 8 > this.a.length) { const b = new Float32Array(this.a.length * 2); b.set(this.a); this.a = b; }
+    const a = this.a, n = this.length;
+    a[n] = x; a[n + 1] = y; a[n + 2] = z; a[n + 3] = p; a[n + 4] = q; a[n + 5] = r; a[n + 6] = s; a[n + 7] = t;
+    this.length = n + 8;
+  }
+  get floats() { return this.a.subarray(0, this.length); }
+}
+
 // ---------- The view ----------
 
 export class View {
@@ -193,10 +208,27 @@ export class View {
     this.markAlpha = 0;
     this.pxPerUnit = MARK_SCALE; // CSS px per table unit at the camera's aim, as last drawn
     this.m = 1; // how much the marks are scaled, to keep one weight on screen
+    // What each frame sends the graphics card, kept from frame to frame (see Floats).
+    this.floats = { paper: new Floats(), edges: new Floats(), shadow: new Floats() };
+    // The canvas's size on the page, kept as it changes rather than read in every frame: read there, just after the
+    // frame has moved the slider, it would have the browser lay the whole page out again in the middle of the frame.
+    // When it changes, the paper is drawn at the new size at once, so the browser never shows the last picture
+    // stretched, and onresize() hears of it (the camera settles to the new shape from there).
+    this.css = null;
+    this.onresize = null;
+    if (typeof ResizeObserver === 'function') {
+      new ResizeObserver(() => {
+        this.css = [canvas.clientWidth, canvas.clientHeight]; // laid out just now, so this costs nothing
+        if (this.css[0] && this.css[1]) this.draw();
+        this.onresize?.();
+      }).observe(canvas);
+    }
   }
 
-  // The canvas's size on the page, in CSS pixels.
+  // The canvas's size on the page, in CSS pixels. Read afresh only while there's none kept: before the first word
+  // from the ResizeObserver, or after the player was last seen hidden, as when a model opens.
   size() {
+    if (this.css && this.css[0] && this.css[1]) return this.css;
     return [this.canvas.clientWidth, this.canvas.clientHeight];
   }
 
@@ -447,11 +479,11 @@ export class View {
   // back and to the right of the paper, and fainter the higher the paper is. Drawn once per pixel with the stencil.
   drawShadow(vp) {
     const gl = this.gl;
-    const data = [];
+    const data = this.floats.shadow.start();
     for (const it of this.items) {
       const c = corners(it).map((q) => [q[0] - (LIGHT[0] * q[2]) / LIGHT[2], q[1] - (LIGHT[1] * q[2]) / LIGHT[2], 0.0004, 0.22 * Math.max(0.3, 1 - 1.5 * q[2])]);
       for (let i = 1; i < c.length - 1; i++) {
-        for (const q of [c[0], c[i], c[i + 1]]) data.push(q[0], q[1], q[2], 0.05, 0.07, 0.06, q[3], 0);
+        for (const q of [c[0], c[i], c[i + 1]]) data.vertex(q[0], q[1], q[2], 0.05, 0.07, 0.06, q[3], 0);
       }
     }
     gl.enable(gl.STENCIL_TEST);
@@ -463,19 +495,18 @@ export class View {
 
   drawPaper(vp, eye) {
     const gl = this.gl, { p, loc } = this.paper;
-    const data = [];
+    const data = this.floats.paper.start();
     for (const it of this.items) {
       const c = corners(it);
       const r = it.pose.r;
-      const n = [r[2], r[5], r[8]];
       const uv = it.facet.poly;
       for (let i = 1; i < c.length - 1; i++) {
-        for (const k of [0, i, i + 1]) data.push(c[k][0], c[k][1], c[k][2], n[0], n[1], n[2], uv[k][0], uv[k][1]);
+        for (const k of [0, i, i + 1]) data.vertex(c[k][0], c[k][1], c[k][2], r[2], r[5], r[8], uv[k][0], uv[k][1]);
       }
     }
     gl.useProgram(p);
     gl.bindBuffer(gl.ARRAY_BUFFER, this.buf.paper);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(data), gl.DYNAMIC_DRAW);
+    gl.bufferData(gl.ARRAY_BUFFER, data.floats, gl.DYNAMIC_DRAW);
     const stride = 32;
     gl.enableVertexAttribArray(loc.aPos);
     gl.vertexAttribPointer(loc.aPos, 3, gl.FLOAT, false, stride, 0);
@@ -498,7 +529,7 @@ export class View {
   // The edges of every facet, as thin strips lying on both faces of the paper, a third of a layer off each face, so
   // the strips of layers lying on each other stay apart.
   drawEdges(vp) {
-    const data = [];
+    const data = this.floats.edges.start();
     const w = 0.0011, lift = LAYER / 3;
     for (const it of this.items) {
       if (it.bridge) continue;
@@ -513,7 +544,7 @@ export class View {
           const off = v3.mul(n, lift * s);
           const a1 = v3.add(v3.add(a, side), off), a2 = v3.add(v3.sub(a, side), off);
           const b1 = v3.add(v3.add(b, side), off), b2 = v3.add(v3.sub(b, side), off);
-          for (const q of [a1, b1, b2, a1, b2, a2]) data.push(q[0], q[1], q[2], 0.1, 0.08, 0.06, 0.34, 0);
+          for (const q of [a1, b1, b2, a1, b2, a2]) data.vertex(q[0], q[1], q[2], 0.1, 0.08, 0.06, 0.34, 0);
         }
       }
     }
@@ -568,12 +599,13 @@ export class View {
     }
   }
 
+  // data: the floats, in a plain array or a Floats.
   drawFlat(buffer, data, vp, dash, alpha) {
     if (!data.length) return;
     const gl = this.gl, { p, loc } = this.flat;
     gl.useProgram(p);
     gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(data), gl.DYNAMIC_DRAW);
+    gl.bufferData(gl.ARRAY_BUFFER, data instanceof Floats ? data.floats : new Float32Array(data), gl.DYNAMIC_DRAW);
     const stride = 32;
     gl.enableVertexAttribArray(loc.aPos);
     gl.vertexAttribPointer(loc.aPos, 3, gl.FLOAT, false, stride, 0);
