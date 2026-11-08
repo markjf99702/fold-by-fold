@@ -802,14 +802,14 @@ export const MODELS = [
         ),
       },
       {
-        say: 'Inside reverse fold the front leg on the left up and out, so it sticks out past the body.',
+        say: 'Inside reverse fold the top leg on the left up and out, so it sticks out past the body. This is a front leg.',
         name: 'Inside reverse fold',
         do: (h) => h.reverseOpen([
           (k) => k.reverse(legLine(k, FACE.K3, 0.28, 35), { flap: onFace(FACE.K3, 0.06, 0.03), split: k.paperLine(K1, K3) }),
         ], { axis: h.through(C, M12), page: pageSeed(FACE.K3, 'a') }),
       },
       {
-        say: 'Do the same with the front leg on the right.',
+        say: 'Do the same with the top leg on the right.',
         name: 'Inside reverse fold',
         do: (h) => h.reverseOpen([
           (k) => k.reverse(legLine(k, FACE.K2, 0.28, 35), { flap: onFace(FACE.K2, 0.06, 0.03), split: k.paperLine(K2, K4) }),
@@ -820,14 +820,14 @@ export const MODELS = [
         do: (h) => h.turnOver(),
       },
       {
-        say: 'Inside reverse fold the back leg on the left out and down.',
+        say: 'Now the other two legs are on top. Inside reverse fold the one on the left out and down, for a back leg.',
         name: 'Inside reverse fold',
         do: (h) => h.reverseOpen([
           (k) => k.reverse(legLine(k, FACE.K1, 0.2, 125), { flap: onFace(FACE.K1, 0.06, 0.03), split: k.paperLine(K1, K3) }),
         ], { axis: h.through(C, M12), page: pageSeed(FACE.K1, 'b') }),
       },
       {
-        say: 'And the back leg on the right.',
+        say: 'And the one on the right.',
         name: 'Inside reverse fold',
         do: (h) => h.reverseOpen([
           (k) => k.reverse(legLine(k, FACE.K4, 0.2, 125), { flap: onFace(FACE.K4, 0.06, 0.03), split: k.paperLine(K2, K4) }),
@@ -838,7 +838,7 @@ export const MODELS = [
         do: (h) => h.turnOver(),
       },
       {
-        say: 'Inside reverse fold the tip of each front leg to make the feet.',
+        say: 'Inside reverse fold the tip of each front leg, the two pointing up, to make the feet.',
         name: 'Inside reverse folds',
         do: (h) => h.together(
           (k) => k.reverse(footLine(k, FACE.K3, 0.07, 70), { flap: onFace(FACE.K3, 0.02, 0.01), split: k.paperLine(K1, K3) }),
