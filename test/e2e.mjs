@@ -1514,6 +1514,20 @@ for (const hash of ['#%', '#crane-3%', '#%F0%9F']) {
   assert.equal(await p.evaluate(() => fold.state.i), 15, 'skipping the bird base didn\'t go to step 16');
   await p.context().close();
 }
+// Where the words' box is too short for step 1's words and the offer together (a small phone, a phone held sideways,
+// Aa on), the offer stays under the words and they scroll together, fading where they're cut off. The offer was drawn
+// over the words' last lines.
+for (const [width, height, big] of [[320, 568, false], [360, 640, false], [568, 320, true]]) {
+  const p = await fresh('#frog', { viewport: { width, height }, deviceScaleFactor: 1, init: (big) => localStorage.setItem('fold-by-fold.v1', JSON.stringify({ big })), arg: big });
+  await p.waitForFunction(() => fold.state.id === 'frog');
+  assert.deepEqual(await p.evaluate(() => {
+    const words = document.createRange();
+    words.selectNodeContents(document.getElementById('say'));
+    const w = document.querySelector('.step-now');
+    return { under: document.querySelector('#skip button').getBoundingClientRect().top >= words.getBoundingClientRect().bottom, faded: w.scrollHeight <= w.clientHeight + 1 || w.classList.contains('more') };
+  }), { under: true, faded: true }, `at ${width}x${height}${big ? ' with Aa on' : ''}, the frog's offer to skip a base is drawn over its first words, or cut off without fading`);
+  await p.context().close();
+}
 
 // Aa, beside Slow on a phone or tablet, makes the step's words about a third bigger (17 px to 22 px on a phone) and the
 // fold's name a little bigger, to read with the phone on the table at arm's length. It's off to start with, filled in

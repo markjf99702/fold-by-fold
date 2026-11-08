@@ -340,8 +340,10 @@ html:has(#player:not([hidden])) { overscroll-behavior-y: none; }
 .chip .hollow { stroke-width: 1.6; }
 .say { margin: 0; font-size: 1.05rem; line-height: 1.45; min-height: 4.35em; } /* three lines at least */
 /* On step 1 of a model that shares a base with others, a quiet offer under the words to skip the base, a line for each,
-   with the step to skip to in the accent colour. The words above keep no room of their own under them then. */
-.say:has(+ .skip:not([hidden])) { min-height: 0; }
+   with the step to skip to in the accent colour. The words above keep no room of their own under them then, but keep
+   the height of their own lines: where the box is too short for both (a small phone, a phone held sideways, Aa on),
+   they scroll together, rather than the offer being drawn over the words. */
+.say:has(+ .skip:not([hidden])) { min-height: auto; }
 .skip { margin: 2px 0 0; display: grid; justify-items: start; }
 .skip button {
   appearance: none; border: 0; background: none; cursor: pointer; text-align: left; padding: 6px 0; margin: 0;
