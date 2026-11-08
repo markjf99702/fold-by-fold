@@ -40,15 +40,19 @@ uniform mat4 uViewProj;
 varying vec4 vColor; varying float vS;
 void main() { vColor = aColor; vS = aS; gl_Position = uViewProj * vec4(aPos, 1.0); }`;
 
-// aS is distance along a line, for dashes: uDash 0 solid, 1 dashed (valley), 2 dash-dot (mountain).
+// aS is distance along a line, for dashes: uDash 0 solid, 1 dashed (valley), 2 dash-dot (mountain). uDashScale
+// stretches the dashes with the marks' width (View.m), so they keep one length on screen too.
 const FLAT_FS = `
+#ifdef GL_FRAGMENT_PRECISION_HIGH
+precision highp float;
+#else
 precision mediump float;
-uniform float uDash; uniform float uAlpha;
+#endif
+uniform float uDash; uniform float uAlpha; uniform float uDashScale;
 varying vec4 vColor; varying float vS;
 void main() {
   if (uDash > 0.5) {
-    float period = uDash > 1.5 ? 0.066 : 0.05;
-    float x = mod(vS, period);
+    float x = mod(vS, (uDash > 1.5 ? 0.066 : 0.05) * uDashScale) / uDashScale;
     if (uDash < 1.5) { if (x > 0.031) discard; }
     else { if (!(x < 0.03 || (x > 0.042 && x < 0.052))) discard; }
   }
@@ -118,6 +122,13 @@ const FOV = (32 * Math.PI) / 180; // the camera's field of view, top to bottom
 const LIGHT = [-0.35, -0.55, 1]; // the way to the light: above the paper, to the front and left
 // How much of the view, out from its middle, the paper may fill as it moves through a step.
 const FIT = 0.92;
+// The marks' widths below are in table units as they look at this many CSS pixels to the unit (a phone showing the
+// crane's petal fold, as in the README). The camera frames each step to fit, so the paper is drawn at any scale; the
+// marks are scaled to match (View.m), so a line or an arrow keeps one weight on screen, as a printed diagram keeps it
+// through a book. A bigger view, looked at from further off, draws them a little heavier: up to 1.4 times, on a
+// desktop.
+const MARK_SCALE = 342;
+const markScale = (w, h) => MARK_SCALE * Math.max(1, Math.min(1.4, Math.sqrt(Math.min(w, h) / 390)));
 
 // The camera's own directions, turned to yaw and tilted to pitch: back (toward the eye), right and up.
 function basis(yaw, pitch) {
@@ -180,6 +191,13 @@ export class View {
     this.items = [];
     this.marks = null;
     this.markAlpha = 0;
+    this.pxPerUnit = MARK_SCALE; // CSS px per table unit at the camera's aim, as last drawn
+    this.m = 1; // how much the marks are scaled, to keep one weight on screen
+  }
+
+  // The canvas's size on the page, in CSS pixels.
+  size() {
+    return [this.canvas.clientWidth, this.canvas.clientHeight];
   }
 
   // The shader programs and buffers, which live on the graphics card.
@@ -224,7 +242,8 @@ export class View {
 
   // Where the framing aims and how far back it puts the camera, for the view's shape as it is now.
   place() {
-    const aspect = (this.canvas.clientWidth || 1) / (this.canvas.clientHeight || 1);
+    const [w, h] = this.size();
+    const aspect = (w || 1) / (h || 1);
     if (this.placed && this.placed.aspect === aspect) return this.placed;
     const { cx, cy, cz, size, fit } = this.framing;
     const fx = 2 * Math.atan(Math.tan(FOV / 2) * aspect);
@@ -312,7 +331,7 @@ export class View {
   // line from the eye misses it (along the horizon), the point that far along it that the aim is.
   under(x, y) {
     const { eye, side, up, ahead } = this.lens();
-    const w = this.canvas.clientWidth || 1, h = this.canvas.clientHeight || 1;
+    const [w, h] = this.size().map((x) => x || 1);
     const ty = Math.tan(FOV / 2), tx = ty * (w / h);
     const d = v3.add(ahead, v3.add(v3.mul(side, (2 * x / w - 1) * tx), v3.mul(up, (1 - 2 * y / h) * ty)));
     const t = Math.abs(d[2]) > 1e-6 ? (this.cam.target[2] - eye[2]) / d[2] : -1;
@@ -353,7 +372,8 @@ export class View {
 
   resize() {
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    const w = Math.round(this.canvas.clientWidth * dpr), h = Math.round(this.canvas.clientHeight * dpr);
+    const [cw, ch] = this.size();
+    const w = Math.round(cw * dpr), h = Math.round(ch * dpr);
     if (this.canvas.width !== w || this.canvas.height !== h) { this.canvas.width = w; this.canvas.height = h; }
   }
 
@@ -373,6 +393,9 @@ export class View {
     const proj = perspective(FOV, W / H, 0.05 * this.cam.dist, 50);
     const vp = mul4(proj, view);
     this.vp = vp;
+    const [cw, ch] = this.size();
+    this.pxPerUnit = (ch / 2) / (this.cam.dist * Math.tan(FOV / 2));
+    this.m = Math.max(0.25, Math.min(2.5, markScale(cw, ch) / this.pxPerUnit)); // within reason, zoomed far in or out
     const below = eye[2] < 0;
 
     gl.enable(gl.BLEND);
@@ -510,17 +533,17 @@ export class View {
     if (m.path) {
       // A symbol lying flat on the table beside the model.
       const flat = (q, t) => v3.norm(v3.cross([0, 0, 1], t));
-      this.drawFlat(this.buf.marks, ribbon(m.path, flat, m.arrow, halo, ink, true), vp, 0, this.markAlpha);
-      this.drawFlat(this.buf.marks, ribbon(m.path, flat, m.arrow, halo, ink, false), vp, 0, this.markAlpha);
+      this.drawFlat(this.buf.marks, ribbon(m.path, flat, m.arrow, halo, ink, true, this.m), vp, 0, this.markAlpha);
+      this.drawFlat(this.buf.marks, ribbon(m.path, flat, m.arrow, halo, ink, false, this.m), vp, 0, this.markAlpha);
       return;
     }
     // The arrow: an arc from the moving part over the fold, facing the camera.
     if (!m.arrow) return;
     const arc = arrowPath(m.arrow);
     const facing = (q, t) => v3.norm(v3.cross(t, v3.norm(v3.sub(eye, q))));
-    // A short arrow (a small tip folding) is drawn finer, so its head doesn't swamp it.
+    // A short arrow on screen (a small tip folding) is drawn finer, so its head doesn't swamp it.
     const r = Math.hypot(m.arrow.to[0] - m.arrow.from[0], m.arrow.to[1] - m.arrow.from[1]) / 2;
-    const k = Math.max(0.45, Math.min(1, r / 0.1));
+    const k = Math.max(0.45, Math.min(1, (r * this.pxPerUnit) / (0.1 * MARK_SCALE))) * this.m;
     this.drawFlat(this.buf.marks, ribbon(arc, facing, m.arrow, halo, ink, true, k), vp, 0, this.markAlpha);
     this.drawFlat(this.buf.marks, ribbon(arc, facing, m.arrow, halo, ink, false, k), vp, 0, this.markAlpha);
   }
@@ -540,8 +563,8 @@ export class View {
     // Opening a fold needs no line: the crease is the flap's own folded edge, and the arrow says to open it.
     if (!m.unfold) {
       const dash = m.type === 'mountain' ? 2 : 1;
-      this.drawFlat(this.buf.marks, lineData(0.0075, halo), vp, dash, this.markAlpha);
-      this.drawFlat(this.buf.marks, lineData(0.0042, ink), vp, dash, this.markAlpha);
+      this.drawFlat(this.buf.marks, lineData(0.0075 * this.m, halo), vp, dash, this.markAlpha);
+      this.drawFlat(this.buf.marks, lineData(0.0042 * this.m, ink), vp, dash, this.markAlpha);
     }
   }
 
@@ -561,6 +584,7 @@ export class View {
     gl.uniformMatrix4fv(loc.uViewProj, false, vp);
     gl.uniform1f(loc.uDash, dash);
     gl.uniform1f(loc.uAlpha, alpha);
+    gl.uniform1f(loc.uDashScale, this.m);
     gl.drawArrays(gl.TRIANGLES, 0, data.length / 8);
     for (const a of [loc.aPos, loc.aColor, loc.aS]) gl.disableVertexAttribArray(a);
   }
@@ -571,7 +595,8 @@ export class View {
     const x = m[0] * q[0] + m[4] * q[1] + m[8] * q[2] + m[12];
     const y = m[1] * q[0] + m[5] * q[1] + m[9] * q[2] + m[13];
     const w = m[3] * q[0] + m[7] * q[1] + m[11] * q[2] + m[15];
-    return [((x / w + 1) / 2) * this.canvas.clientWidth, ((1 - y / w) / 2) * this.canvas.clientHeight];
+    const [cw, ch] = this.size();
+    return [((x / w + 1) / 2) * cw, ((1 - y / w) / 2) * ch];
   }
 }
 

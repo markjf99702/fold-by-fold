@@ -589,6 +589,28 @@ for (const [width, height, list] of [
   await p.context().close();
 }
 
+// The marks keep one weight on screen, as a printed diagram keeps one through a book. The camera frames each step to
+// fit, so the paper is drawn at any scale: marks a fixed width on the paper were hairlines on the crane's first step and
+// fat cartoon arrows on its last, 2.7 times as heavy. The marks are scaled to make up for it, so the screen pixels per
+// unit of paper (at the camera's aim) times their scale stays the same from step to step.
+for (const [width, height] of [[390, 844], [1280, 800]]) {
+  const desk = width >= 900;
+  const p = await fresh('#crane', { viewport: { width, height }, ...(desk ? { deviceScaleFactor: 1, hasTouch: false } : {}) });
+  await p.waitForFunction(() => fold.state.id === 'crane');
+  const seen = await p.evaluate(() => [1, 10, 22].map((n) => {
+    fold.set(n - 1, 0);
+    const v = fold.view();
+    v.settle(1);
+    v.draw();
+    const px = v.canvas.clientHeight / 2 / (v.cam.dist * Math.tan((16 * Math.PI) / 180)); // the field of view is 32 degrees
+    return [px, px * (v.m ?? 1)];
+  }));
+  const spread = (k) => Math.max(...seen.map((x) => x[k])) / Math.min(...seen.map((x) => x[k]));
+  assert.ok(spread(0) > 1.5, `the crane's steps are framed at much the same scale at ${width}x${height}, so this checks nothing: ${JSON.stringify(seen)}`);
+  assert.ok(spread(1) <= 1.1, `the marks change weight from step to step of the crane at ${width}x${height}: ${JSON.stringify(seen)}`);
+  await p.context().close();
+}
+
 // A step that stands the model up is seen from its own angle once its fold moves, by the slider as much as by Play.
 // The angle stays with that step: the next model opens seen from above, as usual.
 {
