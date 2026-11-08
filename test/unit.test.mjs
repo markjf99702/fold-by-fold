@@ -141,6 +141,42 @@ test('four corners folded in together all meet at the center', () => {
   assert.ok(creases(r.to).length >= 4);
 });
 
+test('folds and unfolds made together fold up at once and open again, leaving their creases', () => {
+  // Two opposite corners to the middle and back, as one step, the way the frog creases both edges of a face.
+  const model = { id: 'two-corners', paper: { kind: 'Square' }, steps: [{
+    say: 'Fold two opposite corners in to the middle, and unfold.',
+    do: (h) => h.together(
+      (k) => k.crease(k.onto([0, 0], [0.5, 0.5]), { move: [0, 0] }),
+      (k) => k.crease(k.onto([1, 1], [0.5, 0.5]), { move: [1, 1] }),
+    ),
+  }] };
+  const [step] = build(model).steps;
+  assert.equal(step.name, 'Fold and unfold');
+  // It ends as it began, creased: each fold cut the paper along its line.
+  for (const q of [[0, 0], [1, 1], [0.5, 0.5]]) assert.ok(closePt(step.to.at(q), step.from.at(q)), `paper point ${q} moved`);
+  assert.equal(step.to.facets.size, 3);
+  // Halfway, both corners lie folded on the middle, over the paper; at the end they're back, flat on the mat.
+  const at = (t, q) => {
+    const it = poses(step, t).find((x) => covers(x.facet.poly, q, 1e-9) && (q[0] + q[1] < 0.5 || q[0] + q[1] > 1.5));
+    return transformPoint(it.pose, ...q);
+  };
+  for (const q of [[0, 0], [1, 1]]) {
+    const mid = at(0.5, q), end = at(1, q);
+    assert.ok(closePt(mid.slice(0, 2), step.from.at([0.5, 0.5]), 1e-6) && mid[2] > 0, `halfway, corner ${q} is at ${mid}`);
+    assert.ok(closePt(end, [...step.from.at(q), 0], 1e-9), `at the end, corner ${q} is at ${end}`);
+  }
+  // A diagram marks each one as a fold and unfold: an arrow with a head at each end.
+  const m = marks(step);
+  assert.equal(m.length, 2);
+  assert.ok(m.every((k) => k.type === 'valley' && k.arrow.back), JSON.stringify(m.map((k) => k.arrow)));
+  // Only folds and unfolds can go together that way.
+  const mixed = { ...model, steps: [{ say: 'One corner in and back, the other in.', do: (h) => h.together(
+    (k) => k.crease(k.onto([0, 0], [0.5, 0.5]), { move: [0, 0] }),
+    (k) => k.valley(k.onto([1, 1], [0.5, 0.5]), { move: [1, 1] }),
+  ) }] };
+  assert.throws(() => build(mixed), /A fold and unfold can only be made together with other folds and unfolds/);
+});
+
 for (const model of MODELS) {
   test(`${model.name}: every step folds, and every motion starts and lands on the paper as it lies`, () => {
     const b = build(model);
@@ -163,10 +199,10 @@ for (const model of MODELS) {
       };
       check(0, step.from);
       const bends = step.motion.kind === 'bend' || step.motion.parts?.some((p) => p.bend);
-      if (!bends) check(1, step.motion.kind === 'foldUnfold' ? step.from : step.to);
-      // Halfway through a fold and unfold, every layer is where the fold puts it: a flap folded behind
-      // is under the rest, not level with it.
-      if (step.motion.kind === 'foldUnfold') check(0.5, step.motion.folded);
+      if (!bends) check(1, step.motion.folded ? step.from : step.to);
+      // Halfway through a fold and unfold (or several made together), every layer is where the fold puts it: a flap
+      // folded behind is under the rest, not level with it.
+      if (step.motion.folded) check(0.5, step.motion.folded);
       // Nothing passes through the table, every layer stays in one piece and keeps its shape, and nothing is
       // anywhere but a real place.
       for (let k = 0; k <= 100; k++) {
@@ -197,7 +233,7 @@ for (const model of MODELS) {
       assert.deepEqual(crossings(step.to), [], `${model.id} step ${i + 1}`);
       // So could the paper as each step starts, cut ready to fold, and a fold and unfold at its fullest.
       assert.deepEqual(crossings(step.from), [], `${model.id} step ${i + 1}, as it starts`);
-      if (step.motion.kind === 'foldUnfold') assert.deepEqual(crossings(step.motion.folded), [], `${model.id} step ${i + 1}, folded before it unfolds`);
+      if (step.motion.folded) assert.deepEqual(crossings(step.motion.folded), [], `${model.id} step ${i + 1}, folded before it unfolds`);
     }
   });
 
@@ -245,7 +281,7 @@ test('a crease whose two sides lie together as a step starts and as it ends stay
       for (const m of [motion, ...(motion.parts || []).map((p) => p.reverse)]) {
         for (const h of m?.hinges || []) bridged.add(`${Math.min(h.tip, h.base)}/${Math.max(h.tip, h.base)}`);
       }
-      const l0 = from.levels(), l1 = (motion.kind === 'foldUnfold' ? motion.folded : step.to).levels();
+      const l0 = from.levels(), l1 = (motion.folded || step.to).levels();
       const at1 = (id) => l1.get(id) ?? l0.get(id);
       const pairs = [];
       for (const f of from.facets.values()) {
@@ -581,7 +617,7 @@ test('each arrow has the head a diagram gives it: solid for a valley fold, hollo
     for (const [i, step] of build(model).steps.entries()) {
       for (const a of arrows(step)) {
         assert.ok(['valley', 'mountain', 'unfold'].includes(a.head), `${model.id} step ${i + 1}: head ${a.head}`);
-        assert.equal(!!a.back, step.motion.kind === 'foldUnfold', `${model.id} step ${i + 1}`);
+        assert.equal(!!a.back, !!step.motion.folded, `${model.id} step ${i + 1}`);
         if (!step.unfold) assert.equal(a.head === 'mountain', !a.over, `${model.id} step ${i + 1}: a mountain arrow goes behind`);
         n++;
       }
@@ -686,7 +722,7 @@ test('every arrow starts on the paper that moves and ends on paper where it land
       const { motion } = step;
       if (motion.kind === 'turnOver' || motion.kind === 'turn') continue;
       const where = `${model.id} step ${i + 1}`;
-      const landing = motion.kind === 'foldUnfold' ? motion.folded : step.to;
+      const landing = motion.folded || step.to;
       const bends = motion.kind === 'bend' || motion.parts?.some((p) => p.bend);
       const moving = motion.kind === 'mech' ? null : new Set(motion.moving || motion.parts?.flatMap((p) => p.moving || []) || []);
       for (const m of marks(step)) {
@@ -816,7 +852,7 @@ test('random folds are refused in the engine\'s own words, or fold into real pap
           }
         }
       }
-      for (const [t, sheet] of [[0, step.from], [1, motion.kind === 'foldUnfold' ? step.from : step.to]]) {
+      for (const [t, sheet] of [[0, step.from], [1, motion.folded ? step.from : step.to]]) {
         const off = poses(step, t).find((it) => !corners(it).every((p, k) => closePt(p, flatAt(sheet, it.facet.id)[k], 1e-6)));
         if (off) fail(`at t=${t} facet ${off.facet.id} isn't where the fold puts it`);
       }
@@ -835,7 +871,7 @@ test('random folds are refused in the engine\'s own words, or fold into real pap
       const ms = marks(step) || [];
       if (!ms.length) fail('has no marks');
       symbol(step);
-      const landing = motion.kind === 'foldUnfold' ? motion.folded : step.to;
+      const landing = motion.folded || step.to;
       for (const m of ms) {
         // Folds of two pieces along one line share the line, drawn once.
         const [p, q] = m.line || [];

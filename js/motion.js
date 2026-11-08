@@ -106,6 +106,13 @@ export function poses(step, t, raw = false) {
   if (motion.kind === 'reverse') return raw ? reversePoses(step, e, zFrom, zTo) : lifted(reversePoses(step, e, zFrom, zTo));
 
   if (motion.kind === 'multi') {
+    // Folds and unfolds made together fold up and open again, as one fold and unfold does: halfway, every layer is where
+    // all the folds put it.
+    const back = !!motion.folded;
+    const zMid = back ? motion.folded.levels() : null;
+    const zLand = back ? (id) => zMid.get(id) * LAYER : zTo;
+    const u = Math.min(1, Math.max(0, t));
+    const go = back ? (u < 0.5 ? ease(2 * u) : ease(2 - 2 * u)) : e; // how far over the folds are, and so how far each layer has drifted
     const partOf = new Map();
     // Inside reverse folds among the parts move the way they do on their own, bridges and all.
     const reversed = new Map(), bridges = [];
@@ -117,7 +124,7 @@ export function poses(step, t, raw = false) {
         }
         continue;
       }
-      part.h = axisHeight(part.moving, zFrom, zTo, part.bend, part.sign);
+      part.h = axisHeight(part.moving, zFrom, zLand, part.bend, part.sign);
       for (const id of part.moving) partOf.set(id, part);
     }
     for (const id of from.order) {
@@ -125,14 +132,14 @@ export function poses(step, t, raw = false) {
       const part = partOf.get(id);
       let pose;
       if (reversed.has(id)) pose = reversed.get(id);
-      else if (!part) pose = flatPose(f.m, zFrom(id) + (zTo(id) - zFrom(id)) * e + roomFor(step, id, t));
+      else if (!part) pose = flatPose(f.m, zFrom(id) + (zLand(id) - zFrom(id)) * go + roomFor(step, id, t));
       else {
         const zs = zFrom(id), H = part.h;
         const L = part.line;
         // A bend can keep its own time (a wing that flaps), as a fraction of its angle at each moment.
-        const k = part.schedule ? part.schedule(Math.min(1, Math.max(0, t))) : e;
+        const k = part.schedule ? part.schedule(u) : go;
         pose = rotateAbout(flatPose(f.m, zs), L.p[0], L.p[1], H, L.d[0], L.d[1], part.sign * (part.angle * Math.PI / 180) * k);
-        if (!part.bend) pose.t[2] += (zTo(id) - (2 * H - zs)) * e;
+        if (!part.bend) pose.t[2] += (zLand(id) - (2 * H - zs)) * go;
       }
       if (motion.roll) {
         const R = motion.roll;
@@ -351,8 +358,9 @@ function tipFor(step) {
   // middle of a fold and unfold, where the flap lies folded), where the flap hardly moves and needs very little room: what
   // little it needs there, the model is lifted. (A fold and unfold folds in half the time, and the smoothing below reaches
   // 6 samples either way.)
-  const end = motion.kind === 'foldUnfold' ? 0.09 : 0.12;
-  const flat = (k) => k <= N * end || k >= N * (1 - end) || (motion.kind === 'foldUnfold' && Math.abs(k - N / 2) <= N * 0.085);
+  const back = !!motion.folded; // a fold and unfold, or several made together
+  const end = back ? 0.09 : 0.12;
+  const flat = (k) => k <= N * end || k >= N * (1 - end) || (back && Math.abs(k - N / 2) <= N * 0.085);
   const want = best.fits.map((f, k) => (flat(k) ? 0 : f.a));
   const most = TIP_RATE / N, angles = want.slice();
   for (let k = 1; k <= N; k++) angles[k] = Math.max(angles[k], angles[k - 1] - most);
@@ -372,7 +380,7 @@ function tipFor(step) {
     });
   }
   smooth[0] = smooth[N] = 0;
-  if (motion.kind === 'foldUnfold') smooth[N / 2] = 0;
+  if (back) smooth[N / 2] = 0;
   return { p: best.p, d: best.d, u: best.u, angles: smooth };
 }
 
@@ -428,7 +436,7 @@ export function symbol(step, m) {
 function stepMarks(step) {
   const m = foldMarks(step);
   const { motion } = step;
-  if (!m || !['fold', 'multi'].includes(motion.kind)) return m;
+  if (!m || !['fold', 'multi'].includes(motion.kind) || motion.folded) return m;
   // A flap folded toward you that lands under a layer that stays put has been tucked into a pocket.
   const moving = new Set(motion.moving || motion.parts.flatMap((p) => p.moving || []));
   for (const k of m) {
@@ -451,7 +459,7 @@ function foldMarks(step) {
   if (motion.kind === 'mech') return mechMarks(step);
   if (motion.kind === 'reverse') return padded(sharingLines(markFor(from, { ...motion, sign: -1, type: 'mountain', kind: 'fold' })));
   if (motion.kind === 'multi') {
-    return padded(sharingLines(motion.parts.flatMap((p) => markFor(from, { ...p, kind: p.bend ? 'bend' : 'fold' }))));
+    return padded(sharingLines(motion.parts.flatMap((p) => markFor(from, { ...p, kind: p.bend ? 'bend' : p.back ? 'foldUnfold' : 'fold' }))));
   }
   if (motion.kind === 'turnOver' || motion.kind === 'turn') return [moveMark(step)];
   if (!['fold', 'foldUnfold', 'bend'].includes(motion.kind)) return null;

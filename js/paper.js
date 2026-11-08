@@ -329,7 +329,9 @@ export function bend(sheet, L, angle, opts = {}) {
 
 // Several folds made at the same time, like folding all four corners in at once, or shaping a finished
 // model by bending some flaps part way. Each maker is a function from a sheet to one fold's result, and
-// they're applied in turn; the flaps they move must not overlap.
+// they're applied in turn; the flaps they move must not overlap. Folds and unfolds made together (both
+// lower edges in to the middle line, and open again) all fold at once and open at once: halfway, the paper
+// lies as all of them fold it (the motion's `folded`).
 export function together(sheet, makers) {
   const results = [];
   let s = sheet;
@@ -363,7 +365,10 @@ export function together(sheet, makers) {
   from.order = results[0].from.order.flatMap(expand);
   if (from.order.length !== from.facets.size) throw new Error('Lost track of a facet while folding together');
   const bends = results.every((r) => r.motion.kind === 'bend');
-  const to = bends ? from.clone() : s.clone();
+  const creasing = results.filter((r) => r.motion.kind === 'foldUnfold').length;
+  if (creasing && creasing < results.length) throw new Error('A fold and unfold can only be made together with other folds and unfolds');
+  const folded = creasing ? foldedTogether(from, results, expand) : null;
+  const to = bends || folded ? from.clone() : s.clone();
   const parts = results.map((r) => (r.motion.kind === 'reverse'
     // An inside reverse fold keeps its own motion, and is marked the way a diagram marks one.
     ? { line: r.motion.line, moving: r.motion.moving, sign: -1, type: 'mountain', angle: 180, reverse: r.motion }
@@ -371,22 +376,42 @@ export function together(sheet, makers) {
       line: r.motion.line, moving: r.motion.moving, sign: r.motion.sign, type: r.motion.type,
       angle: r.motion.kind === 'bend' ? r.motion.angle : 180, bend: r.motion.kind === 'bend', schedule: r.motion.schedule || null,
       tuck: r.motion.tuck === true,
+      back: r.motion.kind === 'foldUnfold', // it opens again, as a fold and unfold does
     }));
   // Folds made together turn at the same pace. Two that go the same way about different lines and land on each other
   // (a letter fold made as one step) would meet in the air, and one would pass through the other. Layers turned about
   // one line go over together, as one stack, like a page.
   const plain = parts.filter((p) => !p.bend && !p.reverse);
   const sameLine = (a, b) => Math.abs(cross(a.d, b.d)) < 1e-6 && Math.abs(side(a, b.p)) < 1e-6;
+  const landed = folded || to;
   for (let i = 0; i < plain.length; i++) {
     for (let k = i + 1; k < plain.length; k++) {
       const a = plain[i], b = plain[k];
       if (a.sign !== b.sign || sameLine(a.line, b.line)) continue;
       let shared = 0;
-      for (const x of a.moving) for (const y of b.moving) shared += overlapArea(to.world(x), to.world(y));
+      for (const x of a.moving) for (const y of b.moving) shared += overlapArea(landed.world(x), landed.world(y));
       if (shared > 1e-7) throw new Error("Folds made together can't land on each other: make them one after the other");
     }
   }
-  return result(from, to, { kind: 'multi', parts, moving: parts.flatMap((p) => p.moving) });
+  return result(from, to, { kind: 'multi', parts, moving: parts.flatMap((p) => p.moving), ...(folded && { folded }) });
+}
+
+// The paper with every fold of a fold and unfold made together folded, before they open: each flap turned over its own
+// line and laid on top (or, folded behind, underneath), as fold() lays it.
+function foldedTogether(from, results, expand) {
+  const out = from.clone();
+  out._world = new Map();
+  for (const r of results) {
+    const R = reflection(r.motion.line);
+    const ids = new Set(r.motion.moving.flatMap(expand));
+    for (const id of ids) { const f = out.facets.get(id); out.facets.set(id, { ...f, m: compose(R, f.m) }); }
+    const flipped = out.order.filter((id) => ids.has(id)).reverse(), rest = out.order.filter((id) => !ids.has(id));
+    out.order = r.motion.type === 'mountain' ? flipped.concat(rest) : rest.concat(flipped);
+  }
+  out._levels = null;
+  const problems = crossings(out);
+  if (problems.length) throw new Error(`Folded together, the paper would pass through itself (${problems[0]})`);
+  return out;
 }
 
 // An inside reverse fold: the tip of a flap past line L turns inside out and goes up between the flap's own

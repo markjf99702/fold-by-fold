@@ -48,6 +48,7 @@ function nameOf(m) {
   if (m.kind === 'mech') return m.name || (m.parts ? 'Inside reverse folds' : 'Collapse');
   if (m.kind === 'multi') {
     if (m.parts.every((p) => p.bend)) return 'Shape';
+    if (m.folded) return 'Fold and unfold';
     return m.parts.every((p) => p.type === 'mountain') ? 'Mountain folds' : 'Valley folds';
   }
   return m.kind;

@@ -156,7 +156,7 @@ const pace = () => (prefs.slow ? 2.2 : 1); // Slow gives the marks and the fold 
 
 // How long a step's fold takes at the pace it was started at (P.pace).
 function duration(step) {
-  const k = step.motion.kind;
+  const k = step.motion.folded ? 'foldUnfold' : step.motion.kind; // folds and unfolds made together take as long as one
   const base = k === 'mech' ? 3400 : k === 'reverse' ? 2800 : k === 'foldUnfold' ? 2600 : k === 'turnOver' ? 1900 : k === 'turn' ? 1300 : 2100;
   return base * P.pace;
 }
