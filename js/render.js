@@ -115,6 +115,7 @@ const v3 = {
 };
 
 const FOV = (32 * Math.PI) / 180; // the camera's field of view, top to bottom
+const LIGHT = [-0.35, -0.55, 1]; // the way to the light: above the paper, to the front and left
 // How much of the view, out from its middle, the paper may fill as it moves through a step.
 const FIT = 0.92;
 
@@ -417,15 +418,15 @@ export class View {
     gl.disableVertexAttribArray(loc.aPos);
   }
 
-  // Each facet flattened onto the mat along the light, drawn once per pixel with the stencil.
+  // Each facet flattened onto the mat along the light, which comes from the front left (LIGHT), so the shadow falls
+  // back and to the right of the paper, and fainter the higher the paper is. Drawn once per pixel with the stencil.
   drawShadow(vp) {
     const gl = this.gl;
-    const L = [0.28, 0.42, 1];
     const data = [];
     for (const it of this.items) {
-      const c = corners(it).map((q) => [q[0] - (L[0] * q[2]) / L[2], q[1] - (L[1] * q[2]) / L[2], 0.0004]);
+      const c = corners(it).map((q) => [q[0] - (LIGHT[0] * q[2]) / LIGHT[2], q[1] - (LIGHT[1] * q[2]) / LIGHT[2], 0.0004, 0.22 * Math.max(0.3, 1 - 1.5 * q[2])]);
       for (let i = 1; i < c.length - 1; i++) {
-        for (const q of [c[0], c[i], c[i + 1]]) data.push(q[0], q[1], q[2], 0.05, 0.07, 0.06, 0.22, 0);
+        for (const q of [c[0], c[i], c[i + 1]]) data.push(q[0], q[1], q[2], 0.05, 0.07, 0.06, q[3], 0);
       }
     }
     gl.enable(gl.STENCIL_TEST);
@@ -460,7 +461,7 @@ export class View {
     gl.uniformMatrix4fv(loc.uViewProj, false, vp);
     gl.uniform3fv(loc.uFront, this.front);
     gl.uniform3fv(loc.uBack, this.back);
-    gl.uniform3fv(loc.uLight, [-0.35, -0.55, 1]);
+    gl.uniform3fv(loc.uLight, LIGHT);
     gl.uniform3fv(loc.uEye, eye);
     gl.enable(gl.POLYGON_OFFSET_FILL);
     gl.polygonOffset(1, 1);
