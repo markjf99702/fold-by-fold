@@ -1550,6 +1550,24 @@ for (const [width, height] of [[1280, 800], [390, 844], [360, 780]]) {
   await p.context().close();
 }
 
+// Zoomed in to 400% (a 1280x800 window is then 320x200) the paper keeps a usable square and the words and buttons go
+// under it, the page scrolling to reach them, rather than the words beside it squeezing the paper to nothing (WCAG 2.2,
+// 1.4.10 Reflow). At 300% too. Phones held sideways keep the words beside the paper (above).
+for (const [width, height] of [[320, 200], [427, 267]]) {
+  const p = await fresh('#crane-19', { viewport: { width, height }, deviceScaleFactor: 1, hasTouch: false });
+  await p.waitForFunction(() => fold.state.id === 'crane');
+  const r = await p.evaluate(() => {
+    const box = (q) => document.querySelector(q).getBoundingClientRect();
+    const [stage, play, say] = [box('#stage'), box('#play'), box('#say')];
+    return { stage: [Math.round(stage.width), Math.round(stage.height)], under: say.top >= stage.bottom - 0.5, play: play.bottom + scrollY <= document.documentElement.scrollHeight + 0.5 && play.right <= innerWidth, sideways: document.documentElement.scrollWidth > innerWidth };
+  });
+  assert.ok(r.stage[0] >= 200 && r.stage[1] >= 200, `the paper is ${r.stage.join('x')} at ${width}x${height}`);
+  assert.deepEqual([r.under, r.play, r.sideways], [true, true, false], `at ${width}x${height} the words aren't under the paper, Play can't be reached, or the page scrolls sideways: ${JSON.stringify(r)}`);
+  await p.click('#play');
+  assert.equal(await p.evaluate(() => fold.state.playing), true, `Play did nothing at ${width}x${height}`);
+  await p.context().close();
+}
+
 // On a short phone held upright (an iPhone SE in Safari, or smaller), long words don't squeeze the paper to a strip
 // or push Play off the screen: at every step of the crane and the frog the paper keeps over a third of the height.
 for (const [width, height] of [[375, 553], [320, 460]]) {

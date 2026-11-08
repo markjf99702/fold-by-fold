@@ -299,7 +299,7 @@ html:has(#player:not([hidden])) { overscroll-behavior-y: none; }
 .speed[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
 /* Narrow phones, and the panel beside the paper on a phone held sideways (further down): the buttons draw in a
    little so the row fits, and Play keeps one width for every label. */
-@media (max-width: 379px), (max-width: 899px) and (orientation: landscape) and (max-height: 500px) {
+@media (max-width: 379px), (min-width: 560px) and (max-width: 899px) and (orientation: landscape) and (max-height: 500px) {
   .controls { gap: 6px; }
   .ctl { min-width: 46px; padding: 0 10px; }
   .ctl.main { min-width: 128px; padding: 0 8px; }
@@ -364,7 +364,7 @@ html:has(#player:not([hidden])) { overscroll-behavior-y: none; }
 /* A phone held sideways is too short for the words and buttons under the paper: they left it a strip a finger or
    two tall. They go beside it instead, as on a wide screen, with the steps still along the top and only the
    panel's right side kept clear of a notch; long words scroll in their own box, above the slider and buttons. */
-@media (max-width: 899px) and (orientation: landscape) and (max-height: 500px) {
+@media (min-width: 560px) and (max-width: 899px) and (orientation: landscape) and (max-height: 500px) {
   .player {
     grid-template-columns: minmax(0, 1fr) calc(clamp(320px, 50vw, 380px) + env(safe-area-inset-right));
     grid-template-rows: auto minmax(0, 1fr);
@@ -372,6 +372,13 @@ html:has(#player:not([hidden])) { overscroll-behavior-y: none; }
   }
   .panel { border-top: 0; border-left: 1px solid var(--line); padding-left: var(--gutter); }
   .say { min-height: 0; }
+}
+
+/* Narrower and short as well, as a window zoomed in to 300% or 400% is, there's no room beside the paper: the words
+   took it all and the paper was gone. They go under it, and the page scrolls to reach them, with the paper kept a
+   usable size. */
+@media (max-width: 559px) and (orientation: landscape) and (max-height: 500px) {
+  .player { height: auto; min-height: 100dvh; grid-template-rows: auto max(200px, 75dvh) auto; }
 }
 
 @media (prefers-reduced-motion: reduce) {
