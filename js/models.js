@@ -643,7 +643,8 @@ export const MODELS = [
     ],
   },
   {
-    // The traditional cicada (semi), as origami.me (diagram by Mili Pacheco) and the Origami Resource Center draw it.
+    // The traditional cicada (semi), as origami.me (Peter Saydak, diagrams by Jimena Candia) and the Origami Resource
+    // Center draw it.
     id: 'cicada',
     name: 'Cicada',
     level: 'Easy',
@@ -1089,8 +1090,8 @@ export const MODELS = [
     ],
   },
   {
-    // The traditional lily (yuri), as origami.me draws it (diagram by Kelly Tan): the frog base, its four points folded
-    // down, the lower edges of each face folded in to the middle, and the petals opened out.
+    // The traditional lily (yuri), as origami.me draws it (Florent Fabre, diagrams by Nick Robinson): the frog base, its
+    // four points folded down, the edges of each face at the closed end folded in to the middle, and the petals opened out.
     id: 'lily',
     name: 'Lily',
     level: 'Tricky',
