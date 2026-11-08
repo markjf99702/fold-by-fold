@@ -155,7 +155,14 @@ function openModel(id, i = null) {
     try {
       view = new View($('gl'));
       wireCamera();
-      $('gl').addEventListener('webglcontextrestored', () => { dirty = true; }); // after the view has rebuilt
+      // A phone can take the 3D away from a page and give it back a moment later. If it doesn't come back, the
+      // stage would be a blank box, so say what to do.
+      let lost = 0;
+      $('gl').addEventListener('webglcontextlost', () => {
+        clearTimeout(lost);
+        lost = setTimeout(() => { $('glError').textContent = 'The 3D view stopped. Reload the page to bring the paper back.'; $('glError').hidden = false; }, 3000);
+      });
+      $('gl').addEventListener('webglcontextrestored', () => { clearTimeout(lost); $('glError').hidden = true; dirty = true; }); // after the view has rebuilt
     } catch {
       // No 3D here: say so and put away what only works in 3D. The words, slider and buttons still work.
       $('glError').hidden = false;

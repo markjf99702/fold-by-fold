@@ -495,6 +495,7 @@ async function fresh(hash = '', { init, arg, ...opts } = {}) {
   } });
   await p.waitForFunction(() => fold.state.id === 'crane');
   assert.equal(await p.isVisible('#glError'), true, 'no word that 3D is missing');
+  assert.match(await p.textContent('#glError'), /can’t draw the paper in 3D, but every step is still written out/);
   for (const q of ['#hint', '#topView', '#resetView']) assert.equal(await p.isVisible(q), false, `${q} is still up without 3D`);
   await p.click('#play');
   await p.waitForFunction(() => fold.state.t >= 1, null, { timeout: 10000 });
@@ -528,6 +529,14 @@ async function fresh(hash = '', { init, arg, ...opts } = {}) {
   assert.equal(restored, true, 'the 3D never came back');
   const after = await paper();
   assert.ok(Math.abs(after - before) < before * 0.05, `the paper didn't come back (${after} paper pixels, ${before} before)`);
+  assert.equal(await p.isVisible('#glError'), false, 'a word that the 3D stopped, though it came back at once');
+  // If it doesn't come back within a few seconds, the page says so, rather than leaving a blank box, and the word
+  // goes again once it does come back.
+  await p.evaluate(() => { window.lose = document.getElementById('gl').getContext('webgl').getExtension('WEBGL_lose_context'); lose.loseContext(); });
+  await p.waitForSelector('#glError:not([hidden])', { timeout: 6000 }).catch(() => assert.fail('no word that the 3D stopped'));
+  assert.equal(await p.textContent('#glError'), 'The 3D view stopped. Reload the page to bring the paper back.');
+  await p.evaluate(() => lose.restoreContext());
+  await p.waitForSelector('#glError', { state: 'hidden', timeout: 4000 }).catch(() => assert.fail('the word that the 3D stopped stayed after it came back'));
   await p.context().close();
 }
 

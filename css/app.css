@@ -224,7 +224,11 @@ html:has(#player:not([hidden])) { overscroll-behavior-y: none; }
   .hint .touch { display: none; }
   .hint .mouse { display: inline; }
 }
-.gl-error { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; padding: 24px; margin: 0; }
+/* Where the paper can't be drawn, the mat is still there, saying why. */
+.gl-error {
+  position: absolute; inset: 0; display: grid; place-items: center; text-align: center; margin: 0;
+  padding: 24px max(24px, calc(50% - 13em)); background: var(--mat); color: #eef3ef; text-wrap: balance;
+}
 
 .panel {
   grid-area: panel;
