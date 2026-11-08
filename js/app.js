@@ -644,8 +644,9 @@ function frameCamera(snap) {
   }
   // A step that stands the model up says how big it gets and how high to look, once its fold moves; until then the
   // paper lies flat. Any other step is framed for the whole of its fold, not just how it starts and ends: turning
-  // over stands the paper on its edge, and a fold behind lifts the model to make room under it. The camera looks at
-  // half the height the paper reaches, from the usual angle, so turning the paper round doesn't change its size.
+  // over stands the paper on its edge, and a fold behind tips the model up on an edge to make room under it. The
+  // camera looks at half the height the paper reaches, from the usual angle, so turning the paper round doesn't change
+  // its size.
   const v = aimedFor === s ? s.view : null;
   const size = Math.max(x1 - x0, y1 - y0, v?.size || 0, 0.55);
   const box = [x0, y0, x1, y1];
