@@ -149,8 +149,9 @@ function paintHome() {
 // ---------- Player ----------
 
 let view = null;
-const P = { b: null, id: null, i: 0, t: 0, playing: false, holding: false, clock: 0, t0: 0, pace: 1, waiting: false };
+const P = { b: null, id: null, i: 0, t: 0, playing: false, holding: false, clock: 0, t0: 0, pace: 1, waiting: false, shownAt: -Infinity };
 const HOLD = 850; // how long the marks show on the paper before Play moves it
+const MARKS_IN = 160; // how long a step's marks take to fade in, in ms
 const pace = () => (prefs.slow ? 2.2 : 1); // Slow gives the marks and the fold a little over twice as long
 
 // How long a step's fold takes at the pace it was started at (P.pace).
@@ -392,6 +393,7 @@ function paint() {
   paintControls();
   if (step !== shown) {
     shown = step;
+    P.shownAt = performance.now(); // its marks fade in from now
     $('stepCount').textContent = `Step ${P.i + 1} of ${n}`;
     $('chip').innerHTML = chipFor(step);
     $('say').textContent = step.say;
@@ -628,10 +630,13 @@ function loop(now) {
   }
   if (!view) return; // no 3D: the fold's time still runs for the words and slider, with nothing to draw
   if (!view.settle(still.matches ? 1 : 1 - Math.pow(0.001, dt))) { dirty = true; more(); }
+  // A new step's marks fade in, rather than appearing in one frame as the camera eases to the step.
+  const marksIn = P.t > 0 || still.matches ? 1 : Math.max(0, Math.min(1, (now - P.shownAt) / MARKS_IN));
+  if (marksIn < 1) { dirty = true; more(); }
   if (!asked) lastFrame = 0; // the next frame, whenever it comes, starts the camera's easing afresh
   if (!dirty) return;
   dirty = false;
-  const alpha = P.t <= 0 ? 1 : Math.max(0, 1 - P.t * 5);
+  const alpha = P.t <= 0 ? marksIn : Math.max(0, 1 - P.t * 5);
   view.show(poses(step, P.t), marks(step), alpha);
   view.draw();
 }
@@ -965,7 +970,7 @@ window.addEventListener('resize', redraw);
 // A hook for the tests and screenshot scripts. index.html also looks for it, to tell that the page has started.
 window.fold = {
   get state() { return { id: P.id, i: P.i, t: P.t, playing: P.playing, steps: P.b ? P.b.steps.length : 0 }; },
-  set(i, t) { P.i = i; P.t = t; P.playing = false; keepAim(); paint(); frameCamera(true); },
+  set(i, t) { P.i = i; P.t = t; P.playing = false; keepAim(); paint(); P.shownAt = -Infinity; frameCamera(true); }, // the marks at once
   view: () => view,
   get built() { return [...builtCache.keys()]; }, // the models folded so far
 };

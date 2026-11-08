@@ -34,7 +34,7 @@ async function open(viewport, deviceScaleFactor, hash = '') {
   const page = await ctx.newPage();
   await page.goto(base + hash);
   await page.evaluate(() => document.fonts.ready);
-  await page.addStyleTag({ content: '.hint { display: none !important; }' });
+  await page.addStyleTag({ content: '.hint { display: none !important; } .screen { animation: none !important; }' });
   return page;
 }
 

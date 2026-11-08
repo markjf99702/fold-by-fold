@@ -673,6 +673,34 @@ for (const [width, height] of [[390, 844], [1280, 800]]) {
   await p.context().close();
 }
 
+// Rather than cutting from one to the other in a frame, the gallery and the player fade in as they show, and a new
+// step's marks fade in over a moment instead of appearing whole as the camera eases to the step. The hook the tests and
+// the README pictures use shows the marks at once. With reduced motion asked for, nothing fades.
+for (const reduce of [false, true]) {
+  const p = await fresh('', { viewport: { width: 1280, height: 800 }, deviceScaleFactor: 1, hasTouch: false, ...(reduce ? { reducedMotion: 'reduce' } : {}) });
+  await p.waitForSelector('#home:not([hidden])');
+  const fades = (id) => p.evaluate((id) => getComputedStyle(document.getElementById(id)).animationName !== 'none', id);
+  const home = await fades('home');
+  await p.click('.model[data-model="crane"]');
+  await p.waitForFunction(() => fold.state.id === 'crane');
+  assert.deepEqual([home, await fades('player')], [!reduce, !reduce], `the gallery and player ${reduce ? 'fade in with reduced motion' : 'don\'t fade in'}`);
+  await p.waitForTimeout(600);
+  // How visible the marks are in each frame drawn after the step changes.
+  const drawn = (change, ms) => p.evaluate(([change, ms]) => new Promise((done) => {
+    const v = fold.view(), show = v.show, out = [];
+    v.show = (items, marks, a) => { out.push(a); return show.call(v, items, marks, a); };
+    if (change === 'list') document.querySelector('#stepList li:nth-child(3) button').click();
+    else fold.set(5, 0);
+    setTimeout(() => { v.show = show; done(out); }, ms);
+  }), [change, ms]);
+  const listed = await drawn('list', 600);
+  assert.equal(listed.at(-1), 1, 'a new step\'s marks never showed whole');
+  if (reduce) assert.ok(listed.every((a) => a === 1), `with reduced motion a new step's marks faded in: ${listed}`);
+  else assert.ok(listed.some((a) => a > 0 && a < 1) && listed.every((a, k) => k === 0 || a >= listed[k - 1]), `a new step's marks didn't fade in: ${listed}`);
+  assert.ok((await drawn('set', 300)).every((a) => a === 1), 'fold.set did not show the marks at once');
+  await p.context().close();
+}
+
 // The back arrow returns to the gallery the way the browser's Back would, so Back from the gallery leaves
 // instead of reopening the model. Opened straight from a link, it goes to the gallery without adding a page.
 {

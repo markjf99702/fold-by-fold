@@ -85,6 +85,9 @@ body {
 }
 button { font: inherit; color: inherit; }
 [hidden] { display: none !important; }
+/* The gallery and the player fade in as they show, rather than cutting from one to the other in a frame. */
+.screen:not([hidden]) { animation: screen-in .18s ease-out; }
+@keyframes screen-in { from { opacity: 0; } }
 .noscript { padding: 2rem; text-align: center; }
 /* While the page's script loads: faded in only after a second, so a quick start never shows it. */
 .boot {
@@ -453,4 +456,5 @@ html:has(#player:not([hidden])) { overscroll-behavior-y: none; }
 
 @media (prefers-reduced-motion: reduce) {
   .model, .swatch { transition: none; }
+  .screen:not([hidden]) { animation: none; }
 }
