@@ -205,6 +205,7 @@ function renderSteps() {
     const li = document.createElement('li');
     const b = document.createElement('button');
     b.type = 'button';
+    b.tabIndex = -1; // Tab stops only at the step's own tick (see paint)
     b.setAttribute('aria-label', `Step ${i + 1}: ${s.name}`);
     b.addEventListener('click', () => go(i));
     li.append(b);
@@ -231,8 +232,6 @@ function slideTo(x, first) {
   const i = ticks.reduce((best, li, k) => (Math.abs(x - mid(li)) < Math.abs(x - mid(ticks[best])) ? k : best), 0);
   if (!first && i === P.i) return;
   go(i);
-  // A tick that had the focus hands it on, so a key pressed next acts on the step picked, not the one first touched.
-  if ($('ticks').contains(document.activeElement)) ticks[i].firstChild.focus({ preventScroll: true });
 }
 
 function go(i, { play = false, snap = false, keep = true } = {}) {
@@ -314,8 +313,14 @@ function paint() {
     $('say').textContent = step.say;
     words.scrollTop = 0; // a new step's words start at the top
     fadeWords();
+    // Tab stops at the step's tick only, the way it does at the chosen paper colour, rather than at every one of the
+    // frog's 34. A tick that has the focus hands it on to the step's tick, so a key pressed next acts on the step
+    // you're on: after the arrow keys or Next, or a finger sliding along the bar.
+    const handOn = $('ticks').contains(document.activeElement);
     document.querySelectorAll('#ticks button').forEach((b, k) => {
+      b.tabIndex = k === P.i ? 0 : -1;
       if (k === P.i) b.setAttribute('aria-current', 'step'); else b.removeAttribute('aria-current');
+      if (k === P.i && handOn) b.focus({ preventScroll: true });
     });
     const list = $('stepList');
     [...list.children].forEach((li, k) => {

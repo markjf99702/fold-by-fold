@@ -107,16 +107,16 @@
 
       <div class="stage" id="stage">
         <canvas id="gl" aria-label="The paper, in 3D. Drag to turn it, pinch or scroll to zoom." role="img"></canvas>
-        <p class="hint" id="hint"><span class="touch">Drag to turn the paper · pinch to zoom</span><span class="mouse">Drag to turn the paper · scroll to zoom</span></p>
+        <p class="hint" id="hint" aria-hidden="true"><span class="touch">Drag to turn the paper · pinch to zoom</span><span class="mouse">Drag to turn the paper · scroll to zoom</span></p>
         <p class="gl-error" id="glError" hidden>This browser can’t draw the paper in 3D, but every step is still written out to fold along.</p>
       </div>
 
       <div class="panel">
-        <ol class="ticks" id="ticks" aria-label="Steps"></ol>
         <div class="step-now">
           <p class="chip" id="chip"></p>
           <p class="say" id="say" aria-live="polite"></p>
         </div>
+        <ol class="ticks" id="ticks" aria-label="Steps"></ol>
         <label class="scrub">
           <span class="sr">Where in this fold</span>
           <input type="range" id="scrub" min="0" max="1000" value="0">

@@ -241,7 +241,9 @@ html:has(#player:not([hidden])) { overscroll-behavior-y: none; }
   border-top: 1px solid var(--line);
 }
 .ticks, .scrub, .controls { flex: none; }
-.ticks { list-style: none; margin: -10px 0; padding: 0; display: flex; gap: 4px; touch-action: pan-y; } /* a finger slides along it */
+/* The ticks come after the step's words in the page, so a screen reader reaches the words straight after the paper,
+   but they're shown above them. */
+.ticks { list-style: none; margin: -10px 0; padding: 0; display: flex; gap: 4px; touch-action: pan-y; order: -1; } /* a finger slides along it */
 .ticks li { flex: 1; }
 .ticks button {
   appearance: none; border: 0; padding: 20px 0; width: 100%; background: none; cursor: pointer; display: block;

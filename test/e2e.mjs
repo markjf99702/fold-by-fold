@@ -1241,6 +1241,35 @@ for (const hash of ['#%', '#crane-3%', '#%F0%9F']) {
   await m.context().close();
 }
 
+// The bar of ticks is one stop for Tab, at the step you're on, the way the paper colours are: each tick was a stop of
+// its own, 34 presses to get past the frog's. With a tick in focus the arrow keys move the focus along with the step.
+// A screen reader comes to the step's words straight after the paper, then the ticks: they were read first, every one.
+{
+  const p = await fresh('#frog-12');
+  await p.waitForFunction(() => fold.state.id === 'frog');
+  const on = () => p.evaluate(() => { const a = document.activeElement; return a.closest('#ticks') ? `tick ${[...document.querySelectorAll('#ticks button')].indexOf(a) + 1}` : a.id || a.tagName; });
+  assert.equal(await p.locator('#ticks button[tabindex="0"]').count(), 1, 'Tab stops at more than one tick');
+  await p.focus('#resetView');
+  await p.keyboard.press('Tab');
+  assert.equal(await on(), 'tick 12', 'Tab from the view buttons did not go to the step\'s tick');
+  await p.keyboard.press('Tab');
+  assert.equal(await on(), 'scrub', 'Tab from the step\'s tick did not go on to the slider');
+  await p.keyboard.press('Shift+Tab');
+  await p.keyboard.press('ArrowRight');
+  await p.waitForFunction(() => fold.state.i === 12);
+  assert.equal(await on(), 'tick 13', 'the focus stayed on the tick before when the step moved on');
+  await p.keyboard.press('ArrowLeft');
+  await p.waitForFunction(() => fold.state.i === 11);
+  assert.equal(await on(), 'tick 12', 'the focus stayed on the tick after when the step went back');
+  assert.equal(await p.getAttribute('#ticks li:nth-child(12) button', 'tabindex'), '0');
+  const order = await p.evaluate(() => [...document.querySelectorAll('.panel > *')].filter((e) => e.offsetParent).map((e) => e.id || e.className));
+  assert.deepEqual(order.slice(0, 2), ['step-now', 'ticks'], 'the step\'s words don\'t come before the ticks for a screen reader');
+  const shown = await p.evaluate(() => ['#ticks', '.step-now'].map((q) => document.querySelector(q).getBoundingClientRect().top));
+  assert.ok(shown[0] < shown[1], 'the ticks are no longer above the words');
+  assert.equal(await p.getAttribute('#hint', 'aria-hidden'), 'true', 'the hint repeats the paper\'s own label to screen readers');
+  await p.context().close();
+}
+
 // The cards in a row line up: names, step counts and words at the same height across the row. On a wide screen,
 // and on a phone too, where a name on two lines (Paper airplane) sits beside one on one line (Paper cup), and with
 // a card saying which step you got to.
