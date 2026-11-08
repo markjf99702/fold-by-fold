@@ -977,6 +977,20 @@ for (const hash of ['#%', '#crane-3%', '#%F0%9F']) {
   await p.context().close();
 }
 
+// For screen readers, the list of steps beside the paper is named, and each step in it says its number, which is on
+// screen but was left out of what a screen reader heard; the symbol beside a step's name is left out. The focus ring on
+// a step in the list is drawn inside it, so the list's edges don't cut it off at the sides.
+{
+  const p = await fresh('#crane-3', { viewport: { width: 1280, height: 800 }, deviceScaleFactor: 1, hasTouch: false });
+  await p.waitForFunction(() => fold.state.id === 'crane');
+  assert.equal(await p.getByRole('list', { name: 'All steps' }).getByRole('button', { name: /^Step 3: Turn it over/ }).count(), 1, 'the list of steps is not named, or its steps don\'t say their numbers');
+  assert.equal(await p.locator('#chip svg[aria-hidden="true"]').count(), 1, 'the symbol beside the step\'s name is read out');
+  await p.focus('#speed');
+  await p.keyboard.press('Tab');
+  assert.deepEqual(await p.evaluate(() => [document.activeElement.closest('#stepList') !== null, getComputedStyle(document.activeElement).outlineOffset]), [true, '-3px'], 'the focus ring on a step in the list is cut off');
+  await p.context().close();
+}
+
 // Space plays and pauses after a click anywhere on the player. Most browsers give a clicked button the focus, and
 // Space would press it again: the step clicked in the list, Next (on another step), Slow (off again). The slider
 // leaves Space alone too. A button the keyboard has put the focus on still presses itself.

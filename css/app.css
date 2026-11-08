@@ -337,11 +337,12 @@ html:has(#player:not([hidden])) { overscroll-behavior-y: none; }
     flex: 1 1 auto; min-height: 0; overflow: auto; overscroll-behavior: contain;
   }
   .step-list li button {
-    appearance: none; border: 0; background: none; width: 100%; text-align: left; cursor: pointer;
+    appearance: none; border: 0; background: none; width: 100%; text-align: left; cursor: pointer; position: relative;
     display: grid; grid-template-columns: 2em 1fr; gap: 8px; padding: 10px 6px; border-radius: 8px; font-size: .92rem; color: var(--muted);
   }
   .step-list li button::before { counter-increment: s; content: counter(s); font-weight: 700; font-variant-numeric: tabular-nums; }
   .step-list li button[aria-current="step"] { background: var(--chip); color: var(--ink); }
+  .step-list li button:focus-visible { outline-offset: -3px; } /* inside the button: the list's edges cut off the sides of a ring outside it */
   .step-now { flex: none; overflow: visible; }
   .say { min-height: 0; }
 }

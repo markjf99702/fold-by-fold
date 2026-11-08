@@ -213,7 +213,11 @@ function renderSteps() {
     const li2 = document.createElement('li');
     const b2 = document.createElement('button');
     b2.type = 'button';
-    b2.textContent = s.say;
+    // The number is drawn by the list itself, which a screen reader doesn't hear, so it's said here too.
+    const n = document.createElement('span');
+    n.className = 'sr';
+    n.textContent = `Step ${i + 1}: `;
+    b2.append(n, s.say);
     b2.addEventListener('click', () => go(i));
     li2.append(b2);
     list.append(li2);
@@ -402,14 +406,14 @@ function fadeWords() {
 words.addEventListener('scroll', fadeWords, { passive: true });
 if ('ResizeObserver' in window) new ResizeObserver(fadeWords).observe(words);
 
-// The step's symbol beside its name, drawn as the key under the gallery draws it.
+// The step's symbol beside its name, drawn as the key under the gallery draws it. Screen readers hear the name only.
 const CHIP = {
-  valley: '<svg viewBox="0 0 34 12"><path d="M1 6H33" stroke-dasharray="5 3.5"/></svg>',
-  mountain: '<svg viewBox="0 0 34 12"><path d="M1 6H33" stroke-dasharray="5 2.5 .5 2.5"/></svg>',
-  both: '<svg viewBox="0 0 34 12"><path d="M1 3H33" stroke-dasharray="5 3.5"/><path d="M1 9H33" stroke-dasharray="5 2.5 .5 2.5"/></svg>',
-  turnOver: '<svg viewBox="0 0 34 12"><path d="M5 9C5 2 29 2 29 9"/><path d="M25 6l4 3 3-4"/></svg>',
-  rotate: '<svg viewBox="0 0 34 12"><path d="M20.7 2.9A4.8 4.8 0 1 0 21.5 7.6"/><path d="M23.1 9.7L22 6.1l-3.1 2.1"/></svg>',
-  unfold: '<svg viewBox="0 0 34 12"><path d="M6 10C6 3 22 2 24 6.5"/><path class="hollow" d="M20.4 6.6l5.2 3.3.3-6.1z"/></svg>',
+  valley: '<svg viewBox="0 0 34 12" aria-hidden="true"><path d="M1 6H33" stroke-dasharray="5 3.5"/></svg>',
+  mountain: '<svg viewBox="0 0 34 12" aria-hidden="true"><path d="M1 6H33" stroke-dasharray="5 2.5 .5 2.5"/></svg>',
+  both: '<svg viewBox="0 0 34 12" aria-hidden="true"><path d="M1 3H33" stroke-dasharray="5 3.5"/><path d="M1 9H33" stroke-dasharray="5 2.5 .5 2.5"/></svg>',
+  turnOver: '<svg viewBox="0 0 34 12" aria-hidden="true"><path d="M5 9C5 2 29 2 29 9"/><path d="M25 6l4 3 3-4"/></svg>',
+  rotate: '<svg viewBox="0 0 34 12" aria-hidden="true"><path d="M20.7 2.9A4.8 4.8 0 1 0 21.5 7.6"/><path d="M23.1 9.7L22 6.1l-3.1 2.1"/></svg>',
+  unfold: '<svg viewBox="0 0 34 12" aria-hidden="true"><path d="M6 10C6 3 22 2 24 6.5"/><path class="hollow" d="M20.4 6.6l5.2 3.3.3-6.1z"/></svg>',
 };
 const chipFor = (step) => `${CHIP[symbol(step)]}<span>${step.name}</span>`;
 
