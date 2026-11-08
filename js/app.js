@@ -202,7 +202,7 @@ function outline(m, i) {
   $('modelName').textContent = m.name;
   $('stepCount').textContent = `Step ${k + 1} of ${n}`;
   $('stepNum').textContent = k + 1;
-  $('chip').textContent = '\u00a0'; // the step's symbol and name come with the fold; till then, the line is kept
+  $('chip').textContent = ''; // the step's symbol and name come with the fold; till then, its number keeps the line
   $('say').textContent = m.steps[k].say;
   words.scrollTop = 0;
   fadeWords();
@@ -588,7 +588,48 @@ const CHIP = {
   rotate: '<svg viewBox="0 0 34 12" aria-hidden="true"><path d="M20.7 2.9A4.8 4.8 0 1 0 21.5 7.6"/><path d="M23.1 9.7L22 6.1l-3.1 2.1"/></svg>',
   unfold: '<svg viewBox="0 0 34 12" aria-hidden="true"><path d="M6 10C6 3 22 2 24 6.5"/><path class="hollow" d="M20.4 6.6l5.2 3.3.3-6.1z"/></svg>',
 };
-const chipFor = (step) => `${CHIP[symbol(step, marksOf(step))]}<span>${step.name}</span>`;
+// The name is a button that opens the key of marks at its entry (see openKey), which a screen reader is told too.
+const chipFor = (step) => `${CHIP[symbol(step, marksOf(step))]}<span>${step.name}</span><span class="sr">: how to read its marks</span>`;
+
+// The fold's name under the paper opens the key of marks over the player, at that fold's entry, highlighted, without
+// leaving the model: the same key as under the gallery, copied in. A fold playing pauses meanwhile, out of sight under
+// it. The key closes with its × button, Escape, or a tap outside it.
+const sheet = $('keySheet');
+$('keyBody').append(document.querySelector('.symbols .symbol-list').cloneNode(true));
+// A step's entry is the one for the symbol beside its name, the marks it draws, but for a fold and unfold and an inside
+// reverse fold, which have entries of their own.
+function keyFor(step) {
+  const m = step.motion;
+  if (m.kind === 'reverse' || (m.kind === 'mech' && m.parts) || m.parts?.some((q) => q.reverse)) return 'reverse';
+  if (m.kind === 'foldUnfold' || (m.kind === 'multi' && m.folded)) return 'foldUnfold';
+  return symbol(step, marksOf(step));
+}
+function openKey() {
+  if (P.waiting || sheet.open) return;
+  if (P.playing) pause();
+  const key = keyFor(P.b.steps[P.i]), body = $('keyBody');
+  let here = null;
+  for (const d of body.querySelectorAll('.symbol-list > div')) {
+    const on = d.dataset.key === key;
+    d.classList.toggle('here', on);
+    if (on) { d.setAttribute('aria-current', 'true'); here = d; } else d.removeAttribute('aria-current');
+  }
+  sheet.showModal();
+  // The key itself takes the focus, as a page to read would, rather than its × button, ringed as if from the keyboard.
+  sheet.focus();
+  body.scrollTop = 0;
+  if (here) {
+    const b = here.getBoundingClientRect(), o = body.getBoundingClientRect();
+    if (b.bottom > o.bottom) body.scrollTop += b.top - o.top - 8;
+  }
+}
+$('chip').addEventListener('click', openKey);
+$('keyClose').addEventListener('click', () => sheet.close());
+// A tap outside lands on the dialog itself, round its contents. Only one that also began there closes it, not a drag
+// begun inside, on the words, that ends outside.
+let downOutside = false;
+sheet.addEventListener('pointerdown', (e) => { downOutside = e.target === sheet; });
+sheet.addEventListener('click', (e) => { if (e.target === sheet && downOutside) sheet.close(); });
 
 // What you'll make, so a link to a step shows it too, not only the gallery: the finished model's picture in your paper,
 // as on its card. On a wide screen it heads the list of steps, with what the card says of the model. Under or beside the
@@ -979,6 +1020,7 @@ function nameInAddress() {
 // hides. A page opened at a model, from a link or a reload, leaves the focus where the browser puts it.
 let routed = false;
 function route() {
+  if (sheet.open) sheet.close(); // the browser's Back or Forward, say: the key was over the model left behind
   addressed = location.hash;
   const lost = routed && (!document.activeElement || document.activeElement === document.body || $('home').contains(document.activeElement));
   routed = true;
@@ -1106,7 +1148,8 @@ $('player').addEventListener('mousedown', (e) => {
 document.addEventListener('keydown', (e) => {
   // With Alt, Ctrl or Cmd held the keys are the browser's (Alt+← is Back).
   // A key the paper or the slider has used already is theirs (the arrow keys turn the paper in focus).
-  if ($('player').hidden || e.altKey || e.ctrlKey || e.metaKey || e.defaultPrevented) return;
+  // With the key of marks open, the keys are its own: Escape closes it.
+  if ($('player').hidden || sheet.open || e.altKey || e.ctrlKey || e.metaKey || e.defaultPrevented) return;
   if (e.key === 'Escape') { $('back').click(); return; } // back to the gallery, as the back arrow goes
   if (P.waiting) return; // the model is still being folded
   const onSlider = e.target.closest('input'); // the slider moves itself with the arrow keys

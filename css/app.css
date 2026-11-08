@@ -322,13 +322,54 @@ html:has(#player:not([hidden])) { overscroll-behavior-y: none; }
    models' own typeface, about twice the height of the name. The bar above says which step of how many. */
 .step-head { margin: 0; display: flex; align-items: center; gap: 10px; min-width: 0; }
 .step-num { font-family: var(--display); font-weight: 800; font-size: 1.55rem; line-height: 1.2; font-variant-numeric: lining-nums tabular-nums; }
+/* The fold's name is a button that opens the key of marks at that fold, with a small question mark after it to say so.
+   It reaches a finger's 44 px down over the words, rather than up into the bar of ticks. */
 .chip {
+  appearance: none; border: 0; background: none; padding: 0; margin: 0; cursor: pointer; position: relative; text-align: left;
   display: inline-flex; align-items: center; gap: 8px; font-size: .78rem; font-weight: 700;
-  letter-spacing: .06em; text-transform: uppercase; color: var(--muted);
+  letter-spacing: .06em; text-transform: uppercase; color: var(--muted); min-width: 0;
 }
+.chip::before { content: ''; position: absolute; inset: -6px -8px -20px; }
+.chip:not(:empty)::after {
+  content: '?'; content: '?' / ''; flex: none; display: grid; place-items: center; width: 16px; height: 16px; border-radius: 50%;
+  border: 1.5px solid currentColor; font-size: .64rem; letter-spacing: 0; line-height: 1; margin-left: -2px;
+}
+@media (hover: hover) { .chip:hover { color: var(--ink); } }
 .chip svg { width: 34px; height: 12px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .chip .hollow { stroke-width: 1.6; }
 .say { margin: 0; font-size: 1.05rem; line-height: 1.45; min-height: 4.35em; } /* three lines at least */
+/* The key of marks, over the player (app.js opens it from the fold's name): a sheet up from the bottom of a phone, and
+   a box in the middle of a wider screen, with the step's entry ringed in the accent colour. Its entries are the
+   gallery's own, copied in, so the hollow arrowheads take the colour under them. */
+.sheet {
+  border: 0; padding: 0; color: var(--ink); background: var(--card); overflow: hidden;
+  width: 100%; max-width: 100%; max-height: 82dvh; margin: auto 0 0; border-radius: 16px 16px 0 0;
+  box-shadow: 0 -6px 30px rgba(0, 0, 0, .25);
+}
+.sheet[open] { display: flex; flex-direction: column; animation: sheet-in .2s ease-out; }
+.sheet:focus { outline: none; }
+@keyframes sheet-in { from { transform: translateY(24px); opacity: 0; } }
+.sheet::backdrop { background: rgba(20, 18, 14, .45); }
+.sheet-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 10px max(12px, env(safe-area-inset-right)) 8px max(var(--gutter), env(safe-area-inset-left));
+  border-bottom: 1px solid var(--line); /* the entries scroll under it */
+}
+.sheet-head h2 { font-family: var(--display); font-weight: 800; font-size: 1.3rem; margin: 0; }
+.sheet-body {
+  overflow-y: auto; overscroll-behavior: contain;
+  padding: 6px max(6px, env(safe-area-inset-right)) max(14px, env(safe-area-inset-bottom)) max(6px, env(safe-area-inset-left));
+}
+.sheet .symbol-list { gap: 2px; }
+.sheet .symbol-list > div { --under: var(--card); background: var(--under); padding: 10px; border-radius: 10px; }
+.sheet .symbol-list > div.here { --under: color-mix(in srgb, var(--accent) 9%, var(--card)); box-shadow: inset 0 0 0 2px var(--accent); }
+.sheet .symbol-list .head.hollow { fill: var(--under); }
+@media (min-width: 600px) {
+  .sheet { margin: auto; width: min(680px, calc(100% - 48px)); max-height: min(86dvh, 760px); border-radius: 16px; box-shadow: 0 10px 40px rgba(0, 0, 0, .3); }
+  .sheet-body { padding: 8px 10px 14px; }
+  .sheet-head { padding: 12px 12px 8px 20px; }
+}
+
 /* A hidden copy of the words' box, holding every step's words at once, to find the longest (see app.js). */
 .say-gauge { position: absolute; top: 0; left: 0; height: 0; overflow: hidden; visibility: hidden; pointer-events: none; }
 
@@ -490,5 +531,5 @@ html:has(#player:not([hidden])) { overscroll-behavior-y: none; }
 
 @media (prefers-reduced-motion: reduce) {
   .model, .swatch { transition: none; }
-  .screen:not([hidden]) { animation: none; }
+  .screen:not([hidden]), .sheet[open] { animation: none; }
 }

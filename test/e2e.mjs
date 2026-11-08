@@ -587,7 +587,8 @@ async function fresh(hash = '', { init, arg, ...opts } = {}) {
 }
 
 // On a phone the small things to tap reach the 44 px a finger needs (Apple's guidelines, and WCAG 2.2's enhanced
-// target size), past the room they take: a swatch, the footer links, Slow, the slider and the bar of ticks.
+// target size), past the room they take: a swatch, the footer links, Slow, the slider, the bar of ticks and the fold's
+// name, which opens the key to the marks.
 {
   const p = await fresh();
   await p.waitForSelector('#home:not([hidden])');
@@ -604,8 +605,8 @@ async function fresh(hash = '', { init, arg, ...opts } = {}) {
   const sizes = await reach(['.swatch:nth-child(3)', '.jd-foot a:last-child']);
   await p.click('.model:has(.title:text("Crane"))');
   await p.waitForFunction(() => fold.state.id === 'crane');
-  sizes.push(...await reach(['#speed', '#scrub', '#ticks li:nth-child(4) button']));
-  // The slider, the ticks and the links are wide already; the swatches and Slow need the width too.
+  sizes.push(...await reach(['#speed', '#scrub', '#ticks li:nth-child(4) button', '#chip']));
+  // The slider, the ticks, the fold's name and the links are wide already; the swatches and Slow need the width too.
   const small = sizes.filter(([q, tall, wide]) => tall < 44 || (/swatch|speed/.test(q) && wide < 44));
   assert.deepEqual(small, [], 'too small to tap: [what, px tall, px wide]');
   await p.context().close();
@@ -1432,6 +1433,55 @@ for (const hash of ['#%', '#crane-3%', '#%F0%9F']) {
   await p.context().close();
 }
 
+// The fold's name under the paper opens the key of marks over the player, at that fold's entry, highlighted and in
+// view, without leaving the model, and a fold playing pauses under it. It closes with its × button, Escape (which
+// otherwise goes back to the gallery) or a tap outside it, and the tap that closes it doesn't play the fold. Every step
+// of every model opens one entry, the one for the marks it draws: an inside reverse fold and a fold and unfold have
+// their own.
+{
+  const p = await fresh('#crane-19');
+  await p.waitForFunction(() => fold.state.id === 'crane');
+  const key = () => p.evaluate(() => {
+    const s = document.getElementById('keySheet'), here = [...s.querySelectorAll('.here')];
+    const b = here[0]?.getBoundingClientRect(), o = document.getElementById('keyBody').getBoundingClientRect();
+    return { open: s.open, here: here.map((d) => d.querySelector('dt').textContent), seen: !!b && b.top >= o.top - 0.5 && b.bottom <= o.bottom + 0.5, at: [location.hash, document.getElementById('player').hidden, fold.state.playing] };
+  });
+  await p.tap('#play');
+  await p.waitForFunction(() => fold.state.t > 0.05, null, { timeout: 10000 });
+  await p.tap('#chip');
+  assert.deepEqual(await key(), { open: true, here: ['Inside reverse fold'], seen: true, at: ['#crane-19', false, false] }, 'the fold\'s name didn\'t open the key at its entry, in view, over the paused player');
+  await p.keyboard.press('Escape');
+  const shut = async () => { const k = await key(); return [k.open, ...k.at]; };
+  assert.deepEqual(await shut(), [false, '#crane-19', false, false], 'Escape didn\'t close the key, or left the model');
+  await p.tap('#chip');
+  await p.tap('#keyClose');
+  assert.equal((await key()).open, false, 'the key\'s × button didn\'t close it');
+  await p.tap('#chip');
+  await p.touchscreen.tap(195, 150); // on the paper, under the dimmed backdrop
+  await p.waitForTimeout(500);
+  assert.deepEqual(await shut(), [false, '#crane-19', false, false], 'a tap outside the key didn\'t close it, or played the fold');
+  const wrong = await p.evaluate(async () => {
+    const out = [];
+    const ids = ['cup', 'plane', 'heart', 'fortune-teller', 'cicada', 'dog', 'hat', 'jumping-frog', 'pinwheel', 'helmet', 'waterbomb', 'crane', 'flapping-bird', 'lily', 'frog'];
+    for (const id of ids) {
+      location.hash = id;
+      await new Promise((r) => { const k = () => (fold.state.id === id ? r() : setTimeout(k, 30)); k(); });
+      for (let i = 0; i < fold.state.steps; i++) {
+        fold.set(i, 0);
+        document.getElementById('chip').click();
+        const here = [...document.querySelectorAll('#keySheet .here dt')].map((d) => d.textContent);
+        const name = document.querySelector('#chip span').textContent;
+        const want = { 'Fold and unfold': 'Fold and unfold', 'Unfold': 'Unfold', 'Turn over': 'Turn over', 'Rotate': 'Rotate', 'Collapse': 'Collapse and petal fold', 'Petal fold': 'Collapse and petal fold', 'Inside reverse fold': 'Inside reverse fold', 'Inside reverse folds': 'Inside reverse fold', 'Valley fold': 'Valley fold', 'Mountain fold': 'Mountain fold' }[name];
+        if (!document.getElementById('keySheet').open || here.length !== 1 || (want && here[0] !== want)) out.push(`${id}-${i + 1} ${name}: ${here.join(', ') || 'nothing'}`);
+        document.getElementById('keySheet').close();
+      }
+    }
+    return out;
+  });
+  assert.deepEqual(wrong, [], 'a step\'s name opens the key at the wrong entry, or none');
+  await p.context().close();
+}
+
 // The paper turns and zooms from the keyboard too: with it in focus, the arrow keys turn it the way a drag does and
 // + and - zoom, and they don't step through the model meanwhile. A mouse pressed on the paper doesn't leave the focus
 // there, so after a drag the arrow keys step again. Escape goes back to the gallery, as the back arrow does.
@@ -1790,6 +1840,7 @@ for (const hash of ['#%', '#crane-3%', '#%F0%9F']) {
 // The bar of ticks is one stop for Tab, at the step you're on, the way the paper colours are: each tick was a stop of
 // its own, 38 presses to get past the frog's. With a tick in focus the arrow keys move the focus along with the step.
 // A screen reader comes to the step's words straight after the paper, then the ticks: they were read first, every one.
+// So Tab comes to the fold's name, which opens the key to the marks, before the ticks.
 {
   const p = await fresh('#frog-12');
   await p.waitForFunction(() => fold.state.id === 'frog');
@@ -1799,7 +1850,9 @@ for (const hash of ['#%', '#crane-3%', '#%F0%9F']) {
   await p.keyboard.press('Tab');
   assert.equal(await on(), 'gl', 'Tab from the view buttons did not go to the paper');
   await p.keyboard.press('Tab');
-  assert.equal(await on(), 'tick 12', 'Tab from the paper did not go to the step\'s tick');
+  assert.equal(await on(), 'chip', 'Tab from the paper did not go to the fold\'s name');
+  await p.keyboard.press('Tab');
+  assert.equal(await on(), 'tick 12', 'Tab from the fold\'s name did not go to the step\'s tick');
   await p.keyboard.press('Tab');
   assert.equal(await on(), 'scrub', 'Tab from the step\'s tick did not go on to the slider');
   await p.keyboard.press('Shift+Tab');
