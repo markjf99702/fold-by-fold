@@ -609,6 +609,7 @@ function reachOf(step) {
 // view, when that's at least half as close again as the whole model would be; the next step frames the whole model
 // again. A pinch out goes far enough to see the whole model. Worked out once for each step: { cx, cy, cz, size, pts }.
 const closeUps = new WeakMap();
+let lastFramed = null; // the step the camera was last framed for
 function closeUp(step) {
   if (!closeUps.has(step)) {
     const m = step.motion;
@@ -650,7 +651,12 @@ function frameCamera(snap) {
   const box = [x0, y0, x1, y1];
   const close = s.view ? null : closeUp(s);
   view.widest = close ? Math.max(3, (2.5 * close.whole) / close.size) : 3;
-  view.zoom = Math.min(view.zoom, view.widest); // zoomed out on a close-up, the next step comes back in
+  // The viewer's own zoom and move carry on from step to step, but not into or out of a close-up: the framing itself
+  // moves in or out there, and zoomed out on the crane's head to see the whole crane, the next step showed it a third of
+  // its size; zoomed in on the step before, the head's own step went off the screen.
+  const was = lastFramed && lastFramed !== s && !lastFramed.view ? closeUp(lastFramed) : null;
+  if (lastFramed !== s && (close || was)) { view.zoom = 1; view.pan = [0, 0]; }
+  lastFramed = s;
   if (s.view) view.frame((x0 + x1) / 2, (y0 + y1) / 2, size, v?.lift || 0, { box });
   else if (close) {
     const at = aimedFor === s ? angleOf(s) : { yaw: -90, pitch: 58 };

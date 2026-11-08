@@ -715,7 +715,27 @@ for (const reduce of [false, true]) {
   assert.ok(Math.abs(await dist() - close) < 0.01, 'a double click did not come back to the close view');
   await p.click('#stepList li:nth-child(22) button');
   await settled();
-  assert.ok(await dist() > close * 1.5, 'the step after the head did not frame the whole crane again');
+  const next = await dist();
+  assert.ok(next > close * 1.5, 'the step after the head did not frame the whole crane again');
+  // The viewer's own zoom doesn't carry into or out of a close-up, where the framing itself moves in or out: zoomed out on
+  // the head to see the whole crane, the next step showed it a third of its size, and zoomed in on the step before, the
+  // head's own step went off the screen.
+  await p.click('#stepList li:nth-child(21) button');
+  await settled();
+  await p.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  for (let k = 0; k < 30; k++) await p.mouse.wheel(0, 300);
+  await settled();
+  await p.click('#stepList li:nth-child(22) button');
+  await settled();
+  assert.ok(Math.abs(await dist() - next) < 0.01, `zoomed out on the head, the next step was framed ${(await dist()).toFixed(2)} away, not ${next.toFixed(2)}`);
+  await p.click('#stepList li:nth-child(20) button');
+  await settled();
+  await p.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  for (let k = 0; k < 30; k++) await p.mouse.wheel(0, -300);
+  await settled();
+  await p.click('#stepList li:nth-child(21) button');
+  await settled();
+  assert.ok(Math.abs(await dist() - close) < 0.01, `zoomed in on the step before, the head was seen ${(await dist()).toFixed(2)} away, not ${close.toFixed(2)}`);
   await p.context().close();
 }
 
