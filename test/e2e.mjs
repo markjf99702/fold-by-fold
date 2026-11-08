@@ -4,7 +4,7 @@ import { execSync } from 'node:child_process';
 import { createServer } from 'node:http';
 import { readFile, readdir } from 'node:fs/promises';
 import { join, dirname, extname } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createHash } from 'node:crypto';
 import assert from 'node:assert/strict';
 
@@ -53,6 +53,9 @@ page.on('pageerror', e => problems.push(e.message));
 page.on('console', m => { if (m.type() === 'error') problems.push(m.text()); });
 page.on('requestfailed', r => problems.push('failed: ' + r.url()));
 page.on('request', r => { if (!r.url().startsWith(base)) problems.push('left the site: ' + r.url()); });
+// A file that's missing or renamed answers with an error rather than failing outright (a font would quietly fall back).
+const answered = (r) => { if (r.status() >= 400) problems.push(`${r.status()}: ${r.url()}`); };
+page.on('response', answered);
 
 await page.goto(base);
 await page.evaluate(() => document.fonts.ready);
@@ -253,6 +256,20 @@ for (const f of ['index.html', 'icon.svg', 'manifest.webmanifest', 'icon-192.png
   await c.close();
 }
 
+// It can be installed: the browser finds nothing in the way, it reads the manifest without an error and finds the
+// name in it, and every icon the manifest names is there.
+{
+  const cdp = await ctx.newCDPSession(page);
+  const { installabilityErrors } = await cdp.send('Page.getInstallabilityErrors');
+  assert.deepEqual(installabilityErrors, [], 'the browser would not install it');
+  const { url, errors, manifest } = await cdp.send('Page.getAppManifest');
+  assert.ok(url.endsWith('/manifest.webmanifest'), 'the page names no manifest');
+  assert.deepEqual([errors, manifest?.name], [[], 'Fold by Fold'], 'the manifest has errors, or no name');
+  assert.ok(manifest.icons.length >= 3, 'the manifest names too few icons');
+  for (const icon of manifest.icons) assert.equal((await page.request.get(icon.url)).status(), 200, `${icon.url} is missing`);
+  await cdp.detach();
+}
+
 // Works offline once it has been opened: after one visit to the gallery, a model never opened before opens and folds
 // with no connection. The server goes down as well as the browser: in some Chromium builds the browser's offline switch
 // alone doesn't stop the service worker's own requests, and this passed with no copy at all.
@@ -305,6 +322,7 @@ async function fresh(hash = '', { init, arg, ...opts } = {}) {
   const p = await c.newPage();
   p.on('pageerror', e => problems.push(e.message));
   p.on('console', m => { if (m.type() === 'error') problems.push(m.text()); });
+  p.on('response', answered);
   await p.goto(base + hash);
   return p;
 }
@@ -513,18 +531,33 @@ async function fresh(hash = '', { init, arg, ...opts } = {}) {
   await p.context().close();
 }
 
-// Slow gives the marks longer on the paper before a fold moves, as well as the fold itself.
+// Slow gives the marks longer on the paper before a fold moves, and the fold itself a little over twice as long
+// (2.2 times), and it's remembered.
 {
   const p = await fresh('#cup');
   await p.waitForFunction(() => fold.state.id === 'cup');
-  await p.click('#speed');
-  const held = await p.evaluate(() => new Promise((done) => {
+  // From Play to the fold moving, and from there to its end.
+  const timed = () => p.evaluate(() => new Promise((done) => {
+    fold.set(0, 0);
     document.getElementById('play').click();
     const t0 = performance.now();
-    const tick = () => (fold.state.t > 0 ? done(performance.now() - t0) : requestAnimationFrame(tick));
+    let moved = 0;
+    const tick = () => {
+      const now = performance.now();
+      if (!moved && fold.state.t > 0) moved = now;
+      if (fold.state.t >= 1) done([moved - t0, now - moved]);
+      else requestAnimationFrame(tick);
+    };
     requestAnimationFrame(tick);
   }));
+  const [, folding] = await timed();
+  await p.click('#speed');
+  const [held, slowly] = await timed();
   assert.ok(held > 850 * 2.2 - 50, `with Slow on, the marks show for only ${Math.round(held)} ms before the fold moves`);
+  assert.ok(Math.abs(slowly / folding - 2.2) < 0.3, `with Slow on, the fold takes ${Math.round(slowly)} ms, against ${Math.round(folding)} ms without`);
+  await p.reload();
+  await p.waitForFunction(() => fold.state.id === 'cup');
+  assert.equal(await p.getAttribute('#speed', 'aria-pressed'), 'true', 'Slow was forgotten on a reload');
   await p.context().close();
 }
 
@@ -544,6 +577,20 @@ for (const hash of ['#%', '#crane-3%', '#%F0%9F']) {
   const p = await fresh(hash);
   await p.waitForSelector('#home:not([hidden])', { timeout: 5000 });
   assert.ok(await p.locator('.model').count() >= 5, `no gallery for ${hash}`);
+  await p.context().close();
+}
+
+// A link to a step past the end opens the last step, a step before the first opens the first, and a link that names
+// no model opens the gallery.
+{
+  const p = await fresh('#frog-35');
+  await p.waitForFunction(() => fold.state.id === 'frog');
+  assert.equal(await p.evaluate(() => fold.state.i), 33, '#frog-35 did not open the frog\'s last step');
+  await p.evaluate(() => { location.hash = 'crane-0'; });
+  await p.waitForFunction(() => fold.state.id === 'crane');
+  assert.equal(await p.evaluate(() => fold.state.i), 0, '#crane-0 did not open the crane\'s first step');
+  await p.evaluate(() => { location.hash = 'junk'; });
+  await p.waitForSelector('#home:not([hidden])', { timeout: 5000 }).catch(() => assert.fail('#junk did not open the gallery'));
   await p.context().close();
 }
 
@@ -605,6 +652,13 @@ for (const hash of ['#%', '#crane-3%', '#%F0%9F']) {
   }
   await p.waitForFunction(() => fold.view().goal.yaw === null && fold.view().cam.yaw !== -150, null, { timeout: 3000 }).catch(() => {});
   assert.deepEqual(await p.evaluate(() => [Math.round(fold.view().cam.yaw), Math.round(fold.view().cam.pitch)]), [-90, 58], 'a double tap did not put the view back');
+  // Two fingers spreading apart on the paper zoom in.
+  await p.waitForTimeout(400);
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: x - 30, y, id: 1 }, { x: x + 30, y, id: 2 }] });
+  for (let k = 1; k <= 6; k++) await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: x - 30 - k * 10, y, id: 1 }, { x: x + 30 + k * 10, y, id: 2 }] });
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  await p.waitForFunction(() => fold.view().zoom < 0.8, null, { timeout: 3000 }).catch(() => {});
+  assert.ok(await p.evaluate(() => fold.view().zoom) < 0.8, 'a pinch did not zoom in');
   // In the player, a swipe down can't pull the page to reload it.
   assert.equal(await p.evaluate(() => getComputedStyle(document.documentElement).overscrollBehaviorY), 'none');
   await p.context().close();
@@ -695,6 +749,20 @@ for (const [width, height] of [[1280, 800], [390, 844], [360, 780]]) {
     await p.click('.model:has(h3:text("Paper cup"))');
     await p.waitForSelector('#player:not([hidden])');
     assert.equal(await p.innerText('#hint'), 'Drag to turn the paper · scroll to zoom');
+    // And scrolling on the paper zooms in, the square button looks straight down the way a diagram does, and a
+    // double click puts the view back.
+    const cam = () => p.evaluate(() => { const v = fold.view(); return [Math.round(v.cam.yaw), +v.cam.pitch.toFixed(1), +v.zoom.toFixed(2)]; });
+    const box = await p.locator('#gl').boundingBox();
+    await p.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await p.mouse.wheel(0, -400);
+    await p.waitForFunction(() => fold.view().zoom < 0.8, null, { timeout: 3000 }).catch(() => {});
+    assert.ok((await cam())[2] < 0.8, 'scrolling on the paper did not zoom in');
+    await p.click('#topView');
+    await p.waitForFunction(() => fold.view().goal.pitch === null && fold.view().cam.pitch > 89, null, { timeout: 5000 }).catch(() => {});
+    assert.equal((await cam())[1], 89.9, 'the square button did not look straight down');
+    await p.mouse.dblclick(box.x + box.width / 2, box.y + box.height / 2);
+    await p.waitForFunction(() => fold.view().goal.pitch === null && fold.view().cam.pitch < 60, null, { timeout: 5000 }).catch(() => {});
+    assert.deepEqual(await cam(), [-90, 58, 1], 'a double click did not put the view back');
   }
   await p.context().close();
 }
@@ -814,6 +882,26 @@ for (const [width, height] of [[375, 553], [320, 460]]) {
     assert.deepEqual(short, [], `the ${id}'s words crowd the paper or Play at ${width}x${height}`);
   }
   await p.context().close();
+}
+
+// The single-file copy (npm run build) works straight from disk: it opens, folds a step, and asks for nothing.
+{
+  execSync('node scripts/build.mjs', { cwd: root, stdio: 'pipe' });
+  const file = pathToFileURL(join(root, 'dist/fold-by-fold.html')).href;
+  const c = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, hasTouch: true });
+  const p = await c.newPage();
+  const asked = [];
+  p.on('request', (r) => { if (!r.url().startsWith('data:') && r.url().split('#')[0] !== file) asked.push(r.url()); });
+  p.on('pageerror', e => problems.push(e.message));
+  p.on('console', m => { if (m.type() === 'error') problems.push(m.text()); });
+  await p.goto(file);
+  await p.waitForSelector('#home:not([hidden])');
+  await p.click('.model:has(h3:text("Heart"))');
+  await p.waitForSelector('#player:not([hidden])');
+  await p.click('#play');
+  await p.waitForFunction(() => fold.state.t >= 1, null, { timeout: 15000 }).catch(() => assert.fail('the single-file copy did not fold'));
+  assert.deepEqual(asked, [], 'the single-file copy asked for files');
+  await c.close();
 }
 
 assert.deepEqual(problems.filter(p => !p.startsWith('failed:')), [], 'problems while using it');
