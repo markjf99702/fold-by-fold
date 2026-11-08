@@ -648,6 +648,45 @@ for (const [width, height] of [[390, 844], [1280, 800]]) {
   await p.context().close();
 }
 
+// A fold about a line running straight away from you would stand its paper edge-on to you halfway, where it all but
+// vanished: halfway through the crane's first turn over, only its shadow showed. As such a fold starts, by Play or by the
+// slider, the camera turns 20 degrees to the front left, and the next step is seen straight on again. With reduced motion
+// asked for, the camera is there at once.
+for (const reduce of [false, true]) {
+  const p = await fresh('#crane-3', { viewport: { width: 1280, height: 800 }, deviceScaleFactor: 1, hasTouch: false, ...(reduce ? { reducedMotion: 'reduce' } : {}) });
+  await p.waitForFunction(() => fold.state.id === 'crane');
+  const cam = () => p.evaluate(() => { const v = fold.view(); return [Math.round(v.cam.yaw), Math.round(v.cam.pitch)]; });
+  const settled = (yaw) => p.waitForFunction((yaw) => { const v = fold.view(); return v.goal.yaw === null && Math.round(v.cam.yaw) === yaw; }, yaw, { timeout: 5000 }).catch(() => {});
+  assert.deepEqual(await cam(), [-90, 58], 'the crane\'s turn over did not start seen straight on');
+  if (reduce) {
+    const after = await p.evaluate(() => new Promise((done) => {
+      document.getElementById('play').click();
+      requestAnimationFrame(() => requestAnimationFrame(() => { const v = fold.view(); done([Math.round(v.cam.yaw), Math.round(v.cam.pitch)]); }));
+    }));
+    assert.deepEqual(after, [-110, 58], 'with reduced motion, the camera swung to the side for the turn over');
+  } else {
+    await p.click('#play');
+    await settled(-110);
+    assert.deepEqual(await cam(), [-110, 58], 'the turn over did not turn the camera to the side');
+  }
+  await p.waitForFunction(() => fold.state.t >= 1, null, { timeout: 20000 });
+  await p.click('#next'); // step 4 folds about a line across
+  await settled(-90);
+  assert.deepEqual(await cam(), [-90, 58], 'the step after the turn over was not seen straight on');
+  // The slider turns it as well, on the frog's first squash fold, and a fold across doesn't.
+  await p.evaluate(() => { location.hash = 'frog-7'; });
+  await p.waitForFunction(() => fold.state.id === 'frog' && fold.state.i === 6 && document.getElementById('glWait').hidden, null, { timeout: 20000 });
+  await p.locator('#scrub').evaluate((el) => { el.value = 300; el.dispatchEvent(new Event('input', { bubbles: true })); });
+  await settled(-110);
+  assert.deepEqual(await cam(), [-110, 58], 'the slider did not turn the camera for the squash fold');
+  await p.click('#stepList li:nth-child(6) button');
+  await p.waitForFunction(() => fold.state.i === 5);
+  await p.locator('#scrub').evaluate((el) => { el.value = 300; el.dispatchEvent(new Event('input', { bubbles: true })); });
+  await settled(-90);
+  assert.deepEqual(await cam(), [-90, 58], 'the collapse turned the camera, or the squash fold\'s angle carried over');
+  await p.context().close();
+}
+
 // Each model opens seen from the usual angle and zoom, not from where the last one was left: from underneath and zoomed
 // in, the paper airplane's first step ('white side up') showed only the back of the paper, filling the view.
 {

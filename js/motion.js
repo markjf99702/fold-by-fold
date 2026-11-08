@@ -403,6 +403,17 @@ export function marks(step) {
   return m;
 }
 
+// Whether a step turns paper about a line running straight away from you as you usually see it (up the screen, to within
+// 8 degrees), so that halfway through, the paper that moves stands edge-on to you and all but vanishes: every turn over,
+// the frog's squash folds and pages, and a few more (39 steps of 138).
+export function edgeOn(step) {
+  const { motion } = step;
+  const lines = motion.kind === 'multi' ? motion.parts.filter((p) => !p.bend).map((p) => p.line)
+    : ['fold', 'foldUnfold', 'turnOver'].includes(motion.kind) ? [motion.line]
+      : motion.squash ? [line(motion.squash.line[0], motion.squash.to)] : [];
+  return lines.some((L) => L && Math.abs(L.d[0]) < Math.sin(8 * Math.PI / 180));
+}
+
 // The symbol a diagram's key gives a step: the kind of line it draws (both kinds, for a collapse or a petal
 // fold), or the move for one that turns the whole model. m: the step's marks, if they're to hand.
 export function symbol(step, m) {

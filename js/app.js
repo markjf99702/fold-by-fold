@@ -2,7 +2,7 @@
 
 import { MODELS } from './models.js';
 import { build } from './build.js';
-import { poses, marks, symbol, corners } from './motion.js';
+import { poses, marks, symbol, corners, edgeOn } from './motion.js';
 import { View } from './render.js';
 import { picture } from './thumbs.js';
 import { FINISHED } from './finished.js';
@@ -333,16 +333,24 @@ function go(i, { play = false, snap = false, keep = true } = {}) {
 // fold gets going: Play, or the slider. Before that the paper still lies flat, so the usual view is the right one,
 // and a step's angle never carries over into another step or model. The camera turns only when the step changes
 // or its fold first moves, never while the slider is being dragged on from there.
+//
+// A fold about a line running straight away from you would stand its paper edge-on to you halfway, where it all but
+// vanished (only the crane's shadow showed halfway through its first turn over). So as it starts, the camera turns 20
+// degrees to the front left, the side the light comes from, and the standing paper shows its lit face. At rest, every
+// step is seen straight on, square to the table, like the sheet in front of you.
+const SIDEWAYS = 20;
+const angleOf = (step) => step.view || (edgeOn(step) ? { yaw: -90 - SIDEWAYS, pitch: 58 } : null);
 let aimedFor = null;
 function aimFor(step) {
   if (!view) return;
-  if (step.view) { view.aim(step.view.yaw, step.view.pitch); aimedFor = step; frameCamera(false); }
+  const own = angleOf(step);
+  if (own) { view.aim(own.yaw, own.pitch); aimedFor = step; frameCamera(false); }
   else if (aimedFor) { view.aim(-90, 58); aimedFor = null; frameCamera(false); }
 }
 function keepAim() {
   const step = P.b.steps[P.i];
   if (aimedFor && aimedFor !== step) { view.aim(-90, 58); aimedFor = null; }
-  if (P.t > 0 && step.view && aimedFor !== step) aimFor(step);
+  if (P.t > 0 && angleOf(step) && aimedFor !== step) aimFor(step);
 }
 
 // Saves where you got to in this model. Folding a step makes it your place (Play, or the slider), and once its fold
@@ -617,7 +625,9 @@ function frameCamera(snap) {
     const pts = reachOf(s);
     let top = 0;
     for (let k = 2; k < pts.length; k += 3) top = Math.max(top, pts[k]);
-    view.frame((x0 + x1) / 2, (y0 + y1) / 2, size, top / 2, { box, fit: { pts, yaw: -90, pitch: 58 } });
+    // Turned to the side for a fold that would stand edge-on, it fits the paper as seen from there.
+    const at = aimedFor === s ? angleOf(s) : { yaw: -90, pitch: 58 };
+    view.frame((x0 + x1) / 2, (y0 + y1) / 2, size, top / 2, { box, fit: { pts, yaw: at.yaw, pitch: at.pitch } });
   }
   if (snap) view.settle(1);
   redraw();
@@ -753,7 +763,7 @@ function resetView() {
   const step = P.b.steps[P.i];
   view.zoom = 1;
   view.pan = [0, 0];
-  if (step.view && P.t > 0) aimFor(step);
+  if (angleOf(step) && P.t > 0) aimFor(step);
   else { view.aim(-90, 58); if (aimedFor) { aimedFor = null; frameCamera(false); } }
   redraw();
 }
