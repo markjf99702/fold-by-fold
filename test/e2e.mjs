@@ -199,9 +199,12 @@ assert.equal((await state()).i, 0);
 await page.click('#next');
 assert.equal((await state()).i, 1);
 
-// Slow is a switch.
+// Slow is a switch. On, it's filled in red with light words, like Play, rather than a red outline; off, it's an outline.
+const fill = (q) => page.evaluate((q) => { const c = getComputedStyle(document.querySelector(q)); return [c.backgroundColor, c.color]; }, q);
+assert.equal((await fill('#speed'))[0], 'rgba(0, 0, 0, 0)', 'Slow, off, is filled in');
 await page.click('#speed');
 assert.equal(await page.getAttribute('#speed', 'aria-pressed'), 'true');
+assert.deepEqual(await fill('#speed'), await fill('#play'), 'Slow, on, isn\'t filled in like Play');
 
 // Every step can be shown at any moment without an error.
 for (let i = 0; i < steps; i++) for (const t of [0, 0.5, 1]) await page.evaluate(([i, t]) => fold.set(i, t), [i, t]);

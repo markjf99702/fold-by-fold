@@ -367,7 +367,9 @@ html:has(#player:not([hidden])) { overscroll-behavior-y: none; }
 }
 .speed::before { content: ''; position: absolute; inset: -5.5px -4px; }
 .speed:active { background: var(--chip); }
-.speed[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
+/* On, it's filled in like Play, so it shows from across the table; off, it's the plain outline. */
+.speed[aria-pressed="true"] { border-color: var(--accent); background: var(--accent); color: var(--accent-ink); }
+.speed[aria-pressed="true"]:active { background: color-mix(in srgb, var(--accent) 82%, #000); border-color: transparent; }
 /* Narrow phones, and the panel beside the paper on a phone held sideways (further down): the buttons draw in a
    little so the row fits, and Play keeps one width for every label. */
 @media (max-width: 379px), (min-width: 560px) and (max-width: 899px) and (orientation: landscape) and (max-height: 500px) {
