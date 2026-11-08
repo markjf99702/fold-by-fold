@@ -2235,6 +2235,39 @@ for (const [width, height] of [[1280, 800], [390, 844], [360, 780]]) {
   await p.context().close();
 }
 
+// Held sideways, the words' column runs the full height of the screen beside the paper, from the top. The back arrow,
+// the model's name and the step stay in a bar over the paper, and the buttons that look straight down and put the view
+// back sit over the paper's top right corner, round, where a tap reaches them rather than the paper. Held upright, and
+// on a wide screen, they stay in the bar.
+{
+  const p = await fresh('#crane-10', { viewport: { width: 844, height: 390 } });
+  await p.waitForFunction(() => fold.state.id === 'crane');
+  const where = () => p.evaluate(() => {
+    const box = (q) => document.querySelector(q).getBoundingClientRect();
+    const [bar, stage, panel] = [box('.bar'), box('#stage'), box('.panel')];
+    const inBox = (b, o) => b.left >= o.left - 0.5 && b.right <= o.right + 0.5 && b.top >= o.top - 0.5 && b.bottom <= o.bottom + 0.5;
+    const hit = (q) => { const b = box(q), at = document.elementFromPoint((b.left + b.right) / 2, (b.top + b.bottom) / 2); return !!at && document.querySelector(q).contains(at); };
+    const views = ['#topView', '#resetView'].map(box);
+    return {
+      words: Math.round(panel.top) === 0 && Math.round(panel.bottom) === innerHeight,
+      bar: ['#back', '#modelName', '#stepCount'].every((q) => inBox(box(q), bar)) && bar.right <= stage.right + 0.5,
+      views: views.every((b) => inBox(b, stage) && b.top - stage.top < 24 && stage.right - views[1].right < 24) && ['#topView', '#resetView'].every(hit),
+      round: getComputedStyle(document.getElementById('resetView')).borderRadius === '50%',
+    };
+  });
+  for (const [width, height] of [[844, 390], [667, 375], [568, 320]]) {
+    await p.setViewportSize({ width, height });
+    await p.waitForTimeout(100);
+    assert.deepEqual(await where(), { words: true, bar: true, views: true, round: true }, `held sideways at ${width}x${height}, the words don't run the height of the screen, or the view buttons aren't on the paper's corner`);
+  }
+  await p.tap('#topView');
+  await p.waitForFunction(() => fold.view().goal.pitch > 89 || fold.view().cam.pitch > 89, null, { timeout: 3000 }).catch(() => assert.fail('the button on the paper\'s corner doesn\'t look straight down'));
+  await p.setViewportSize({ width: 390, height: 844 });
+  await p.waitForTimeout(100);
+  assert.equal(await p.evaluate(() => ['#topView', '#resetView'].every((q) => document.querySelector('.bar').contains(document.querySelector(q)) && document.querySelector(q).getBoundingClientRect().bottom <= document.querySelector('.bar').getBoundingClientRect().bottom)), true, 'held upright, the view buttons left the bar');
+  await p.context().close();
+}
+
 // Zoomed in to 400% (a 1280x800 window is then 320x200) the paper keeps a usable square and the words and buttons go
 // under it, the page scrolling to reach them, rather than the words beside it squeezing the paper to nothing (WCAG 2.2,
 // 1.4.10 Reflow). At 300% too. Phones held sideways keep the words beside the paper (above).

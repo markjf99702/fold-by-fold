@@ -562,15 +562,22 @@ html:has(#player:not([hidden])) { overscroll-behavior-y: none; }
 
 /* A phone held sideways is too short for the words and buttons under the paper: they left it a strip a finger or
    two tall. They go beside it instead, as on a wide screen, with the steps still along the top and only the
-   panel's right side kept clear of a notch; long words scroll in their own box, above the slider and buttons. */
+   panel's right side kept clear of a notch; long words scroll in their own box, above the slider and buttons.
+   The words run the full height of the screen, from the top: the bar, with the back arrow, the model's name and the
+   step, keeps to the paper's side, and the buttons that look straight down and put the view back sit over the paper's
+   top right corner, round and dark like the hint, rather than taking a strip of the words' column. */
 @media (min-width: 560px) and (max-width: 899px) and (orientation: landscape) and (max-height: 500px) {
   .player {
     grid-template-columns: minmax(0, 1fr) calc(clamp(320px, 50vw, 380px) + env(safe-area-inset-right));
     grid-template-rows: auto minmax(0, 1fr);
-    grid-template-areas: "bar bar" "stage panel";
+    grid-template-areas: "bar panel" "stage panel";
   }
-  .panel { border-top: 0; border-left: 1px solid var(--line); padding-left: var(--gutter); }
+  .panel { border-top: 0; border-left: 1px solid var(--line); padding-left: var(--gutter); padding-top: max(10px, env(safe-area-inset-top)); }
   .say { min-height: 0; }
+  .bar { position: relative; padding-right: var(--gutter); }
+  .bar-end { position: absolute; top: calc(100% + 10px); right: 10px; z-index: 2; }
+  .bar-end .icon-btn { background: rgba(20, 30, 26, .55); color: #eef3ef; }
+  .bar-end .icon-btn:active { background: rgba(20, 30, 26, .75); }
 }
 /* Held sideways, the words' box doesn't keep the height of a model's longest words: beside the paper it doesn't
    change the paper's size, and under it (below) the page scrolls. */
