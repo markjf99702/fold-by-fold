@@ -596,6 +596,24 @@ test('frog: each petal fold comes after a step that creases the face along the s
   }
 });
 
+// The dog's face as Origami-Instructions.com shows it: the triangle's corners fold down from the top of its middle crease
+// and hang out past the sides of the face, and its top and its chin fold behind, leaving the ears below the chin.
+test('dog face: its ears hang out past the sides of its face, below its chin, and its top and chin fold behind', () => {
+  const dog = MODELS.find((m) => m.id === 'dog');
+  assert.ok(dog, 'there is no dog face');
+  const b = once(dog), tri = b.steps[1].to, ears = b.steps[2].to;
+  const bottom = tri.at([1, 0]), top = tri.at([0.5, 0.5]);
+  for (const [corner, ear] of [[[1, 1], [1, 1]], [[0, 0], [0, 0]]]) {
+    const edge = line(tri.at(corner), bottom), tip = ears.at(ear);
+    assert.ok(side(edge, tip) * side(edge, top) < 0 && tip[1] < top[1] - 0.5, `the ear from paper corner ${ear} doesn't hang out past the face`);
+  }
+  const end = b.end, chin = end.at([1, 0]);
+  assert.ok(chin[1] > bottom[1] + 0.1 && chin[1] > end.at([1, 1])[1], 'the chin is not folded up behind, above the ears');
+  assert.ok(end.order.indexOf(end.facetAt([0.97, 0.03]).id) < end.order.indexOf(end.facetAt([0.5, 0.3]).id), 'the chin is not behind the face');
+  const highest = end.order.flatMap((id) => end.world(id)).filter((q) => Math.abs(q[1] - end.bounds().y1) < 1e-9);
+  assert.ok(Math.max(...highest.map((q) => q[0])) - Math.min(...highest.map((q) => q[0])) > 0.1, 'the top of the head is not flat');
+});
+
 // The pinwheel as origami.me draws it: the windmill base, a flat hexagon as wide as the paper and half as tall, and then
 // its four points, the paper's corners, sticking out the four ways round the middle, a quarter turn apart.
 test('pinwheel: the windmill base folds flat, and its four points end a quarter turn apart round the middle', () => {

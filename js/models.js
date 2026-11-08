@@ -139,6 +139,10 @@ function windmillHalf(y0, up) {
 }
 const PIN_UP = 'mountain';
 
+// The dog's ears fold down along lines this many degrees below level from the top of its middle crease, so they hang a
+// little out from its face; its top point folds behind DOG_TOP down, and its chin DOG_CHIN up.
+const EAR = 30, DOG_TOP = 0.1, DOG_CHIN = 0.16;
+
 // The jumping frog's index card: 3 by 5, so 1 wide and 5/3 tall. The top square collapses into a
 // waterbomb base around X, the middle of the square; the body below it is BODY tall.
 const CARD = 5 / 3, BODY = CARD - 1;
@@ -681,6 +685,43 @@ export const MODELS = [
       {
         say: 'Fold the right side behind the same way. That’s the cicada.',
         do: (h) => h.mountain(cicadaSide(h, 1), { move: [0, 0.5] }),
+      },
+    ],
+  },
+  {
+    // The traditional dog's face (inu), as Origami-Instructions.com shows it: a triangle, its corners folded down for
+    // the ears, and its top and bottom points folded behind.
+    id: 'dog',
+    name: 'Dog face',
+    level: 'Easy',
+    blurb: 'A puppy with floppy ears, in a few quick folds. Draw on its eyes and nose.',
+    paper: { kind: 'Square', colorUp: false, turn: 45 },
+    steps: [
+      {
+        say: 'White side up, turned like a diamond. Fold the top corner down to the bottom corner.',
+        do: (h) => h.valley(h.onto([0, 1], [1, 0]), { move: [0, 1] }),
+      },
+      {
+        say: 'Fold the left corner over to the right corner, and unfold, to crease the middle.',
+        do: (h) => h.crease(h.onto([1, 1], [0, 0]), { move: [1, 1] }),
+      },
+      {
+        say: 'Fold the left and right corners down from the top of the crease, so they hang down past the sides. These are the ears.',
+        name: 'Valley folds',
+        do: (h) => h.together(
+          (k) => k.valley(k.lineAt(k.at([0.5, 0.5]), 180 + EAR), { move: [1, 1] }),
+          (k) => k.valley(k.lineAt(k.at([0.5, 0.5]), -EAR), { move: [0, 0] }),
+        ),
+      },
+      {
+        say: 'Fold the top point down behind, to flatten the top of the head.',
+        // A level line has the paper above it on its left, the side that moves.
+        do: (h) => h.mountain(h.level(h.at([0.5, 0.5])[1] - DOG_TOP)),
+      },
+      {
+        say: 'Fold the bottom point up behind too, between the ears. That’s the dog: draw on its eyes and nose.',
+        // Both layers of the point, which are joined only at the top.
+        do: (h) => h.mountain(h.level(h.at([1, 0])[1] + DOG_CHIN), { flap: [[0.03, 0.97], [0.97, 0.03]] }),
       },
     ],
   },
