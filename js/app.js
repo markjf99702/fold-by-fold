@@ -344,7 +344,7 @@ function paint() {
     $('playLabel').textContent = label;
     $('playIcon').innerHTML = icon;
   }
-  $('scrub').value = Math.round(P.t * 1000);
+  scrubAt(P.t);
   $('speed').setAttribute('aria-pressed', prefs.slow);
   nameInAddress();
   document.querySelectorAll('#ticks button').forEach((b, k) => b.classList.toggle('done', k < P.i || (k === P.i && P.t >= 1)));
@@ -358,6 +358,14 @@ function paintControls() {
   unavailable(prev, P.i === 0 && P.t === 0);
   const label = P.t > 0.02 ? 'Replay this fold' : 'Previous step';
   if (prev.title !== label) { prev.title = label; prev.setAttribute('aria-label', label); }
+}
+
+// The slider says how far the fold has gone, for screen readers, rather than a number out of 1000.
+function scrubAt(t) {
+  const s = $('scrub');
+  s.value = Math.round(t * 1000);
+  const say = t <= 0 ? 'Not started' : t >= 1 ? 'Folded' : `${Math.min(99, Math.max(1, Math.round(t * 100)))}% folded`;
+  if (s.getAttribute('aria-valuetext') !== say) s.setAttribute('aria-valuetext', say);
 }
 
 // Next on the last step and the back button at the very start say they're unavailable and do nothing, but they're not
@@ -458,7 +466,7 @@ function loop(now) {
       if (now - P.clock >= HOLD * pace()) { P.holding = false; P.clock = now; }
     } else {
       P.t = Math.min(1, P.t0 + (now - P.clock) / duration(step));
-      $('scrub').value = Math.round(P.t * 1000);
+      scrubAt(P.t);
       if (P.t >= 1) { P.playing = false; keepPlace(placeNow()); paint(); } else paintControls();
     }
     dirty = true;
@@ -682,12 +690,23 @@ $('speed').addEventListener('click', () => {
   if (P.playing && !P.holding) { P.t0 = P.t; P.clock = performance.now(); }
   paint();
 });
-$('scrub').addEventListener('input', (e) => {
-  P.t = e.target.value / 1000;
+function scrubTo(v) {
+  P.t = v / 1000;
   P.playing = false;
   keepPlace(placeNow());
   keepAim();
   paint();
+}
+$('scrub').addEventListener('input', (e) => scrubTo(e.target.value));
+// The slider's own arrow keys move it one of its thousand steps, too little to see: here they move the fold a twentieth
+// of the way, to the next twentieth. Page Up and Page Down (a tenth), Home and End are the slider's own, and Space plays
+// and pauses, as it does anywhere in the player.
+$('scrub').addEventListener('keydown', (e) => {
+  const by = { ArrowRight: 1, ArrowUp: 1, ArrowLeft: -1, ArrowDown: -1 }[e.key];
+  if (!by || e.altKey || e.ctrlKey || e.metaKey) return;
+  e.preventDefault();
+  const v = Number(e.target.value);
+  scrubTo(Math.max(0, Math.min(1000, (by > 0 ? Math.floor(v / 50) + 1 : Math.ceil(v / 50) - 1) * 50)));
 });
 $('ticks').addEventListener('pointerdown', (e) => {
   if (e.button !== 0) return; // a right click, say

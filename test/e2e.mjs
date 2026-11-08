@@ -910,6 +910,28 @@ for (const hash of ['#%', '#crane-3%', '#%F0%9F']) {
   await p.context().close();
 }
 
+// The slider's arrow keys move the fold a twentieth of the way at a time: it runs from 0 to 1000, and each press moved
+// it a thousandth, too little to see. Page Up and Page Down still go a tenth, Home and End to the ends. A screen
+// reader hears how far the fold has gone rather than a number out of 1000, and Space there plays and pauses as it
+// does anywhere else in the player.
+{
+  const p = await fresh('#crane-3', { viewport: { width: 1280, height: 800 }, deviceScaleFactor: 1, hasTouch: false });
+  await p.waitForFunction(() => fold.state.id === 'crane');
+  const now = () => p.evaluate(() => [fold.state.i, fold.state.t, document.getElementById('scrub').getAttribute('aria-valuetext')]);
+  assert.deepEqual(await now(), [2, 0, 'Not started'], 'the slider does not say the fold has not started');
+  await p.focus('#scrub');
+  for (const [key, t, say] of [['ArrowRight', 0.05, '5% folded'], ['ArrowRight', 0.1, '10% folded'], ['ArrowUp', 0.15, '15% folded'],
+    ['ArrowDown', 0.1, '10% folded'], ['ArrowLeft', 0.05, '5% folded'], ['End', 1, 'Folded'], ['PageDown', 0.9, '90% folded'], ['Home', 0, 'Not started']]) {
+    await p.keyboard.press(key);
+    assert.deepEqual(await now(), [2, t, say], `${key} on the slider did not move the fold to ${t}`);
+  }
+  await p.keyboard.press(' ');
+  assert.equal(await p.evaluate(() => fold.state.playing), true, 'Space on the slider did not play');
+  await p.waitForFunction(() => fold.state.t >= 1, null, { timeout: 15000 });
+  assert.equal(await p.getAttribute('#scrub', 'aria-valuetext'), 'Folded', 'the slider does not say the fold has landed');
+  await p.context().close();
+}
+
 // Next and the back button keep the focus at the ends of a model. Going through a model with Enter on Next, the focus
 // fell to the page at the last step, as the button turned itself off under it; the back button did the same at the
 // first step. They say they're unavailable there instead, and pressing them does nothing.
