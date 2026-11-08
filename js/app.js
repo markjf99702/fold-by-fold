@@ -667,12 +667,14 @@ document.addEventListener('keydown', () => { if (!$('player').hidden) keepAwake(
 // set the #part, as they always did.
 const framed = window.self !== window.top;
 
-// The address names the step you're on (#crane-12, and the first step just #crane), so copying it or sharing it from
-// the browser sends that step. It's rewritten in place once the step has settled for a moment: sliding along the ticks
-// passes many steps a second, and browsers limit how often a page may rewrite its address (Safari throws after 100
-// times in 30 seconds). The page's history also notes whether the step's fold had landed, so a reload, or a phone
-// reopening the tab, shows it folded as you left it rather than asking for that fold again; a copied address opens
-// the step from its start. In a frame the address is left alone.
+// The address names the step you're on (#crane-12), so copying it or sharing it from the browser sends that step. The
+// first step is just #crane while it's where you got to; a bare name opens at your place, so once that's further on
+// (after step 1's fold lands, or starting again from the end) it's #crane-1, and a reload stays on step 1. The address
+// is rewritten in place once the step has settled for a moment: sliding along the ticks passes many steps a second, and
+// browsers limit how often a page may rewrite its address (Safari throws after 100 times in 30 seconds). The page's
+// history also notes whether the step's fold had landed, so a reload, or a phone reopening the tab, shows it folded as
+// you left it rather than asking for that fold again; a copied address opens the step from its start. In a frame the
+// address is left alone.
 let addressed = null; // the address as the page last opened or wrote it
 let addressTimer = 0;
 function nameInAddress() {
@@ -680,7 +682,7 @@ function nameInAddress() {
   clearTimeout(addressTimer);
   addressTimer = setTimeout(() => {
     if ($('player').hidden || location.hash !== addressed) return; // gone somewhere else meanwhile
-    const hash = '#' + P.id + (P.i ? '-' + (P.i + 1) : '');
+    const hash = '#' + P.id + (P.i || prefs.progress[P.id] > 0 ? '-' + (P.i + 1) : '');
     const landed = P.t >= 1;
     if (hash === addressed && !!history.state?.landed === landed) return;
     try {

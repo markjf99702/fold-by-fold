@@ -450,11 +450,39 @@ async function fresh(hash = '', { init, arg, ...opts } = {}) {
   }));
   assert.deepEqual(writes, [1, '#helmet-9'], 'the address was rewritten for every step passed, or not for the last');
   await p.evaluate(() => document.querySelector('#ticks button').click());
-  await p.waitForFunction(() => location.hash === '#helmet', null, { timeout: 3000 }).catch(() => assert.fail('step 1 is not named by the model alone'));
+  await p.waitForFunction(() => location.hash === '#helmet-1', null, { timeout: 3000 }).catch(() => assert.fail('step 1, with your place further on, is not named #helmet-1'));
   const other = await fresh(new URL(url).hash);
   await other.waitForFunction(() => fold.state.id === 'helmet');
   assert.deepEqual(await other.evaluate(() => [fold.state.i, fold.state.t]), [6, 0], 'the copied address did not open its step from the start');
   await other.context().close();
+  await p.context().close();
+}
+
+// Step 1 is named by the model alone (#cup) only while it's where you got to: a bare name opens at your place, so once
+// that's further on, step 1 is #cup-1. A reload on step 1 stays there, from its start or folded as it was left.
+{
+  const p = await fresh('#cup-5');
+  await p.waitForFunction(() => fold.state.id === 'cup');
+  const scrub = (v) => p.locator('#scrub').evaluate((el, v) => { el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); }, v);
+  await scrub(1000);
+  assert.equal(await p.textContent('#playLabel'), 'Start again');
+  await p.click('#play');
+  await p.waitForFunction(() => location.hash === '#cup-1', null, { timeout: 3000 }).catch(() => assert.fail('step 1 with your place further on is not named #cup-1'));
+  await p.reload();
+  await p.waitForFunction(() => fold.state.id === 'cup');
+  assert.deepEqual(await p.evaluate(() => [fold.state.i, fold.state.t]), [0, 0], 'a reload on step 1 went to your place');
+  await p.click('#back');
+  await p.waitForSelector('#home:not([hidden])');
+  assert.equal(await p.textContent('.model[data-model="cup"] .count'), 'Step 5 of 5', 'starting again lost your place');
+  // A model's first fold landing makes step 2 your place; a reload shows step 1 folded, as it was left.
+  await p.click('.model[data-model="frog"]');
+  await p.waitForFunction(() => fold.state.id === 'frog');
+  assert.equal(await p.evaluate(() => location.hash), '#frog');
+  await scrub(1000);
+  await p.waitForFunction(() => location.hash === '#frog-1' && history.state?.landed, null, { timeout: 3000 }).catch(() => assert.fail('step 1 folded is not named #frog-1'));
+  await p.reload();
+  await p.waitForFunction(() => fold.state.id === 'frog');
+  assert.deepEqual(await p.evaluate(() => [fold.state.i, fold.state.t]), [0, 1], 'a reload after step 1 landed did not show it folded');
   await p.context().close();
 }
 
