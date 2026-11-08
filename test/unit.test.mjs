@@ -89,6 +89,22 @@ test('folds made together that would move the same paper are refused, rather tha
   assert.throws(() => build(model), /twice step 1: Folds made together must move different flaps$/);
 });
 
+test('folds made together that would land on each other are refused, rather than passing through each other on the way', () => {
+  // A letter fold as one step: the bottom third up and the top down. Both turn at the same pace from opposite
+  // sides, so halfway they meet in the air, and one would pass through the other along the whole width.
+  const model = { id: 'letter', steps: [{ say: 'Fold the bottom third up and the top down, together.', do: (h) => h.together(
+    (k) => k.valley(k.level(-1 / 6), { flap: [0.5, 0.1] }),
+    (k) => k.valley(k.level(0.2), { flap: [0.5, 0.9] }),
+  ) }] };
+  assert.throws(() => build(model), /letter step 1: Folds made together can't land on each other: make them one after the other$/);
+  // One after the other, they're fine.
+  const apart = build({ id: 'letter', steps: [
+    { say: 'Fold the bottom third up.', do: (h) => h.valley(h.level(-1 / 6), { flap: [0.5, 0.1] }) },
+    { say: 'Fold the top down over it.', do: (h) => h.valley(h.level(0.2), { flap: [0.5, 0.9] }) },
+  ] });
+  assert.deepEqual(crossings(apart.end), []);
+});
+
 // The paper folded in half along a diagonal, and the line between its front and back halves.
 const diagonal = { say: 'Fold in half along the diagonal.', do: (h) => h.valley(h.through([0, 0], [1, 1]), { move: [0.9, 0.1] }) };
 const halves = (h) => h.paperLine([0, 0], [1, 1]);

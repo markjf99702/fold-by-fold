@@ -371,6 +371,20 @@ export function together(sheet, makers) {
       line: r.motion.line, moving: r.motion.moving, sign: r.motion.sign, type: r.motion.type,
       angle: r.motion.kind === 'bend' ? r.motion.angle : 180, bend: r.motion.kind === 'bend', schedule: r.motion.schedule || null,
     }));
+  // Folds made together turn at the same pace. Two that go the same way about different lines and land on each other
+  // (a letter fold made as one step) would meet in the air, and one would pass through the other. Layers turned about
+  // one line go over together, as one stack, like a page.
+  const plain = parts.filter((p) => !p.bend && !p.reverse);
+  const sameLine = (a, b) => Math.abs(cross(a.d, b.d)) < 1e-6 && Math.abs(side(a, b.p)) < 1e-6;
+  for (let i = 0; i < plain.length; i++) {
+    for (let k = i + 1; k < plain.length; k++) {
+      const a = plain[i], b = plain[k];
+      if (a.sign !== b.sign || sameLine(a.line, b.line)) continue;
+      let shared = 0;
+      for (const x of a.moving) for (const y of b.moving) shared += overlapArea(to.world(x), to.world(y));
+      if (shared > 1e-7) throw new Error("Folds made together can't land on each other: make them one after the other");
+    }
+  }
   return result(from, to, { kind: 'multi', parts, moving: parts.flatMap((p) => p.moving) });
 }
 
