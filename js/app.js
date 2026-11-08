@@ -321,8 +321,13 @@ function paint() {
     [...list.children].forEach((li, k) => {
       if (k === P.i) li.firstChild.setAttribute('aria-current', 'step'); else li.firstChild.removeAttribute('aria-current');
     });
-    // Only where the list is shown (beside the paper on a wide screen): elsewhere it would cost a layout for nothing.
-    if (list.offsetParent) list.children[P.i].firstChild.scrollIntoView({ block: 'nearest' });
+    // The list keeps the step in its middle, so the steps after it show too. Only where the list is shown (beside the
+    // paper on a wide screen): elsewhere it would cost a layout for nothing. The list scrolls itself, since scrolling
+    // the step into view could scroll the page as well, and in Chrome it moves where the next Tab goes.
+    if (list.offsetParent) {
+      const b = list.children[P.i].getBoundingClientRect(), l = list.getBoundingClientRect();
+      list.scrollTop += (b.top + b.bottom) / 2 - (l.top + list.clientTop + list.clientHeight / 2);
+    }
   }
   $('next').disabled = P.i === n - 1;
   const last = P.i === n - 1;

@@ -963,20 +963,22 @@ for (const hash of ['#%', '#crane-3%', '#%F0%9F']) {
 }
 
 // Scrubbing on a phone does only what the slider changes: the list of steps, hidden there, isn't scrolled to the step
-// on every move (on a slow phone that was most of the cost). On a wide screen the list still follows the step.
+// on every move (on a slow phone that was most of the cost), nor when the step changes. On a wide screen the list still
+// follows the step.
 {
   const p = await fresh('#frog-16');
   await p.waitForFunction(() => fold.state.id === 'frog');
   const scrolls = await p.evaluate(() => {
     let n = 0;
-    const own = Element.prototype.scrollIntoView;
-    Element.prototype.scrollIntoView = function (...a) { n++; return own.apply(this, a); };
+    const list = document.getElementById('stepList'), own = Object.getOwnPropertyDescriptor(Element.prototype, 'scrollTop');
+    Object.defineProperty(list, 'scrollTop', { configurable: true, get() { return own.get.call(this); }, set(v) { n++; own.set.call(this, v); } });
     const s = document.getElementById('scrub');
     for (let k = 1; k <= 20; k++) { s.value = String(k * 40); s.dispatchEvent(new Event('input', { bubbles: true })); }
-    Element.prototype.scrollIntoView = own;
+    for (const k of [17, 18, 19]) document.querySelector(`#ticks li:nth-child(${k}) button`).click();
+    delete list.scrollTop;
     return n;
   });
-  assert.equal(scrolls, 0, `scrubbing scrolled the hidden list of steps ${scrolls} times`);
+  assert.equal(scrolls, 0, `the hidden list of steps was scrolled ${scrolls} times`);
   await p.setViewportSize({ width: 1000, height: 560 });
   await p.waitForTimeout(100);
   await p.evaluate(() => document.querySelector('#ticks li:nth-child(31) button').click());
@@ -985,6 +987,29 @@ for (const hash of ['#%', '#crane-3%', '#%F0%9F']) {
     return b.top >= list.top - 0.5 && b.bottom <= list.bottom + 0.5;
   });
   assert.ok(seen, 'on a wide screen the list of steps did not scroll to the step');
+  await p.context().close();
+}
+
+// On a wide screen the list of steps keeps the step you're on in its middle, so the steps after it show too: the step
+// sat at the very bottom, with the next one out of sight. The list scrolls only when the step changes, so it can be
+// scrolled to read ahead while a fold plays and stays there when the fold lands, and the page itself never scrolls.
+{
+  const p = await fresh('#frog-20', { viewport: { width: 1280, height: 700 }, deviceScaleFactor: 1, hasTouch: false });
+  await p.waitForFunction(() => fold.state.id === 'frog');
+  const where = () => p.evaluate(() => {
+    const list = document.getElementById('stepList'), l = list.getBoundingClientRect();
+    const on = list.querySelector('[aria-current="step"]'), r = on.getBoundingClientRect(), next = on.parentElement.nextElementSibling.getBoundingClientRect();
+    return { off: Math.round((r.top + r.bottom) / 2 - (l.top + list.clientTop + list.clientHeight / 2)), next: next.bottom <= l.bottom + 0.5, top: list.scrollTop, page: scrollY };
+  });
+  let w = await where();
+  assert.ok(Math.abs(w.off) <= 1 && w.page === 0, `step 20 isn't in the middle of the list: ${JSON.stringify(w)}`);
+  await p.evaluate(() => fold.set(29, 0));
+  w = await where();
+  assert.ok(w.next && w.page === 0, `the step after step 30 is out of sight in the list: ${JSON.stringify(w)}`);
+  await p.click('#play');
+  await p.evaluate(() => { document.getElementById('stepList').scrollTop = 0; });
+  await p.waitForFunction(() => fold.state.t >= 1, null, { timeout: 15000 });
+  assert.equal((await where()).top, 0, 'the list jumped back to the step when its fold landed');
   await p.context().close();
 }
 
