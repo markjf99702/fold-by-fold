@@ -230,6 +230,49 @@ function snaps(step) {
   return out;
 }
 
+// Two pieces joined along a crease that lie together as a step starts and as it ends (within 2 layers of each other) stay
+// together on the way: the crease opens by no more than a few layers of paper. (The frog's petal folds opened by 19 layers
+// mid-fold, the side that turned over hovering in the air beside the paper it's joined to, plain to see from the side.) A
+// piece folded round other layers can't turn over without opening by about half the stack it's folded round: one of the
+// frog's petal folds wraps a piece round 11 layers, and its creases open by 6.5 there. The strips bending across an inside
+// reverse fold's crease are left out: that crease is meant to give.
+test('a crease whose two sides lie together as a step starts and as it ends stays shut on the way', () => {
+  const opened = [];
+  for (const model of MODELS) {
+    for (const [i, step] of once(model).steps.entries()) {
+      const { from, motion } = step;
+      const bridged = new Set();
+      for (const m of [motion, ...(motion.parts || []).map((p) => p.reverse)]) {
+        for (const h of m?.hinges || []) bridged.add(`${Math.min(h.tip, h.base)}/${Math.max(h.tip, h.base)}`);
+      }
+      const l0 = from.levels(), l1 = (motion.kind === 'foldUnfold' ? motion.folded : step.to).levels();
+      const at1 = (id) => l1.get(id) ?? l0.get(id);
+      const pairs = [];
+      for (const f of from.facets.values()) {
+        for (const { g, edge } of from.neighbors(f)) {
+          if (g.id < f.id || bridged.has(`${f.id}/${g.id}`)) continue;
+          if (Math.abs(l0.get(f.id) - l0.get(g.id)) > 2 || Math.abs(at1(f.id) - at1(g.id)) > 2) continue;
+          pairs.push({ f: f.id, g: g.id, edge });
+        }
+      }
+      if (!pairs.length) continue;
+      let worst = 0, when = 0;
+      for (let k = 1; k < 100; k++) {
+        const pose = new Map(poses(step, k / 100).filter((it) => !it.bridge).map((it) => [it.facet.id, it.pose]));
+        for (const { f, g, edge } of pairs) {
+          for (const q of edge) {
+            const a = transformPoint(pose.get(f), ...q), b = transformPoint(pose.get(g), ...q);
+            const d = Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
+            if (d > worst) { worst = d; when = k / 100; }
+          }
+        }
+      }
+      if (worst > 7 * LAYER) opened.push(`${model.id} ${i + 1}: ${(worst / LAYER).toFixed(1)} layers at t=${when}`);
+    }
+  }
+  assert.deepEqual(opened, []);
+});
+
 test('each step starts with the paper just where the last one left it, however the new step cuts it', () => {
   const jumps = [];
   for (const model of MODELS) {

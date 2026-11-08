@@ -55,11 +55,6 @@ function axisRot(p, d, angle) {
 
 const flatT = (m, z) => ({ r: [m.a, m.b, 0, m.c, m.d, 0, 0, 0, det(m) < 0 ? -1 : 1], t: [m.e, m.f, z] });
 
-// Moves a pose off its face by distance d, along the face's normal.
-function thick(P, d) {
-  return { r: P.r, t: [P.t[0] + P.r[2] * d, P.t[1] + P.r[5] * d, P.t[2] + P.r[8] * d] };
-}
-
 // ---------- Setting up ----------
 
 // Where the segment of line Lp inside polygon poly starts and ends, as parameters along [a, b].
@@ -314,9 +309,8 @@ function angleIn(sheet, j) {
 // is the finished state; otherwise it is worked out from where the hinges end up. turnsPage: the motion turns a
 // page over and back, lying open and flat halfway (see between()).
 function run(from, known, plan, { root, samples, turnsPage = false }) {
-  // The hinges turn as if the paper had no thickness, so creases that meet at a point really do meet
-  // there. Each layer's thickness is added back afterward, along its own face.
-  const lift0 = (id) => from.levels().get(id) * LAYER * (det(from.facets.get(id).m) > 0 ? 1 : -1);
+  // The hinges are solved as if the paper had no thickness, so creases that meet at a point really do meet
+  // there. The thickness goes back in afterward (see the end).
 
   // Hinges and rigid joins.
   const all = joins(from);
@@ -505,12 +499,10 @@ function run(from, known, plan, { root, samples, turnsPage = false }) {
   // The finished state, flat.
   const to = from.clone();
   to._world = new Map();
-  const endPose = new Map();
   for (const id of from.order) {
     const f = from.facets.get(id);
     const P = composeT(WEnd.get(bodyOf.get(id)), flatT(f.m, 0));
     if (Math.abs(P.r[2]) + Math.abs(P.r[5]) + Math.abs(P.r[6]) + Math.abs(P.r[7]) > 1e-6) throw new Error('The folded state is not flat');
-    endPose.set(id, P);
     to.facets.set(id, { ...f, m: { a: P.r[0], b: P.r[1], c: P.r[3], d: P.r[4], e: P.t[0], f: P.t[1] } });
   }
   if (known) {
@@ -535,24 +527,19 @@ function run(from, known, plan, { root, samples, turnsPage = false }) {
   }
   to._levels = null;
 
-  // Each layer's height above the table, measured along its own face: where it starts, and where it
-  // ends up in the finished stack.
-  const lv = to.levels();
-  const lift1 = (id) => lv.get(id) * LAYER * Math.sign(endPose.get(id).r[8]);
-  // A page turned over and back lies flat halfway, turned over. Its thickness, blended straight from start to
-  // end along its own face, would put it under the layers it lies on there, and the whole model would be lifted
-  // off the mat to make room. So it goes by way of the paper's stack with the page open: that flat state,
-  // stacked as the layers lie just before they get there.
-  let liftMid = null;
+  // A page turned over and back lies flat halfway, turned over. Its layers, drifting straight from where they start to
+  // where they end, would go under the layers it lies on there, and the whole model would be lifted off the mat to make
+  // room. So they go by way of the paper's stack with the page open: that flat state, stacked as the layers lie just
+  // before they get there.
+  let xMid = null, lvMid = null;
   if (turnsPage) {
-    const Wm = kin(xs[Math.round(samples / 2)]);
+    xMid = xs[Math.round(samples / 2)];
+    const Wm = kin(xMid);
     const open = from.clone();
     open._world = new Map();
-    const midPose = new Map();
     for (const id of from.order) {
       const f = from.facets.get(id);
       const P = composeT(Wm.get(bodyOf.get(id)), flatT(f.m, 0));
-      midPose.set(id, P);
       open.facets.set(id, { ...f, m: { a: P.r[0], b: P.r[1], c: P.r[3], d: P.r[4], e: P.t[0], f: P.t[1] } });
     }
     const Wn = kin(xs[Math.floor(samples * 0.47)]);
@@ -564,29 +551,101 @@ function run(from, known, plan, { root, samples, turnsPage = false }) {
       (id) => det(open.facets.get(id).m) * det(from.facets.get(id).m) < 0,
     );
     open._levels = null;
-    const lm = open.levels();
-    liftMid = (id) => lm.get(id) * LAYER * Math.sign(midPose.get(id).r[8]);
+    lvMid = open.levels();
   }
-  // Otherwise the thickness keeps pace with the hinges, which ease in and out: blended straight in time, a layer
-  // bound higher up rose through the layer over it before the flap had lifted, and showed through it as Play began.
-  const lift = (id, u) => (!liftMid ? lift0(id) + (lift1(id) - lift0(id)) * ease(u)
-    : u < 0.5 ? lift0(id) + (liftMid(id) - lift0(id)) * (u / 0.5) : liftMid(id) + (lift1(id) - liftMid(id)) * ((u - 0.5) / 0.5));
+
+  // The paper's thickness. Each layer rides on its rigid piece at its own height in the stack, and each hinge turns
+  // about its crease raised to where the layers it joins are, the way a plain flap turns about the top of the layers
+  // under it (motion.js). The thickness used to be put back after the hinges had turned, along each layer's own face,
+  // and two pieces joined at a crease halfway up a thick stack came apart there as they turned: by 19 layers mid-fold,
+  // in the frog's petal folds. Worked out once the step knows the paper it starts from (see Sheet.levels()).
+  const lvEnd = to.levels();
+  const thickness = (lvStart) => {
+    const zFrom = (id) => lvStart.get(id) * LAYER;
+    const zTo = (id) => lvEnd.get(id) * LAYER;
+    const zMid = (id) => lvMid.get(id) * LAYER;
+    const over = (x) => Math.abs(Math.cos(x) + 1) < 1e-6; // turned right over
+    const flat = (T) => Math.abs(Math.abs(T.r[8]) - 1) < 1e-9;
+    const raise = (e, h, x) => axisRot([e.axisP[0], e.axisP[1], h], e.axisD, x);
+    // The layers on each piece that are joined to another piece lying with them, as the step starts and as it ends.
+    const edge = new Map();
+    for (const j of all) {
+      if (bodyOf.get(j.f) === bodyOf.get(j.g)) continue;
+      if (Math.abs(lvStart.get(j.f) - lvStart.get(j.g)) > 2 || Math.abs(lvEnd.get(j.f) - lvEnd.get(j.g)) > 2) continue;
+      for (const id of [j.f, j.g]) {
+        const b = bodyOf.get(id);
+        if (!edge.has(b)) edge.set(b, new Set());
+        edge.get(b).add(id);
+      }
+    }
+    // Each hinge's height, in its parent's frame. Where it turns right over (at the end, or halfway for a page turned
+    // over and back), the one that brings the layers on its far side to their heights in the stack then: turned over
+    // about a line at height h, a layer at height z goes to 2h - z. A piece folded round other layers can't bring every
+    // one of its layers there, so it brings those joined to other pieces as near as it can, either way. Otherwise, the
+    // height halfway between the layers the hinge joins.
+    const heights = new Array(n);
+    const WEnd3 = new Map([[rootBody, I3()]]), WMid3 = new Map([[rootBody, I3()]]);
+    order.forEach((e, i) => {
+      const pick = (W, Z) => {
+        const A = W.get(e.parentBody);
+        if (!flat(A)) return null;
+        const hs = [...(edge.get(e.body) || [e.childFacet])].map((id) => ((Z(id) - A.t[2]) / A.r[8] + zFrom(id)) / 2);
+        return (Math.min(...hs) + Math.max(...hs)) / 2;
+      };
+      let h = null;
+      if (over(xEnd[i])) h = pick(WEnd3, zTo);
+      else if (xMid && over(xMid[i])) h = pick(WMid3, zMid);
+      heights[i] = h ?? (zFrom(e.parentFacet) + zFrom(e.childFacet)) / 2;
+      WEnd3.set(e.body, composeT(WEnd3.get(e.parentBody), raise(e, heights[i], xEnd[i])));
+      if (xMid) WMid3.set(e.body, composeT(WMid3.get(e.parentBody), raise(e, heights[i], xMid[i])));
+    });
+    // Each layer's height on its piece: where it starts, where it has to be for the stack it ends in, and for a page
+    // turn, where it has to be for the stack with the page open.
+    const onPiece = (W, id, Z) => {
+      const B = W.get(bodyOf.get(id)), m = from.facets.get(id).m;
+      return (Z - B.r[6] * m.e - B.r[7] * m.f - B.t[2]) / B.r[8];
+    };
+    const z0 = new Map(), z1 = new Map(), zm = new Map();
+    for (const id of from.order) {
+      z0.set(id, zFrom(id));
+      z1.set(id, onPiece(WEnd3, id, zTo(id)));
+      if (xMid) zm.set(id, onPiece(WMid3, id, zMid(id)));
+    }
+    return {
+      lvStart,
+      kin: (x) => {
+        const W = new Map([[rootBody, I3()]]);
+        order.forEach((e, i) => W.set(e.body, composeT(W.get(e.parentBody), raise(e, heights[i], x[i]))));
+        return W;
+      },
+      // A layer drifts from one height to the next on its piece as the fold goes. The drift keeps pace with the hinges,
+      // which ease in and out: blended straight in time, a layer bound higher up rose through the layer over it before
+      // the flap had lifted, and showed through it as Play began.
+      height: (id, u) => {
+        const a = z0.get(id), b = z1.get(id);
+        if (!xMid) return a + (b - a) * ease(u);
+        const c = zm.get(id);
+        return u < 0.5 ? a + (c - a) * (u / 0.5) : c + (b - c) * ((u - 0.5) / 0.5);
+      },
+    };
+  };
+  let thick = null;
 
   const motion = {
     kind: 'mech', pathGap,
     moving: from.order.filter((id) => bodyOf.get(id) !== rootBody),
   };
-  // Poses at time t: between samples the hinge angles are blended, and each layer's thickness moves over
-  // to where it sits in the finished stack (by way of where it sits with the page open, for a page turn).
+  // Poses at time t: between samples the hinge angles are blended.
   motion.at = (t) => {
     const N = xs.length - 1;
     const u = Math.min(1, Math.max(0, t));
     const k = Math.min(N - 1, Math.floor(u * N)), w = u * N - k;
-    const W = kin(xs[k].map((v, i) => v + (xs[k + 1][i] - v) * w));
+    const lvStart = from.levels();
+    if (thick?.lvStart !== lvStart) thick = thickness(lvStart);
+    const W = thick.kin(xs[k].map((v, i) => v + (xs[k + 1][i] - v) * w));
     return from.order.map((id) => {
       const f = from.facets.get(id);
-      const P = thick(composeT(W.get(bodyOf.get(id)), flatT(f.m, 0)), lift(id, u));
-      return { facet: f, pose: P };
+      return { facet: f, pose: composeT(W.get(bodyOf.get(id)), flatT(f.m, thick.height(id, u))) };
     });
   };
   return { from, to, motion };
