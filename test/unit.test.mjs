@@ -14,6 +14,15 @@ import { crossings } from '../js/check.js';
 const builds = new Map();
 const once = (model) => builds.get(model.id) || builds.set(model.id, build(model)).get(model.id);
 const close = (a, b, tol = 1e-9) => Math.abs(a - b) < tol;
+// A turn without stretching, skewing or mirroring: a row-major 3x3 whose columns are at right angles and one
+// long, with determinant 1.
+function rigid(r) {
+  const col = (j) => [r[j], r[3 + j], r[6 + j]];
+  const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+  const [x, y, z] = [col(0), col(1), col(2)];
+  const det = dot(x, [y[1] * z[2] - y[2] * z[1], y[2] * z[0] - y[0] * z[2], y[0] * z[1] - y[1] * z[0]]);
+  return [dot(x, x) - 1, dot(y, y) - 1, dot(z, z) - 1, dot(x, y), dot(x, z), dot(y, z), det - 1].every((e) => Math.abs(e) < 1e-9);
+}
 const closePt = (p, q, tol = 1e-9) => p.every((x, i) => close(x, q[i], tol));
 const paperArea = (s) => [...s.facets.values()].reduce((t, f) => t + Math.abs(area(f.poly)), 0);
 // Down the middle of the table. A fold moves whatever is on the line's left, so this one moves the left half.
@@ -118,9 +127,17 @@ for (const model of MODELS) {
       // Halfway through a fold and unfold, every layer is where the fold puts it: a flap folded behind
       // is under the rest, not level with it.
       if (step.motion.kind === 'foldUnfold') check(0.5, step.motion.folded);
-      // Nothing passes through the table, and every layer stays in one piece.
-      for (let t = 0; t <= 1; t += 0.05) {
-        for (const it of poses(step, t)) for (const p of corners(it)) assert.ok(p[2] > -1e-9, `${where} goes under the table at t=${t}`);
+      // Nothing passes through the table, every layer stays in one piece and keeps its shape, and nothing is
+      // anywhere but a real place.
+      for (let k = 0; k <= 100; k++) {
+        const t = k / 100;
+        for (const it of poses(step, t)) {
+          for (const p of corners(it)) {
+            if (!p.every(Number.isFinite)) assert.fail(`${where} at t=${t}: a corner is at ${p}`);
+            if (p[2] <= -1e-9) assert.fail(`${where} goes under the table at t=${t}`);
+          }
+          if (!it.bridge && !rigid(it.pose.r)) assert.fail(`${where} at t=${t}: facet ${it.facet.id} stretches or skews`);
+        }
       }
       if (step.motion.kind === 'mech') assert.ok(step.motion.pathGap < 1e-5, `${where} tears the paper by ${step.motion.pathGap} on the way`);
       if (['fold', 'foldUnfold', 'bend', 'multi', 'mech', 'reverse'].includes(step.motion.kind)) {
@@ -137,6 +154,9 @@ for (const model of MODELS) {
   test(`${model.name}: every folded state could be real paper, with nothing passing through anything`, () => {
     for (const [i, step] of build(model).steps.entries()) {
       assert.deepEqual(crossings(step.to), [], `${model.id} step ${i + 1}`);
+      // So could the paper as each step starts, cut ready to fold, and a fold and unfold at its fullest.
+      assert.deepEqual(crossings(step.from), [], `${model.id} step ${i + 1}, as it starts`);
+      if (step.motion.kind === 'foldUnfold') assert.deepEqual(crossings(step.motion.folded), [], `${model.id} step ${i + 1}, folded before it unfolds`);
     }
   });
 
