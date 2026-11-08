@@ -121,6 +121,24 @@ function lilyEdges(face, kind) {
 // How far the lily's front and back petals fold out, from straight up.
 const LILY_OPEN = 145;
 
+// Half the pinwheel's windmill base, at the bottom (y0 0) or the top (y0 1) of the paper: the strip there folds in along
+// its crease, and the corners of the flaps folded in to the middle pull out to the sides. Each flap's square next to
+// the strip folds along its diagonal, and the square above that along the diagonal that swings its inner corner out;
+// the flap's fold to the middle opens beside the strip. up: which way the strip turns.
+function windmillHalf(y0, up) {
+  const y = (v) => (y0 ? 1 - v : v);
+  return {
+    root: [0.5, 0.6], arrow: [0, y(0)],
+    creases: [
+      { a: [0.25, y(0.25)], b: [0.75, y(0.25)], fold: up, drive: true },
+      { a: [0.25, y(0)], b: [0.25, y(0.25)], fold: 'flat', via: -90 }, { a: [0.75, y(0)], b: [0.75, y(0.25)], fold: 'flat', via: -90 },
+      { a: [0, y(0)], b: [0.25, y(0.25)], fold: 'mountain' }, { a: [1, y(0)], b: [0.75, y(0.25)], fold: 'mountain' },
+      { a: [0.25, y(0.25)], b: [0, y(0.5)], fold: 'valley' }, { a: [0.75, y(0.25)], b: [1, y(0.5)], fold: 'valley' },
+    ],
+  };
+}
+const PIN_UP = 'mountain';
+
 // The jumping frog's index card: 3 by 5, so 1 wide and 5/3 tall. The top square collapses into a
 // waterbomb base around X, the middle of the square; the body below it is BODY tall.
 const CARD = 5 / 3, BODY = CARD - 1;
@@ -735,6 +753,57 @@ export const MODELS = [
       {
         say: 'Turn it over. That’s the frog. Press down on its back end, slide your finger off, and it hops.',
         do: (h) => h.turnOver(),
+      },
+    ],
+  },
+  {
+    // The traditional pinwheel (kazaguruma), as origami.me draws it: the edges folded in to the middle both ways, the
+    // corners pulled out at the bottom and the top into the windmill base, and two of its points folded out.
+    id: 'pinwheel',
+    name: 'Pinwheel',
+    level: 'Medium',
+    blurb: 'The windmill, kazaguruma. Pin it to a stick and it spins when you blow.',
+    paper: { kind: 'Square', colorUp: false },
+    steps: [
+      {
+        say: 'White side up. Fold in half side to side, and unfold.',
+        do: (h) => h.crease(h.onto([0, 0.5], [1, 0.5]), { move: [0, 0.5] }),
+      },
+      {
+        say: 'Fold the left and right edges in to the middle crease.',
+        do: (h) => h.together(
+          (k) => k.valley(k.onto([0, 0.5], [0.5, 0.5]), { move: [0, 0.5] }),
+          (k) => k.valley(k.onto([1, 0.5], [0.5, 0.5]), { move: [1, 0.5] }),
+        ),
+      },
+      {
+        say: 'Fold the top and bottom edges in to the middle, and unfold.',
+        do: (h) => h.together(
+          (k) => k.crease(k.onto([0.5, 1], [0.5, 0.5]), { move: [0.5, 1] }),
+          (k) => k.crease(k.onto([0.5, 0], [0.5, 0.5]), { move: [0.5, 0] }),
+        ),
+      },
+      {
+        say: 'Pull the bottom corners of the two flaps out to the sides, folding the bottom edge up along its crease. Press it flat into a boat shape.',
+        name: 'Collapse',
+        do: (h) => h.mech(windmillHalf(0, PIN_UP)),
+      },
+      {
+        say: 'Do the same at the top: pull the corners out and fold the top edge down, and press it flat. This is the windmill base.',
+        name: 'Collapse',
+        do: (h) => h.mech(windmillHalf(1, PIN_UP)),
+      },
+      {
+        say: 'Fold the right point of the top half up, and the left point of the bottom half down, along the line from the middle to the corners. That’s the pinwheel. Pin it through the middle to the end of a stick and blow.',
+        name: 'Valley folds',
+        do: (h) => {
+          // The diagonal through the middle, up to the right.
+          const mid = h.at([0.5, 0.5]), vane = h.lineAt(mid, 45);
+          return h.together(
+            (k) => k.valley(vane, { flap: [0.02, 0.98] }),
+            (k) => k.valley(vane, { flap: [0.98, 0.02] }),
+          );
+        },
       },
     ],
   },

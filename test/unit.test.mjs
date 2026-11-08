@@ -596,6 +596,23 @@ test('frog: each petal fold comes after a step that creases the face along the s
   }
 });
 
+// The pinwheel as origami.me draws it: the windmill base, a flat hexagon as wide as the paper and half as tall, and then
+// its four points, the paper's corners, sticking out the four ways round the middle, a quarter turn apart.
+test('pinwheel: the windmill base folds flat, and its four points end a quarter turn apart round the middle', () => {
+  const pinwheel = MODELS.find((m) => m.id === 'pinwheel');
+  assert.ok(pinwheel, 'there is no pinwheel');
+  const b = once(pinwheel);
+  const base = b.steps.findIndex((st) => /windmill base/.test(st.say));
+  assert.ok(base > 0 && b.steps[base].motion.kind === 'mech' && b.steps[base - 1].motion.kind === 'mech', 'the windmill base is not made by pulling the corners out at each end');
+  const w = b.steps[base].to.bounds();
+  assert.ok(close(w.x1 - w.x0, 1) && close(w.y1 - w.y0, 0.5), `the windmill base is ${(w.x1 - w.x0).toFixed(3)} by ${(w.y1 - w.y0).toFixed(3)}`);
+  const c = b.end.at([0.5, 0.5]);
+  const tips = [[0, 0], [1, 0], [1, 1], [0, 1]].map((q) => { const p = b.end.at(q); return [p[0] - c[0], p[1] - c[1]]; });
+  // Each point turned a quarter turn about the middle lands on the next.
+  for (const [x, y] of tips) assert.ok(tips.some(([u, v]) => close(u, -y) && close(v, x)), `no point a quarter turn on from ${x.toFixed(3)}, ${y.toFixed(3)}`);
+  assert.ok(tips.every(([x, y]) => close(Math.hypot(x, y), 0.5)), 'the points are not all half the paper out from the middle');
+});
+
 // The lily as origami.me draws it: the frog base with its four long points folded down, each face's edges at the closed
 // end folded in to the middle line, and the petals opened out from a long stem.
 test('lily: from the frog base it narrows to a long stem, and stands on it with its petals open', () => {
