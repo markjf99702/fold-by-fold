@@ -306,7 +306,8 @@ export function squash(sheet, { top, bottom, corner, seed }) {
     if (worldOn(spine, j) && inP(j.f) !== inP(j.g)) {
       const mine = inP(j.f) ? j.f : j.g;
       if (inF(mine)) return { target: theta1, weight: 1 };
-      return { target: j.theta0, via: j.theta0 / 2, weight: 1 };
+      // The back layer stands up with the front one, at its pace, so the flap rises as one; then it lies back down.
+      return { target: j.theta0, via: j.theta0 / 2, rise: true, weight: 1 };
     }
     if (Math.abs(theta1 - j.theta0) < 1e-9) return null;
     return { target: theta1, when: [0.5, 1], weight: 0.02 };
@@ -334,8 +335,9 @@ function angleIn(sheet, j) {
 }
 
 // The solver. plan(join) says what each crease does: null to stay as it is, or { target (radians, or null
-// to go wherever the others make it), via (an angle to pass through on the way), when ([start, end] as
-// fractions of the step), schedule (t -> 0..1), weight (how closely to keep to all that) }. `to`, if known,
+// to go wherever the others make it), via (an angle to pass through on the way), rise (with via: go there and back
+// at the pace of a crease turning all the way over, so halfway it is there), when ([start, end] as fractions of the
+// step), schedule (t -> 0..1), weight (how closely to keep to all that) }. `to`, if known,
 // is the finished state; otherwise it is worked out from where the hinges end up. turnsPage: the motion turns a
 // page over and back, lying open and flat halfway (see between()). standing: it ends standing up in 3D (see standUp()).
 function run(from, known, plan, { root, samples, turnsPage = false, standing = null }) {
@@ -406,6 +408,7 @@ function run(from, known, plan, { root, samples, turnsPage = false, standing = n
     const p = e.hinge.plan;
     e.delta = p.target === null ? null : p.target - e.hinge.theta0;
     e.viaDelta = p.via === undefined ? undefined : p.via - e.hinge.theta0;
+    e.rise = !!p.rise;
     e.when = p.when || [0, 1];
     e.schedule = p.schedule || null;
     e.weight = p.weight ?? 1;
@@ -428,6 +431,7 @@ function run(from, known, plan, { root, samples, turnsPage = false, standing = n
     const u = t <= a ? 0 : t >= b ? 1 : (t - a) / (b - a);
     if (e.schedule) return e.delta * e.schedule(t);
     if (e.viaDelta === undefined) return e.delta * ease(u);
+    if (e.rise) return e.viaDelta * 2 * Math.min(ease(u), 1 - ease(u));
     return u < 0.5 ? e.viaDelta * ease(2 * u) : e.viaDelta + (e.delta - e.viaDelta) * ease(2 * u - 1);
   };
   const targetAt = (t) => order.map((e) => (e.delta === null ? null : along(e, t)));

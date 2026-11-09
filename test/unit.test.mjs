@@ -375,20 +375,17 @@ function recoloured(step, a, b) {
 
 // A fold eases in and out: in its first tenth and its last, hardly anything moves, so hardly any of the paper seen from
 // above changes colour. (The frog's petal folds flashed white as Play began, and frog 24 again as it landed, from a
-// layer whose thickness ran ahead of its hinges and rose through the layer over it.) What's left stays under 2%: rays
-// that fall right by a crease, and a fold and unfold, which moves at twice the pace. Turning the model over changes
-// everything at once, and the flapping bird stands up in the first third of its step, keeping its own time.
+// layer whose thickness ran ahead of its hinges and rose through the layer over it. In its squash folds, and the lily's,
+// the flap's back layer stood up ahead of the front one and showed through it: 31-45% of the face turned white by a
+// tenth of the way.) What's left stays under 2%: rays that fall right by a crease, and a fold and unfold, which moves at
+// twice the pace. Turning the model over changes everything at once, and the flapping bird stands up in the first third
+// of its step, keeping its own time.
 test('as a fold begins and as it lands, the paper seen from above keeps its colours', () => {
-  // In the frog's squash folds the back layer of the flap lifts ahead of the front one and shows through it as they open
-  // (31-45% of the face turns white by a tenth of the way). Of the paper passing through paper mid-fold, Mark had the
-  // waterbomb's tucks mended and the squash and petal folds left as they are.
-  // The lily is folded from the same frog base, with the same squash folds.
-  const thick = new Set(['frog 7', 'frog 9', 'frog 11', 'frog 14', 'lily 7', 'lily 9', 'lily 11', 'lily 14']);
   const flashes = [];
   for (const model of MODELS) {
     for (const [i, step] of once(model).steps.entries()) {
       const own = step.motion.roll?.schedule || step.motion.parts?.some((p) => p.schedule);
-      if (step.motion.kind === 'turnOver' || own || thick.has(`${model.id} ${i + 1}`)) continue;
+      if (step.motion.kind === 'turnOver' || own) continue;
       for (const [a, b, when] of [[0, 0.1, 'begins'], [0.9, 1, 'lands']]) {
         const share = recoloured(step, a, b);
         if (share > 0.02) flashes.push(`${model.id} ${i + 1} as it ${when}: ${(share * 100).toFixed(1)}%`);
