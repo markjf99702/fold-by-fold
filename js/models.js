@@ -774,6 +774,58 @@ export const MODELS = [
     ],
   },
   {
+    // The traditional house, as the Friend printed it ('Origami House', Aug.–Sept. 1983, page 26): a square folded in
+    // half twice and opened once, the sides and the top corners creased, then the sides brought in to the middle, opened,
+    // and their top corners squashed into triangles for the roof. White side up, so the roof is in the paper's color and
+    // the walls are white.
+    id: 'house',
+    name: 'House',
+    level: 'Easy',
+    blurb: 'A house with a roof in your paper’s color and white walls. Draw on its doors and windows.',
+    paper: { kind: 'Square', colorUp: false },
+    steps: [
+      {
+        say: 'White side up. Fold the top edge down to the bottom edge.',
+        do: (h) => h.valley(h.onto([0.5, 1], [0.5, 0]), { move: [0.5, 1] }),
+      },
+      {
+        say: 'Fold it in half again, side to side, to make a square, and unfold it.',
+        do: (h) => h.crease(h.onto([0, 0.25], [1, 0.25]), { move: [0, 0.25] }),
+      },
+      {
+        say: 'Fold the left and right edges in to the middle crease, and unfold them.',
+        do: (h) => h.together(
+          (k) => k.crease(k.onto([0, 0.25], [0.5, 0.25]), { move: [0, 0.25] }),
+          (k) => k.crease(k.onto([1, 0.25], [0.5, 0.25]), { move: [1, 0.25] }),
+        ),
+      },
+      {
+        say: 'Fold each top corner down so its top edge lies along the crease you just made, and unfold them.',
+        do: (h) => h.together(
+          (k) => k.crease(k.onto([0, 0.5], [0.25, 0.25]), { move: [0.02, 0.48] }),
+          (k) => k.crease(k.onto([1, 0.5], [0.75, 0.25]), { move: [0.98, 0.48] }),
+        ),
+      },
+      {
+        say: 'Fold the left and right sides in to the middle along their creases.',
+        do: (h) => h.together(
+          (k) => k.valley(k.onto([0, 0.25], [0.5, 0.25]), { move: [0, 0.25] }),
+          (k) => k.valley(k.onto([1, 0.25], [0.5, 0.25]), { move: [1, 0.25] }),
+        ),
+      },
+      {
+        say: 'Lift the right side so it stands straight up, and open it. Lay its top layer back out to the side, and squash the top corner flat into a triangle along the corner creases. This is a squash fold. The triangle is one side of the roof.',
+        // White side up, paper u = 0 lies on the right. The side's top layer is the bottom half of the paper, turned over
+        // onto it in the last step.
+        do: (h) => h.squash({ top: h.at([0.25, 0.5]), bottom: h.at([0.25, 0]), corner: h.at([0, 0.5]), seed: [0.1, 0.3] }),
+      },
+      {
+        say: 'Squash fold the left side the same way. That’s the house: draw on its doors and windows.',
+        do: (h) => h.squash({ top: h.at([0.75, 0.5]), bottom: h.at([0.75, 0]), corner: h.at([1, 0.5]), seed: [0.9, 0.3] }),
+      },
+    ],
+  },
+  {
     id: 'jumping-frog',
     name: 'Jumping frog',
     level: 'Easy',

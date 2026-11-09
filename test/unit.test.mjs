@@ -655,6 +655,40 @@ test('paper hat: a triangle on top, with a brim folded up on each side, one in f
   assert.ok(close(end.bounds().x1 - end.bounds().x0, 1), 'the hat is not as wide as the sheet');
 });
 
+// The house as the Friend printed it ('Origami House', Aug.–Sept. 1983): a square folded in half, its sides creased in
+// to the middle and its top corners down, then the sides brought in to the middle and each one's top corner squashed into
+// a triangle for the roof. It ends as wide as the sheet and half as tall, the roof cutting away its top corners, and folded
+// white side up, the roof shows the paper's colour over white walls.
+test('house: two squash folds make a roof in the paper\'s colour over white walls, as wide as the sheet', () => {
+  const house = MODELS.find((m) => m.id === 'house');
+  assert.ok(house, 'there is no house');
+  const b = once(house), end = b.end, box = end.bounds();
+  assert.equal(b.steps.filter((s) => s.motion.squash).length, 2, 'the roof is not made by two squash folds');
+  assert.ok(close(box.x1 - box.x0, 1) && close(box.y1 - box.y0, 0.5), 'the house is not as wide as the sheet and half as tall');
+  // The top of each squash is a point of the roof, over the crease a quarter of the way in from its side.
+  for (const q of [[0.25, 0.5], [0.75, 0.5]]) {
+    const p = end.at(q);
+    assert.ok(close(Math.abs(p[0]), 0.25) && close(p[1], box.y1), `the roof's point is at ${p}, not a quarter in from the side at the top`);
+  }
+  // Which side of the paper is uppermost at a point on the table: true for its colour, false for white, null for none.
+  const shows = (x, y) => {
+    const id = end.order.filter((k) => covers(end.world(k), [x, y], -1e-9)).at(-1);
+    return id === undefined ? null : det(end.facets.get(id).m) > 0;
+  };
+  const roof = [], walls = [];
+  for (let i = 0; i < 20; i++) {
+    const x = box.x0 + (i + 0.53) / 20; // a little off the middle of each square, and off the roof's slopes
+    for (let j = 0; j < 10; j++) {
+      const y = box.y0 + (j + 0.41) / 20;
+      const cut = y - box.y0 > 0.75 - Math.abs(x); // beyond a slope of the roof, from its point down to the side
+      const want = cut ? null : y - box.y0 > 0.25;
+      if (shows(x, y) !== want) (want === false ? walls : roof).push(`${x.toFixed(3)}, ${y.toFixed(3)}: ${shows(x, y)}`);
+    }
+  }
+  assert.deepEqual(roof, [], 'the roof is not all in the paper\'s colour, with the corners beyond it cut away');
+  assert.deepEqual(walls, [], 'the walls are not all white');
+});
+
 // The pinwheel as origami.me draws it: the windmill base, a flat hexagon as wide as the paper and half as tall, and then
 // its four points, the paper's corners, sticking out the four ways round the middle, a quarter turn apart.
 test('pinwheel: the windmill base folds flat, and its four points end a quarter turn apart round the middle', () => {

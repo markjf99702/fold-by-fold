@@ -211,7 +211,7 @@ for (let i = 0; i < steps; i++) for (const t of [0, 0.5, 1]) await page.evaluate
 
 // So does every step of the other models: the collapses, petal and squash folds, reverse folds and tucks, the folds
 // made together, the models that stand up at the end, and the card that isn't square.
-for (const id of ['plane', 'heart', 'fortune-teller', 'cicada', 'dog', 'hat', 'jumping-frog', 'pinwheel', 'helmet', 'waterbomb', 'crane', 'flapping-bird', 'lily', 'frog']) {
+for (const id of ['plane', 'heart', 'fortune-teller', 'cicada', 'dog', 'hat', 'house', 'jumping-frog', 'pinwheel', 'helmet', 'waterbomb', 'crane', 'flapping-bird', 'lily', 'frog']) {
   await page.evaluate((id) => { location.hash = id; }, id);
   await page.waitForFunction((id) => fold.state.id === id, id);
   const n = (await state()).steps;
@@ -1572,7 +1572,7 @@ for (const hash of ['#%', '#crane-3%', '#%F0%9F']) {
   assert.deepEqual(await shut(), [false, '#crane-19', false, false], 'a tap outside the key didn\'t close it, or played the fold');
   const wrong = await p.evaluate(async () => {
     const out = [];
-    const ids = ['cup', 'plane', 'heart', 'fortune-teller', 'cicada', 'dog', 'hat', 'jumping-frog', 'pinwheel', 'helmet', 'waterbomb', 'crane', 'flapping-bird', 'lily', 'frog'];
+    const ids = ['cup', 'plane', 'heart', 'fortune-teller', 'cicada', 'dog', 'hat', 'house', 'jumping-frog', 'pinwheel', 'helmet', 'waterbomb', 'crane', 'flapping-bird', 'lily', 'frog'];
     for (const id of ids) {
       location.hash = id;
       await new Promise((r) => { const k = () => (fold.state.id === id ? r() : setTimeout(k, 30)); k(); });
