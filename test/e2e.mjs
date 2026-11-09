@@ -1558,9 +1558,10 @@ for (const hash of ['#%', '#crane-3%', '#%F0%9F']) {
 // The fold's name under the paper opens the key of marks over the player, at that fold's entry, highlighted and in
 // view, without leaving the model, and a fold playing pauses under it. It closes with its × button, Escape (which
 // otherwise goes back to the gallery) or a tap outside it, and the tap that closes it doesn't play the fold. Every step
-// of every model opens one entry, the one for the marks it draws: an inside reverse fold and a fold and unfold have
-// their own. Plain folds made together toward you and behind (the crane's wings, the frog's two pages) open at the
-// valley fold and the mountain fold, not the collapse whose two lines they draw.
+// of every model opens one entry, the one for the marks it draws: an inside reverse fold, a fold and unfold, a squash
+// fold and turning a page have their own (every page turn opens that one, the frog's two at once too). Plain folds made
+// together toward you and behind (the crane's wings) open at the valley fold and the mountain fold, not the collapse
+// whose two lines they draw.
 {
   const p = await fresh('#crane-19');
   await p.waitForFunction(() => fold.state.id === 'crane');
@@ -1595,7 +1596,7 @@ for (const hash of ['#%', '#crane-3%', '#%F0%9F']) {
         const here = [...document.querySelectorAll('#keySheet .here dt')].map((d) => d.textContent);
         const name = document.querySelector('#chip span').textContent;
         const both = 'Valley fold, Mountain fold';
-        const want = { 'Fold and unfold': 'Fold and unfold', 'Unfold': 'Unfold', 'Turn over': 'Turn over', 'Rotate': 'Rotate', 'Collapse': 'Collapse and petal fold', 'Petal fold': 'Collapse and petal fold', 'Inside reverse fold': 'Inside reverse fold', 'Inside reverse folds': 'Inside reverse fold', 'Valley fold': 'Valley fold', 'Mountain fold': 'Mountain fold', 'Valley and mountain': both, 'Turn pages': both, 'Turn two pages': both }[name];
+        const want = { 'Fold and unfold': 'Fold and unfold', 'Unfold': 'Unfold', 'Turn over': 'Turn over', 'Rotate': 'Rotate', 'Collapse': 'Collapse and petal fold', 'Petal fold': 'Collapse and petal fold', 'Inside reverse fold': 'Inside reverse fold', 'Inside reverse folds': 'Inside reverse fold', 'Valley fold': 'Valley fold', 'Mountain fold': 'Mountain fold', 'Valley and mountain': both, 'Squash fold': 'Squash fold', 'Turn a page': 'Turn a page', 'Turn pages': 'Turn a page', 'Turn two pages': 'Turn a page' }[name];
         if (!document.getElementById('keySheet').open || (want ? here.join(', ') !== want : here.length !== 1)) out.push(`${id}-${i + 1} ${name}: ${here.join(', ') || 'nothing'}`);
         document.getElementById('keySheet').close();
       }

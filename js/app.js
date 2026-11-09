@@ -635,12 +635,16 @@ const chipFor = (step) => `${CHIP[symbol(step, marksOf(step))]}<span>${step.name
 // it. The key closes with its × button, Escape, or a tap outside it.
 const sheet = $('keySheet');
 $('keyBody').append(document.querySelector('.symbols .symbol-list').cloneNode(true));
-// A step's entry is the one for the symbol beside its name, the marks it draws, but for a fold and unfold and an inside
-// reverse fold, which have entries of their own. Plain folds made together, one toward you and one behind (the crane's
-// wings, the frog's two pages), draw a valley line and a mountain line, as a collapse does, but they're a valley fold
-// and a mountain fold, so they open at both of those.
+// A step's entry is the one for the symbol beside its name, the marks it draws, but for a fold and unfold, an inside
+// reverse fold, a squash fold and turning a page, which have entries of their own. A page turned is a plain fold to the
+// engine, on creases already made, so it's known by its name. Plain folds made together, one toward you and one behind
+// (the crane's wings), draw a valley line and a mountain line, as a collapse does, but they're a valley fold and a
+// mountain fold, so they open at both of those.
+const PAGE = /^Turn (a page|two pages|pages)$/;
 function keyFor(step) {
   const m = step.motion;
+  if (m.kind === 'mech' && m.squash) return ['squash'];
+  if (PAGE.test(step.name)) return ['page'];
   if (m.kind === 'reverse' || (m.kind === 'mech' && m.parts) || m.parts?.some((q) => q.reverse)) return ['reverse'];
   if (m.kind === 'foldUnfold' || (m.kind === 'multi' && m.folded)) return ['foldUnfold'];
   if (m.kind === 'multi' && !step.unfold && m.parts.every((q) => !q.bend && !q.back) && new Set(m.parts.map((q) => q.type)).size > 1) return ['valley', 'mountain'];
