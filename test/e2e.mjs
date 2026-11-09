@@ -2338,7 +2338,9 @@ for (const [width, height] of [[1280, 800], [390, 844], [360, 780]]) {
 
 // On a phone held sideways the words and buttons go beside the paper, so the paper keeps the height of the screen
 // instead of a strip under them. The slider and buttons fit beside it and stay in view, and long words scroll in
-// their own box above them, fading out at the bottom while there's more. Held upright, they stay under the paper.
+// their own box above them, fading out at the bottom while there's more, with the steps along the top rather than a
+// list of them under the buttons. However wide the phone: an iPhone 16 Pro Max is 956x440 held sideways, and had the
+// wide screen's layout. Held upright, they stay under the paper.
 {
   const p = await fresh('#crane-19', { viewport: { width: 844, height: 390 } }); // the longest words of any step
   await p.waitForFunction(() => fold.state.id === 'crane');
@@ -2353,9 +2355,10 @@ for (const [width, height] of [[1280, 800], [390, 844], [360, 780]]) {
       overlap: order.some((b, k) => k > 0 && b.top < order[k - 1].bottom - 0.5),
       out, play: play.top >= pn.top - 0.5 && play.bottom <= Math.min(pn.bottom, innerHeight) + 0.5 && panel.scrollTop === 0,
       sideways: document.documentElement.scrollWidth > innerWidth,
+      steps: [!!document.getElementById('ticks').offsetParent, !!document.getElementById('stepList').offsetParent],
     };
   });
-  for (const [width, height] of [[844, 390], [667, 375], [844, 340], [568, 320]]) {
+  for (const [width, height] of [[956, 440], [932, 430], [844, 390], [667, 375], [844, 340], [568, 320]]) {
     await p.setViewportSize({ width, height });
     await p.waitForTimeout(100);
     const r = await layout();
@@ -2365,6 +2368,7 @@ for (const [width, height] of [[1280, 800], [390, 844], [360, 780]]) {
     assert.deepEqual(r.out, [], `buttons cut off at ${width}x${height}`);
     assert.ok(r.play, `Play is out of sight at ${width}x${height}`);
     assert.equal(r.sideways, false, `the player scrolls sideways at ${width}x${height}`);
+    assert.deepEqual(r.steps, [true, false], `the steps aren't along the top, or their list shows, at ${width}x${height}`);
   }
   // At 568x320 the words are longer than their box: it fades at the bottom until it's scrolled to the end.
   assert.equal(await p.evaluate(() => document.querySelector('.step-now').classList.contains('more')), true, 'long words don\'t fade out where they\'re cut off');
@@ -2379,8 +2383,8 @@ for (const [width, height] of [[1280, 800], [390, 844], [360, 780]]) {
 
 // Held sideways, the words' column runs the full height of the screen beside the paper, from the top. The back arrow,
 // the model's name and the step stay in a bar over the paper, and the buttons that look straight down and put the view
-// back sit over the paper's top right corner, round, where a tap reaches them rather than the paper. Held upright, and
-// on a wide screen, they stay in the bar.
+// back sit over the paper's top right corner, round, where a tap reaches them rather than the paper, on the biggest
+// phones too. Held upright, and on a tablet or a computer's screen, they stay in the bar.
 {
   const p = await fresh('#crane-10', { viewport: { width: 844, height: 390 } });
   await p.waitForFunction(() => fold.state.id === 'crane');
@@ -2397,16 +2401,18 @@ for (const [width, height] of [[1280, 800], [390, 844], [360, 780]]) {
       round: getComputedStyle(document.getElementById('resetView')).borderRadius === '50%',
     };
   });
-  for (const [width, height] of [[844, 390], [667, 375], [568, 320]]) {
+  for (const [width, height] of [[956, 440], [932, 430], [844, 390], [667, 375], [568, 320]]) {
     await p.setViewportSize({ width, height });
     await p.waitForTimeout(100);
     assert.deepEqual(await where(), { words: true, bar: true, views: true, round: true }, `held sideways at ${width}x${height}, the words don't run the height of the screen, or the view buttons aren't on the paper's corner`);
   }
   await p.tap('#topView');
   await p.waitForFunction(() => fold.view().goal.pitch > 89 || fold.view().cam.pitch > 89, null, { timeout: 3000 }).catch(() => assert.fail('the button on the paper\'s corner doesn\'t look straight down'));
-  await p.setViewportSize({ width: 390, height: 844 });
-  await p.waitForTimeout(100);
-  assert.equal(await p.evaluate(() => ['#topView', '#resetView'].every((q) => document.querySelector('.bar').contains(document.querySelector(q)) && document.querySelector(q).getBoundingClientRect().bottom <= document.querySelector('.bar').getBoundingClientRect().bottom)), true, 'held upright, the view buttons left the bar');
+  for (const [width, height] of [[390, 844], [1024, 768], [1280, 800]]) {
+    await p.setViewportSize({ width, height });
+    await p.waitForTimeout(100);
+    assert.equal(await p.evaluate(() => ['#topView', '#resetView'].every((q) => document.querySelector('.bar').contains(document.querySelector(q)) && document.querySelector(q).getBoundingClientRect().bottom <= document.querySelector('.bar').getBoundingClientRect().bottom)), true, `at ${width}x${height}, held upright or on a wide screen, the view buttons left the bar`);
+  }
   await p.context().close();
 }
 

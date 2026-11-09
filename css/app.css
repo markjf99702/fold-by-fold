@@ -446,7 +446,7 @@ html:has(#player:not([hidden])) { overscroll-behavior-y: none; }
 #bigWords { padding: 0 10px; min-width: 38px; } /* with Slow's reach past its edges, a finger's 44 px */
 /* Narrow phones, and the panel beside the paper on a phone held sideways (further down): the buttons draw in a
    little so the row fits, and Play keeps one width for every label. */
-@media (max-width: 379px), (min-width: 560px) and (max-width: 899px) and (orientation: landscape) and (max-height: 500px) {
+@media (max-width: 379px), (min-width: 560px) and (orientation: landscape) and (max-height: 500px) {
   .controls { gap: 6px; }
   .ctl { min-width: 46px; padding: 0 10px; }
   .ctl.main { min-width: 128px; padding: 0 8px; }
@@ -536,7 +536,8 @@ html:has(#player:not([hidden])) { overscroll-behavior-y: none; }
 
 .step-list { display: none; }
 
-@media (min-width: 900px) {
+/* A wide screen, but for a phone held sideways (below), however wide: no more than 500 px tall, it's always sideways. */
+@media (min-width: 900px) and (min-height: 500.02px) {
   .player {
     grid-template-columns: minmax(0, 1fr) calc(380px + env(safe-area-inset-right));
     grid-template-rows: auto minmax(0, 1fr);
@@ -588,8 +589,10 @@ html:has(#player:not([hidden])) { overscroll-behavior-y: none; }
    panel's right side kept clear of a notch; long words scroll in their own box, above the slider and buttons.
    The words run the full height of the screen, from the top: the bar, with the back arrow, the model's name and the
    step, keeps to the paper's side, and the buttons that look straight down and put the view back sit over the paper's
-   top right corner, round and dark like the hint, rather than taking a strip of the words' column. */
-@media (min-width: 560px) and (max-width: 899px) and (orientation: landscape) and (max-height: 500px) {
+   top right corner, round and dark like the hint, rather than taking a strip of the words' column. However wide the
+   phone: the biggest are more than 900 px wide held sideways (956 px for an iPhone 16 Pro Max), and they had the wide
+   screen's layout, the bar across the top and a sliver of the list of steps under the buttons. */
+@media (min-width: 560px) and (orientation: landscape) and (max-height: 500px) {
   .player {
     grid-template-columns: minmax(0, 1fr) calc(clamp(320px, 50vw, 380px) + env(safe-area-inset-right));
     grid-template-rows: auto minmax(0, 1fr);
