@@ -242,6 +242,33 @@ for (const model of MODELS) {
   test(`${model.name}: the paper moves smoothly, with nothing snapping over from one moment to the next`, () => {
     for (const [i, step] of once(model).steps.entries()) assert.deepEqual(snaps(step), [], `${model.id} step ${i + 1}`);
   });
+
+  test(`${model.name}: no part of the paper turns straight back or stops dead partway through a step`, () => {
+    for (const [i, step] of once(model).steps.entries()) {
+      const j = jolt(step);
+      assert.ok(j.share < 0.5, `${model.id} step ${i + 1} changes speed by ${(j.share * 100).toFixed(0)}% of its fastest at t ${j.at}`);
+    }
+  });
+}
+
+// The most any corner's velocity changes from one moment of a step to the next, as a share of the fastest any corner
+// goes, over steps of 1/240 (which fall on every sample the hinges are solved at), leaving out the layers' thickness. A
+// motion that rounds its turns stays under a quarter; a piece turning straight back at full speed makes it 2, as the
+// back layer of a squash fold's flap did when it stood up with the front one and fell back the moment it was upright.
+function jolt(step) {
+  const N = 240, at = [];
+  for (let k = 0; k <= N; k++) at.push(poses(step, k / N, true).map((it) => corners(it)));
+  let fastest = 0, most = 0, when = 0;
+  for (let k = 1; k < N; k++) {
+    at[k].forEach((c, a) => c.forEach((p, n) => {
+      const was = at[k - 1][a][n], next = at[k + 1][a][n];
+      const v1 = [0, 1, 2].map((q) => p[q] - was[q]), v2 = [0, 1, 2].map((q) => next[q] - p[q]);
+      fastest = Math.max(fastest, Math.hypot(...v1), Math.hypot(...v2));
+      const d = Math.hypot(...v2.map((x, q) => x - v1[q]));
+      if (d > most) { most = d; when = k / N; }
+    }));
+  }
+  return { share: fastest ? most / fastest : 0, at: when.toFixed(3) };
 }
 
 // Where the paper moves much faster than just before and after, as a flap does that snaps over: the speed is how far

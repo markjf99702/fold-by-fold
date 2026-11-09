@@ -21,6 +21,9 @@ const FOLDS = { valley: Math.PI, mountain: -Math.PI, flat: 0 };
 const CLOSE = 400;
 // The most a hinge may turn from one sample of a motion to the next by jumping to another way of folding.
 const STEP = 6 * Math.PI / 180;
+// How a rising crease (see run()) turns back: it rounds the turn off while the crease turning all the way over beside it
+// goes from 35% to 65% of its way, and so turns back 85% of the way to `via` (77 degrees of 90), without a jolt.
+const TURN_BACK = 0.3;
 
 // ---------- 3D rigid transforms: { r: row-major 3x3, t: [x, y, z] } ----------
 
@@ -306,7 +309,8 @@ export function squash(sheet, { top, bottom, corner, seed }) {
     if (worldOn(spine, j) && inP(j.f) !== inP(j.g)) {
       const mine = inP(j.f) ? j.f : j.g;
       if (inF(mine)) return { target: theta1, weight: 1 };
-      // The back layer stands up with the front one, at its pace, so the flap rises as one; then it lies back down.
+      // The back layer stands up with the front one, at its pace, so the flap rises as one; then, as the front one goes
+      // on over, it lies back down, turning short of upright so the two part without a jolt.
       return { target: j.theta0, via: j.theta0 / 2, rise: true, weight: 1 };
     }
     if (Math.abs(theta1 - j.theta0) < 1e-9) return null;
@@ -335,8 +339,9 @@ function angleIn(sheet, j) {
 }
 
 // The solver. plan(join) says what each crease does: null to stay as it is, or { target (radians, or null
-// to go wherever the others make it), via (an angle to pass through on the way), rise (with via: go there and back
-// at the pace of a crease turning all the way over, so halfway it is there), when ([start, end] as fractions of the
+// to go wherever the others make it), via (an angle to pass through on the way), rise (with via: go toward it and back
+// to where it began, keeping pace with a crease turning all the way over, and ease round short of it near halfway
+// rather than turning back at full speed), when ([start, end] as fractions of the
 // step), schedule (t -> 0..1), weight (how closely to keep to all that) }. `to`, if known,
 // is the finished state; otherwise it is worked out from where the hinges end up. turnsPage: the motion turns a
 // page over and back, lying open and flat halfway (see between()). standing: it ends standing up in 3D (see standUp()).
@@ -431,7 +436,11 @@ function run(from, known, plan, { root, samples, turnsPage = false, standing = n
     const u = t <= a ? 0 : t >= b ? 1 : (t - a) / (b - a);
     if (e.schedule) return e.delta * e.schedule(t);
     if (e.viaDelta === undefined) return e.delta * ease(u);
-    if (e.rise) return e.viaDelta * 2 * Math.min(ease(u), 1 - ease(u));
+    if (e.rise) {
+      // The lesser of the way up and the way back, with the corner between them rounded off (a smooth minimum).
+      const up = ease(u), back = 1 - up, h = Math.max(TURN_BACK - Math.abs(up - back), 0) / TURN_BACK;
+      return e.viaDelta * 2 * (Math.min(up, back) - (h * h * TURN_BACK) / 4);
+    }
     return u < 0.5 ? e.viaDelta * ease(2 * u) : e.viaDelta + (e.delta - e.viaDelta) * ease(2 * u - 1);
   };
   const targetAt = (t) => order.map((e) => (e.delta === null ? null : along(e, t)));
