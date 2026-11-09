@@ -931,7 +931,9 @@ function wireCamera() {
   // A tap on the paper does what Play does (the paper is the biggest thing to hit with a knuckle or a busy finger), and a
   // double tap puts the view back. A tap is one finger, or a click, that hardly moves. Double taps are picked out here
   // from the taps themselves, since phones don't all report them to the page, so a tap plays only once 300 ms have gone
-  // by without a second one begun near it. A double click at the mouse's own speed puts the view back too.
+  // by without a second one begun near it. A double click at the mouse's own speed puts the view back too. On a finished
+  // model a tap does nothing: the big button reads Start again there, and a stray tap while you look at the model would
+  // send it back to step 1, so starting again is left to the button.
   const DOUBLE = 300;
   let tap = null, pending = null, pointer = 'mouse'; // pending: a tap waiting to play, { x, y, t, timer }
   // One finger turns the paper once it has moved 8 px, and from there on, so a finger that only rests or taps leaves it
@@ -988,7 +990,7 @@ function wireCamera() {
       it.timer = setTimeout(() => {
         if (pending !== it) return;
         pending = null;
-        if (!$('player').hidden) { hideHint(); primary(); }
+        if (!$('player').hidden && !finished()) { hideHint(); primary(); }
       }, DOUBLE);
     }
     tap = null;

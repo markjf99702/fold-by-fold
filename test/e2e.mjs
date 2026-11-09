@@ -1157,7 +1157,8 @@ for (const reduce of [false, true]) {
 
 // When the last fold lands the model is finished: the bar says so, the last tick fills in, and the buttons offer to
 // start again or go back to all the models, Next, Slow and Aa making way. The camera eases round to see the model at an
-// angle, its own for a model that stands up, and a double tap comes back to it. Starting again puts it all back.
+// angle, its own for a model that stands up, and a double tap comes back to it. A tap on the paper doesn't start it
+// again, as it would play a fold anywhere else; Start again, on its button, puts it all back.
 {
   const p = await fresh('#cup-5');
   await p.waitForFunction(() => fold.state.id === 'cup');
@@ -1170,6 +1171,18 @@ for (const reduce of [false, true]) {
   assert.deepEqual(await end(), ['Finished · 5 steps', 'Start again', true, false, false, false, true], 'the finished cup does not say so, or offer to go back to all the models');
   assert.deepEqual(await aim(), [-120, 34], 'the camera did not turn to see the finished cup at an angle');
   assert.equal(await p.textContent('#tell'), 'Finished. 5 steps.', 'a screen reader is not told the cup is finished');
+  // A tap on the finished paper, while you look at it, does nothing: Start again is only on its button.
+  {
+    const [x, y] = await p.evaluate(() => { const r = document.getElementById('gl').getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; });
+    const cdp = await p.context().newCDPSession(p);
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] });
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    await p.waitForTimeout(800);
+    assert.deepEqual(await end(), ['Finished · 5 steps', 'Start again', true, false, false, false, true], 'a tap on the finished cup started it again');
+    await p.mouse.click(x, y);
+    await p.waitForTimeout(800);
+    assert.deepEqual(await end(), ['Finished · 5 steps', 'Start again', true, false, false, false, true], 'a click on the finished cup started it again');
+  }
   await p.evaluate(() => { const v = fold.view(); v.goal.yaw = v.goal.pitch = null; v.cam.yaw = -40; v.cam.pitch = 70; });
   await p.click('#resetView');
   assert.deepEqual(await aim(), [-120, 34], 'putting the view back did not come back to the finished cup\'s angle');
