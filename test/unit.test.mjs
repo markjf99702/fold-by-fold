@@ -999,8 +999,6 @@ test('a fold line is drawn only where there is paper, even where the moving pape
   assert.deepEqual(off, [], 'the line runs over the table');
 });
 
-// A flap bent part way never lands, so it isn't tucked anywhere, though folded flat it would land under paper that stays
-// put. The lily's petals, bent out as it stands up, had their arrows broken like a tuck's.
 // Printing a model draws each step flat, as a printed diagram does: the paper as the step starts, from above, and over
 // it the marks the player draws, seen from above too.
 test('a printed step draws its paper as the step starts and each of its marks, inside the drawing and one weight in all', () => {
@@ -1049,6 +1047,8 @@ test('each step\'s result is pictured as the step leaves the paper, and the last
   }
 });
 
+// A flap bent part way never lands, so it isn't tucked anywhere, though folded flat it would land under paper that stays
+// put. The lily's petals, bent out as it stands up, had their arrows broken like a tuck's.
 test('a flap bent part way is never marked as tucked into a pocket', () => {
   const model = { id: 'bent', paper: { kind: 'Square' }, steps: [{
     say: 'Bend the left edge up, most of the way over.',
