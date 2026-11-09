@@ -4,7 +4,7 @@ import { MODELS } from './models.js';
 import { build } from './build.js';
 import { poses, marks, symbol, corners, edgeOn } from './motion.js';
 import { View } from './render.js';
-import { picture } from './thumbs.js';
+import { picture, after } from './thumbs.js';
 import { FINISHED } from './finished.js';
 
 const KEY = 'fold-by-fold.v1';
@@ -204,6 +204,7 @@ function outline(m, i) {
   $('stepCount').textContent = `Step ${k + 1} of ${n}`;
   $('stepNum').textContent = k + 1;
   $('chip').textContent = ''; // the step's symbol and name come with the fold; till then, its number keeps the line
+  $('result').hidden = true; // and so does the picture of how it ends
   $('say').textContent = m.steps[k].say;
   words.scrollTop = 0;
   renderSteps(m, m.steps);
@@ -371,6 +372,7 @@ function go(i, { snap = false, keep = true } = {}) {
   P.i = Math.max(0, Math.min(i, P.b.steps.length - 1));
   P.t = 0;
   P.playing = false;
+  peek = null;
   if (keep) keepPlace(P.i, { further: true });
   keepAim();
   paint();
@@ -427,6 +429,7 @@ const placeNow = () => (P.t < 1 ? P.i : P.i < P.b.steps.length - 1 ? P.i + 1 : 0
 // counted from when they came up: pressed straight after going to a step, the marks still show before the paper
 // moves, and pressed after reading the step and looking at them, it folds at once.
 function start() {
+  peek = null;
   keepPlace();
   if (P.t >= 1) P.t = 0;
   aimFor(P.b.steps[P.i]);
@@ -467,6 +470,8 @@ function paint() {
     P.shownAt = performance.now(); // its marks fade in from now
     $('stepNum').textContent = P.i + 1;
     $('chip').innerHTML = chipFor(step);
+    $('result').innerHTML = picture(resultOf(step), { front: paperColor(), back: BACK });
+    $('result').hidden = false;
     $('say').textContent = step.say;
     $('skip').hidden = P.i !== 0 || !$('skip').childElementCount;
     tell();
@@ -513,6 +518,7 @@ function paint() {
   playButton(label, icon);
   scrubAt(P.t);
   $('speed').setAttribute('aria-pressed', prefs.slow);
+  if ($('result').getAttribute('aria-pressed') !== String(P.t >= 1)) $('result').setAttribute('aria-pressed', P.t >= 1);
   nameInAddress();
   document.querySelectorAll('#ticks button').forEach((b, k) => b.classList.toggle('done', k < P.i || (k === P.i && P.t >= 1)));
   redraw();
@@ -663,6 +669,23 @@ $('keyClose').addEventListener('click', () => sheet.close());
 let downOutside = false;
 sheet.addEventListener('pointerdown', (e) => { downOutside = e.target === sheet; });
 sheet.addEventListener('click', (e) => { if (e.target === sheet && downOutside) sheet.close(); });
+
+// How the paper should look once the step's fold has landed, beside the fold's name, to check your own paper against:
+// drawn as the gallery draws the finished models, in your paper, from above (in 3D, from where the player ends it, for
+// a step that stands the model up). A tap takes the fold to its end, to see it on the paper as well, as the slider
+// would, and another takes it back to where it was. Worked out once for each step.
+const results = new WeakMap();
+function resultOf(step) {
+  if (!results.has(step)) results.set(step, after(step));
+  return results.get(step);
+}
+let peek = null; // the step and where its fold was, when its picture took the fold to its end
+$('result').addEventListener('click', () => {
+  if (P.waiting) return;
+  const step = P.b.steps[P.i];
+  if (P.t < 1) { const was = P.t; scrubTo(1000); peek = { step, t: was }; }
+  else { const t = peek?.step === step ? peek.t : 0; scrubTo(Math.round(t * 1000)); }
+});
 
 // What you'll make, so a link to a step shows it too, not only the gallery: the finished model's picture in your paper,
 // as on its card. On a wide screen it heads the list of steps, with what the card says of the model. Under or beside the
@@ -1144,6 +1167,7 @@ function scrubTo(v) {
   if (P.waiting) { scrubAt(0); return; }
   P.t = v / 1000;
   P.playing = false;
+  peek = null;
   keepPlace(placeNow());
   keepAim();
   paint();

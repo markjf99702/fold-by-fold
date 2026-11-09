@@ -1214,6 +1214,58 @@ for (const reduce of [false, true]) {
   await p.context().close();
 }
 
+// Beside the fold's name, a picture of how the paper should look once the fold has landed, to check your own paper
+// against: in your paper, drawn as the gallery draws the models, from above for a step that leaves the paper flat, and
+// standing, as on the model's card, for one that stands it up. The words keep clear of it. A tap takes the fold to its
+// end, as the slider would, and another takes it back to where it was. It's bigger on a wide screen.
+{
+  const p = await fresh('#crane-3', { init: () => localStorage.setItem('fold-by-fold.v1', '{"paper":"indigo"}') });
+  await p.waitForFunction(() => fold.state.id === 'crane' && document.getElementById('glWait').hidden);
+  const look = () => p.evaluate(async () => {
+    const r = document.getElementById('result'), box = r.getBoundingClientRect(), chip = document.getElementById('chip').getBoundingClientRect();
+    const words = document.createRange();
+    words.selectNodeContents(document.getElementById('say'));
+    const { MODELS } = await import('./js/models.js'), { build } = await import('./js/build.js');
+    return {
+      shown: !r.hidden, size: Math.round(box.width), pressed: r.getAttribute('aria-pressed'),
+      beside: box.left > chip.right && box.top < chip.bottom && box.bottom > chip.top,
+      clear: [...words.getClientRects()].every((l) => l.right <= box.left || l.top >= box.bottom),
+      paper: [...new Set([...r.querySelectorAll('polygon')].map((q) => q.getAttribute('fill')))].every((c) => c === '#2f4f8f' || c === '#f3eee3'),
+      facets: r.querySelectorAll('polygon').length === build(MODELS.find((m) => m.id === 'crane')).steps[fold.state.i].to.facets.size,
+    };
+  });
+  const here = { shown: true, size: 50, pressed: 'false', beside: true, clear: true, paper: true, facets: true };
+  assert.deepEqual(await look(), here, 'step 3 has no picture of how it ends beside its name');
+  await p.tap('#result');
+  await p.waitForFunction(() => fold.state.t === 1, null, { timeout: 3000 }).catch(() => assert.fail('a tap on the picture did not take the fold to its end'));
+  assert.equal(await p.getAttribute('#result', 'aria-pressed'), 'true');
+  assert.equal(await p.textContent('#playLabel'), 'Next fold');
+  await p.tap('#result');
+  await p.waitForFunction(() => fold.state.t === 0, null, { timeout: 3000 }).catch(() => assert.fail('a second tap on the picture did not take the fold back'));
+  assert.equal(await p.getAttribute('#result', 'aria-pressed'), 'false');
+  // Back to where it was, part way through, and to its start if the fold was played to its end.
+  await p.evaluate(() => fold.set(2, 0.4));
+  await p.tap('#result');
+  await p.waitForFunction(() => fold.state.t === 1, null, { timeout: 3000 });
+  await p.tap('#result');
+  await p.waitForFunction(() => fold.state.t === 0.4, null, { timeout: 3000 }).catch(() => assert.fail('the picture did not take the fold back to where it was'));
+  await p.evaluate(() => fold.set(2, 1));
+  await p.tap('#result');
+  await p.waitForFunction(() => fold.state.t === 0, null, { timeout: 3000 });
+  // The next step has its own.
+  await p.click('#next');
+  assert.deepEqual(await look(), here, 'step 4\'s picture is not its own');
+  // The last step stands the crane up: its picture is the one on the crane's card, as at the top of the list.
+  await p.evaluate(() => fold.set(22, 0));
+  assert.equal(await p.evaluate(() => [...document.querySelectorAll('#result polygon')].map((q) => q.getAttribute('points')).join()),
+    await p.evaluate(() => [...document.querySelectorAll('#goal polygon')].map((q) => q.getAttribute('points')).join()), 'the standing crane is not pictured as on its card');
+  await p.setViewportSize({ width: 1280, height: 800 });
+  await p.evaluate(() => fold.set(9, 0));
+  assert.deepEqual(await look(), { ...here, size: 64 }, 'on a wide screen the picture is not bigger, or not clear of the words');
+  assert.ok(await p.locator('#result polygon[fill="#2f4f8f"]').count() > 0, 'the petal fold\'s picture is not in your paper');
+  await p.context().close();
+}
+
 // Two quick presses of Play still fold. The second comes while the marks are up and the paper hasn't moved yet, so it
 // looks as if the first did nothing: it starts the fold then, rather than pausing it before it begins.
 {
@@ -1960,7 +2012,8 @@ for (const [width, height] of [[390, 844], [360, 780], [320, 568], [844, 390], [
 // The bar of ticks is one stop for Tab, at the step you're on, the way the paper colours are: each tick was a stop of
 // its own, 38 presses to get past the frog's. With a tick in focus the arrow keys move the focus along with the step.
 // A screen reader comes to the step's words straight after the paper, then the ticks: they were read first, every one.
-// So Tab comes to the fold's name, which opens the key to the marks, before the ticks.
+// So Tab comes to the fold's name, which opens the key to the marks, and the picture of how the step ends, before the
+// ticks.
 {
   const p = await fresh('#frog-12');
   await p.waitForFunction(() => fold.state.id === 'frog');
@@ -1972,7 +2025,9 @@ for (const [width, height] of [[390, 844], [360, 780], [320, 568], [844, 390], [
   await p.keyboard.press('Tab');
   assert.equal(await on(), 'chip', 'Tab from the paper did not go to the fold\'s name');
   await p.keyboard.press('Tab');
-  assert.equal(await on(), 'tick 12', 'Tab from the fold\'s name did not go to the step\'s tick');
+  assert.equal(await on(), 'result', 'Tab from the fold\'s name did not go to the picture of how the step ends');
+  await p.keyboard.press('Tab');
+  assert.equal(await on(), 'tick 12', 'Tab from the picture of how the step ends did not go to the step\'s tick');
   await p.keyboard.press('Tab');
   assert.equal(await on(), 'scrub', 'Tab from the step\'s tick did not go on to the slider');
   await p.keyboard.press('Shift+Tab');

@@ -5,16 +5,20 @@
 //
 // It comes in two parts so the gallery needn't fold every model to show them: finished() works out the shapes,
 // which tools/make-thumbs.mjs does ahead of time for the finished models (js/finished.js), and picture() draws
-// them in whichever paper is chosen.
+// them in whichever paper is chosen. The player draws each step's result the same way, from after().
 
 import { det, area, centroid, intersectPolys, ccw } from './geom.js';
 import { poses, corners } from './motion.js';
 
-// The shapes of a built model's finished picture: standing() for one whose last step stands it up (it has a view
-// to be seen from), outline() for one that ends flat.
+// The shapes of a built model's finished picture: its last step's.
 export function finished(b) {
-  const last = b.steps[b.steps.length - 1];
-  return last.view ? standing(poses(last, 1), last.view) : outline(b.end);
+  return after(b.steps[b.steps.length - 1]);
+}
+
+// The shapes of the paper as a step leaves it, for the picture beside the fold's name in the player: standing() for a
+// step that stands the model up (it has a view to be seen from), outline() for one that leaves it flat.
+export function after(step) {
+  return step.view ? standing(poses(step, 1), step.view) : outline(step.to);
 }
 
 // The shapes, from the table up: for each facet, 1 if the front of the paper faces up (0 for the white back),

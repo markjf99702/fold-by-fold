@@ -7,7 +7,7 @@ import { apply, area, bisector, side, centroid, overlapArea, line, ccw, clip, de
 import { build } from '../js/build.js';
 import { poses, marks, symbol, corners, transformPoint, LAYER } from '../js/motion.js';
 import { MODELS } from '../js/models.js';
-import { finished, outline, standing, picture } from '../js/thumbs.js';
+import { finished, outline, standing, picture, after } from '../js/thumbs.js';
 import { FINISHED } from '../js/finished.js';
 import { crossings } from '../js/check.js';
 
@@ -1000,6 +1000,19 @@ test('a fold line is drawn only where there is paper, even where the moving pape
 
 // A flap bent part way never lands, so it isn't tucked anywhere, though folded flat it would land under paper that stays
 // put. The lily's petals, bent out as it stands up, had their arrows broken like a tuck's.
+// Beside the fold's name, the player pictures the paper as the step leaves it, as the gallery pictures a finished model.
+test('each step\'s result is pictured as the step leaves the paper, and the last step\'s is the gallery\'s picture', () => {
+  for (const model of MODELS) {
+    const b = once(model);
+    b.steps.forEach((s, i) => {
+      const shapes = after(s);
+      if (s.view) assert.equal(shapes.length, poses(s, 1).length, `${model.id} step ${i + 1}`);
+      else assert.deepEqual(shapes, outline(s.to), `${model.id} step ${i + 1}`);
+    });
+    assert.deepEqual(after(b.steps.at(-1)), FINISHED[model.id], `${model.id}'s last step is not pictured as its card is`);
+  }
+});
+
 test('a flap bent part way is never marked as tucked into a pocket', () => {
   const model = { id: 'bent', paper: { kind: 'Square' }, steps: [{
     say: 'Bend the left edge up, most of the way over.',

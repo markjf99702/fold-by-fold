@@ -291,6 +291,7 @@ html:has(#player:not([hidden])) { overscroll-behavior-y: none; }
   min-height: 0; overflow: hidden;
   background: var(--bg);
   border-top: 1px solid var(--line);
+  --result: 50px; /* the picture of how the step ends, in the top right corner of the words (and their hidden copy) */
 }
 .ticks, .scrub, .controls { flex: none; }
 /* The ticks come after the step's words in the page, so a screen reader reaches the words straight after the paper,
@@ -312,7 +313,7 @@ html:has(#player:not([hidden])) { overscroll-behavior-y: none; }
    longest words (measured by the page into --words), so the paper doesn't grow and shrink from step to step; on a
    short screen the paper's own room (above) still comes first. */
 .step-now {
-  display: grid; align-content: start; gap: 4px;
+  display: grid; align-content: start; gap: 4px; position: relative;
   flex: 1 1 var(--words, auto); min-height: 0; overflow-y: auto; overscroll-behavior: contain;
 }
 .step-now.more {
@@ -321,7 +322,7 @@ html:has(#player:not([hidden])) { overscroll-behavior-y: none; }
 }
 /* The step's number in large type before its symbol and name, the way origami books number their diagrams: in the
    models' own typeface, about twice the height of the name. The bar above says which step of how many. */
-.step-head { margin: 0; display: flex; align-items: center; gap: 10px; min-width: 0; }
+.step-head { margin: 0; display: flex; align-items: center; gap: 10px; min-width: 0; padding-right: calc(var(--result) + 14px); }
 .step-num { font-family: var(--display); font-weight: 800; font-size: 1.55rem; line-height: 1.2; font-variant-numeric: lining-nums tabular-nums; }
 /* The fold's name is a button that opens the key of marks at that fold, with a small question mark after it to say so.
    It reaches a finger's 44 px down over the words, rather than up into the bar of ticks. */
@@ -338,7 +339,20 @@ html:has(#player:not([hidden])) { overscroll-behavior-y: none; }
 @media (hover: hover) { .chip:hover { color: var(--ink); } }
 .chip svg { width: 34px; height: 12px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .chip .hollow { stroke-width: 1.6; }
-.say { margin: 0; font-size: 1.05rem; line-height: 1.45; min-height: 4.35em; } /* three lines at least */
+.say { margin: 0; font-size: 1.05rem; line-height: 1.45; min-height: 4.35em; display: flow-root; } /* three lines at least */
+/* Beside the fold's name, the picture of how the paper should look once the fold has landed (app.js): the step's result,
+   drawn as the gallery draws the finished models, on a piece of the mat. It's a button that takes the fold to its end and
+   back, ringed in the accent colour while the fold is there (4 px in from the corner, so the words' box doesn't cut the
+   ring off). The words' first lines keep clear of it, round a space as big as the rest of it below the fold's name (the
+   number sets that line's height). */
+.result {
+  position: absolute; top: 4px; right: 4px; width: var(--result); aspect-ratio: 1; padding: 0; border: 0; margin: 0;
+  border-radius: 8px; background: var(--mat); display: grid; place-items: center; cursor: pointer;
+}
+.result::before { content: ''; position: absolute; inset: -2px; } /* a finger's 44 px and more, within the words' box */
+.result svg { width: 84%; height: 84%; filter: drop-shadow(0 1.5px 2px rgba(0, 0, 0, .25)); }
+.result[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent); }
+.say::before { content: ''; float: right; width: calc(var(--result) + 14px); height: calc(var(--result) - 1.55rem * 1.2); }
 /* On step 1 of a model that shares a base with others, a quiet offer under the words to skip the base, a line for each,
    with the step to skip to in the accent colour. The words above keep no room of their own under them then, but keep
    the height of their own lines: where the box is too short for both (a small phone, a phone held sideways, Aa on),
@@ -451,6 +465,7 @@ html:has(#player:not([hidden])) { overscroll-behavior-y: none; }
 @media (min-width: 600px) and (max-width: 899px) and (orientation: portrait) {
   .panel > * { width: 100%; max-width: 36rem; margin-inline: auto; }
   .say { font-size: 1.2rem; }
+  .panel { --result: 64px; }
 }
 
 /* Aa, beside Slow, makes the words bigger, to read from the table with the phone at arm's length: the step's words a
@@ -559,6 +574,7 @@ html:has(#player:not([hidden])) { overscroll-behavior-y: none; }
   }
   .step-list .base-end::after { content: ''; flex: 1; border-top: 1px solid color-mix(in srgb, var(--accent) 35%, transparent); }
   .step-now { flex: none; overflow: visible; }
+  .panel { --result: 64px; }
   .say { min-height: 0; }
 }
 
