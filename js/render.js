@@ -1,7 +1,7 @@
 // Draws the paper in WebGL: two-sided sheets with a little paper grain, the edges of every layer,
 // a cutting mat with the paper's shadow on it, and the diagram marks (fold lines and arrows).
 
-import { corners, LAYER } from './motion.js';
+import { corners, arrowPath, LAYER } from './motion.js';
 
 const PAPER_VS = `
 attribute vec3 aPos; attribute vec3 aNormal; attribute vec2 aUv;
@@ -632,29 +632,6 @@ export class View {
     const [cw, ch] = this.size();
     return [((x / w + 1) / 2) * cw, ((1 - y / w) / 2) * ch];
   }
-}
-
-// Points along the arrow's arc: a half circle standing on the fold, over the paper for a valley fold and
-// under it for a mountain fold, ending short of the target so the head sits on it.
-function arrowPath(ar) {
-  const from = ar.from, to = ar.to;
-  const c = v3.lerp(from, to, 0.5);
-  const u = v3.sub(from, c);
-  const r = Math.hypot(u[0], u[1]);
-  const ud = v3.norm([u[0], u[1], 0]);
-  // Lean the arc sideways as well as up, so it reads as a curve from above as well as from the side.
-  const across = [-ud[1], ud[0], 0];
-  const bow = v3.norm(v3.add(v3.mul([0, 0, ar.over ? 1 : -1], 0.62), v3.mul(across, 0.78)));
-  const total = Math.PI * Math.min(1, (ar.angle || 180) / 180);
-  const pts = [];
-  const N = 28;
-  const k = 0.82; // start and end a little inside the moving part
-  for (let i = 0; i <= N; i++) {
-    const phi = 0.1 + (total - 0.2) * (i / N);
-    const x = r * k * Math.cos(phi), y = r * k * Math.sin(phi) * 0.75;
-    pts.push([c[0] + ud[0] * x + bow[0] * y, c[1] + ud[1] * x + bow[1] * y, c[2] + bow[2] * y]);
-  }
-  return pts;
 }
 
 // The arrow's shaft, a strip along the path, with its heads: first the halo under it all (under true), then

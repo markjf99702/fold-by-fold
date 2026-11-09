@@ -156,6 +156,7 @@
         <div class="step-list" id="stepList">
           <p class="goal" id="goal"></p>
           <ol id="steps" aria-label="All steps"></ol>
+          <button type="button" class="print-steps" id="printSteps">Print the steps</button>
         </div>
       </div>
 
@@ -170,6 +171,9 @@
         <div class="sheet-body" id="keyBody"></div>
       </dialog>
     </section>
+
+    <!-- The open model's steps as a printed diagram, made as it's printed (app.js): shown on paper only. -->
+    <section class="print-out" id="printOut"></section>
   </main>
 </body>
 </html>

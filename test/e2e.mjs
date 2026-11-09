@@ -1266,6 +1266,63 @@ for (const reduce of [false, true]) {
   await p.context().close();
 }
 
+// Printing a model gives its steps as a printed diagram, for folding away from the screen, and none of the player: its
+// name and the picture of what you'll make, then every step, numbered and three across, drawn flat from above with its
+// marks, and its words. A paler shade of your paper, so the marks read on it. On a wide screen Print the steps, at the
+// end of the list of steps, prints it; anywhere, the browser's own Print does. The gallery prints as it shows.
+{
+  const p = await fresh('#crane-5', { viewport: { width: 1280, height: 800 }, hasTouch: false, init: () => localStorage.setItem('fold-by-fold.v1', '{"paper":"indigo"}') });
+  await p.waitForFunction(() => fold.state.id === 'crane' && document.getElementById('glWait').hidden);
+  await p.evaluate(() => { window.print = () => { window.printed = (window.printed || 0) + 1; }; });
+  await p.locator('#printSteps').scrollIntoViewIfNeeded();
+  assert.ok(await p.isVisible('#printSteps'), 'no Print the steps at the end of the list of steps');
+  await p.click('#printSteps');
+  assert.equal(await p.evaluate(() => window.printed), 1, 'Print the steps did not print');
+  await p.emulateMedia({ media: 'print' });
+  const printout = () => p.evaluate(async () => {
+    const { MODELS } = await import('./js/models.js');
+    const out = document.getElementById('printOut'), id = fold.state.id, m = MODELS.find((x) => x.id === id);
+    const cells = [...out.querySelectorAll('.po-steps > li')];
+    const top = (k) => Math.round(cells[k].getBoundingClientRect().top);
+    return {
+      shows: [getComputedStyle(out).display !== 'none', getComputedStyle(document.getElementById('player')).display === 'none'],
+      name: out.querySelector('h1')?.textContent,
+      pictured: out.querySelectorAll('.po-head polygon').length > 0,
+      steps: cells.length === m.steps.length && cells.every((li, i) => li.querySelector('.po-n').textContent === String(i + 1) && li.textContent.includes(m.steps[i].say) && li.querySelectorAll('svg polygon').length > 0),
+      across: top(0) === top(1) && top(1) === top(2) && top(3) > top(0),
+      paper: [...new Set([...out.querySelectorAll('.po-steps svg polygon:not(.halo):not(.head)')].map((q) => q.getAttribute('fill')))].sort(),
+    };
+  });
+  assert.deepEqual(await printout(), { shows: [true, true], name: 'Crane', pictured: true, steps: true, across: true, paper: ['#97a7c7', '#ffffff'] },
+    'printing the crane does not give its steps as a printed diagram');
+  // Each step's own marks: a valley line and its arrow to fold and unfold, the symbol to turn it over, and both kinds of
+  // line for the collapse into the square base, with the arrow that follows a corner down.
+  assert.deepEqual(await p.evaluate(() => [1, 3, 6].map((n) => {
+    const cell = document.querySelectorAll('#printOut .po-steps > li')[n - 1];
+    return [...new Set([...cell.querySelectorAll('.line, .turnOver, .rotate, .arrow')].map((e) => e.getAttribute('class')))].sort().join(' ');
+  })), ['arrow line valley', 'turnOver', 'arrow line mountain line valley'], 'a printed step does not have its marks');
+  await p.emulateMedia({ media: 'screen' });
+  assert.deepEqual(await p.evaluate(() => [getComputedStyle(document.getElementById('printOut')).display, getComputedStyle(document.getElementById('player')).display]),
+    ['none', 'grid'], 'the printout shows on the screen');
+  await p.context().close();
+
+  // On a phone, from the browser's own Print (which tells the page first), with no link to print from.
+  const q = await fresh('#frog');
+  await q.waitForFunction(() => fold.state.id === 'frog' && document.getElementById('glWait').hidden);
+  assert.equal(await q.isVisible('#printSteps'), false, 'Print the steps shows on a phone');
+  await q.evaluate(() => window.dispatchEvent(new Event('beforeprint')));
+  await q.emulateMedia({ media: 'print' });
+  assert.equal(await q.evaluate(() => [...document.querySelectorAll('#printOut .po-steps > li')].length), 38, 'the browser\'s Print does not print the frog\'s steps');
+  // The gallery prints as it shows.
+  await q.emulateMedia({ media: 'screen' });
+  await q.click('#back');
+  await q.waitForSelector('#home:not([hidden])');
+  await q.evaluate(() => window.dispatchEvent(new Event('beforeprint')));
+  await q.emulateMedia({ media: 'print' });
+  assert.deepEqual(await q.evaluate(() => ['home', 'printOut'].map((id) => getComputedStyle(document.getElementById(id)).display !== 'none')), [true, false], 'printing the gallery prints the last model\'s steps');
+  await q.context().close();
+}
+
 // Two quick presses of Play still fold. The second comes while the marks are up and the paper hasn't moved yet, so it
 // looks as if the first did nothing: it starts the fold then, rather than pausing it before it begins.
 {

@@ -22,14 +22,20 @@ export function after(step) {
 }
 
 // The shapes, from the table up: for each facet, 1 if the front of the paper faces up (0 for the white back),
-// and its corners in a 100 x 100 box.
-export function outline(sheet, pad = 0.06) {
-  const b = sheet.bounds();
+// and its corners in a 100 x 100 box. The box frames the paper, or bounds b on the table (a printed step's takes in its
+// marks too, flat.js).
+export function outline(sheet, pad = 0.06, b = sheet.bounds()) {
+  const at = framing(b, pad), pt = (q) => at(q).map((v) => v.toFixed(2)).join(',');
+  return sheet.order.map((id) => [det(sheet.facets.get(id).m) > 0 ? 1 : 0, sheet.world(id).map(pt).join(' ')]);
+}
+
+// Where a point on the table goes in a 100 x 100 box round bounds b ({ x0, x1, y0, y1, cx, cy }), seen from above: b in
+// the middle, its longer side across the box with pad of that side to spare at each end.
+export function framing(b, pad = 0.06) {
   const size = Math.max(b.x1 - b.x0, b.y1 - b.y0) * (1 + pad * 2);
   const x0 = b.cx - size / 2, y1 = b.cy + size / 2;
   const S = 100 / size;
-  const pt = ([x, y]) => `${((x - x0) * S).toFixed(2)},${((y1 - y) * S).toFixed(2)}`;
-  return sheet.order.map((id) => [det(sheet.facets.get(id).m) > 0 ? 1 : 0, sheet.world(id).map(pt).join(' ')]);
+  return ([x, y]) => [(x - x0) * S, (y1 - y) * S];
 }
 
 const dot3 = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];

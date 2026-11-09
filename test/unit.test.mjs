@@ -8,6 +8,7 @@ import { build } from '../js/build.js';
 import { poses, marks, symbol, corners, transformPoint, LAYER } from '../js/motion.js';
 import { MODELS } from '../js/models.js';
 import { finished, outline, standing, picture, after } from '../js/thumbs.js';
+import { diagram } from '../js/flat.js';
 import { FINISHED } from '../js/finished.js';
 import { crossings } from '../js/check.js';
 
@@ -1000,6 +1001,41 @@ test('a fold line is drawn only where there is paper, even where the moving pape
 
 // A flap bent part way never lands, so it isn't tucked anywhere, though folded flat it would land under paper that stays
 // put. The lily's petals, bent out as it stands up, had their arrows broken like a tuck's.
+// Printing a model draws each step flat, as a printed diagram does: the paper as the step starts, from above, and over
+// it the marks the player draws, seen from above too.
+test('a printed step draws its paper as the step starts and each of its marks, inside the drawing and one weight in all', () => {
+  const widths = new Set();
+  for (const model of MODELS) {
+    once(model).steps.forEach((s, i) => {
+      const where = `${model.id} step ${i + 1}`;
+      const ms = marks(s) || [];
+      const svg = diagram(s, ms, { front: '#aabbcc' });
+      // Every facet, in the paper's colour where its front is up and white where its back is.
+      const fills = [...svg.matchAll(/<polygon points="[^"]*" fill="(#[0-9a-f]{6})" stroke="#4a443c"/g)].map((m) => m[1]);
+      assert.equal(fills.length, s.from.facets.size, `${where}: not every facet is drawn`);
+      assert.deepEqual(fills, s.from.order.map((id) => (det(s.from.facets.get(id).m) > 0 ? '#aabbcc' : '#ffffff')), `${where}: the paper's colours`);
+      // A dashed line for each valley fold, dashes and dots for each mountain fold, and none to open a fold out.
+      const lines = [...svg.matchAll(/<path class="line (valley|mountain)" d="[^"]*" stroke="#1d1b18" stroke-width="([\d.]+)" stroke-dasharray="([^"]+)"/g)];
+      assert.deepEqual(lines.map((m) => m[1]), ms.filter((m) => m.line && !m.unfold).map((m) => m.type), `${where}: the fold lines`);
+      for (const [, type, w, dash] of lines) { assert.equal(dash.split(' ').length, type === 'mountain' ? 4 : 2, where); widths.add(w); }
+      // Each arrow, or the symbol for turning the model over or around, with the head the player gives it, and one
+      // to unfold at the tail of a fold and unfold. A tuck's arrow breaks where it goes in under the pocket.
+      const want = ms.filter((m) => m.path || m.arrow);
+      const groups = [...svg.matchAll(/<g class="(arrow|turnOver|rotate)">(.*?)<\/g>/g)];
+      assert.deepEqual(groups.map((g) => g[1]), want.map((m) => (m.path ? m.type : 'arrow')), `${where}: the arrows and symbols`);
+      groups.forEach(([, , g], k) => {
+        const a = want[k].arrow;
+        assert.deepEqual([...g.matchAll(/class="head (\w+)"/g)].map((h) => h[1]), [a.head || 'valley', ...(a.back ? ['unfold'] : [])], `${where}: an arrow's heads`);
+        assert.equal(g.match(/class="shaft" d="([^"]*)"/)[1].split('M').length - 1, a.tuck ? 2 : 1, `${where}: a tuck's arrow doesn't break, or another does`);
+      });
+      // All of it in the drawing's box, the symbols beside the model and the arrows' heads too.
+      const nums = [...svg.matchAll(/ (?:points|d)="([^"]*)"/g)].flatMap((m) => m[1].match(/-?\d+(\.\d+)?/g).map(Number));
+      assert.ok(nums.every((v) => v >= 0 && v <= 100), `${where}: a mark goes outside the drawing`);
+    });
+  }
+  assert.equal(widths.size, 1, `fold lines are drawn at different weights: ${[...widths]}`);
+});
+
 // Beside the fold's name, the player pictures the paper as the step leaves it, as the gallery pictures a finished model.
 test('each step\'s result is pictured as the step leaves the paper, and the last step\'s is the gallery\'s picture', () => {
   for (const model of MODELS) {

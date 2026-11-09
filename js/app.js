@@ -5,6 +5,7 @@ import { build } from './build.js';
 import { poses, marks, symbol, corners, edgeOn } from './motion.js';
 import { View } from './render.js';
 import { picture, after } from './thumbs.js';
+import { diagram } from './flat.js';
 import { FINISHED } from './finished.js';
 
 const KEY = 'fold-by-fold.v1';
@@ -182,9 +183,11 @@ function duration(step) {
 // paper still to come on the mat, and the folding waits until that has been drawn. Meanwhile the keys and buttons do
 // nothing (P.waiting), and going anywhere else drops it. A model opened before shows at once, folded.
 let opening = 0; // counts the models opened, so only the latest goes on to be shown once it's folded
+let inPlayer = null; // the model the player shows, folded yet or not
 function openModel(id, i = null, { landed = false } = {}) {
   const m = MODELS.find((x) => x.id === id);
   if (!m) { location.hash = ''; return; }
+  inPlayer = id;
   const ticket = ++opening;
   show('player');
   if (builtCache.has(id)) { ready(m, i, landed); return; }
@@ -707,6 +710,52 @@ function goalCard(a) {
   $('goalCard').hidden = a <= 0.01;
   $('goalCard').style.opacity = a;
 }
+
+// ---------- Printing ----------
+
+// Printing a model gives its steps as a printed diagram, for folding away from the screen, rather than one frame of the
+// paper and a greyed-out Play: its name and the picture of what you'll make, then every step, numbered and three
+// across, drawn flat from above as it starts, with its marks and its words (flat.js draws them, css/app.css lays them
+// out for paper). The paper's colour is a paler shade of yours, so the marks read on it and a printer spares its ink.
+// It's made as printing begins, from the browser's own Print or Ctrl+P (beforeprint), or from Print the steps under
+// the list of steps on a wide screen, and kept for the next time. The gallery prints as it shows.
+let printFor = null; // the model and paper colour the printout was made for
+function printOut(id) {
+  const paper = paperColor(), key = `${id} ${paper}`;
+  if (printFor === key) return;
+  printFor = key;
+  const b = built(id), m = b.model, front = paler(paper), ink = '#1d1b18';
+  const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text) e.textContent = text; return e; };
+  const head = el('header', 'po-head');
+  const pic = el('span', 'po-pic');
+  pic.innerHTML = picture(FINISHED[id], { front, back: '#ffffff', edge: 'rgba(40,30,20,.6)' });
+  const about = el('div');
+  about.append(el('h1', '', m.name), el('p', 'po-meta', `${m.level} · ${m.paper.kind} · ${b.steps.length} steps`), el('p', 'po-blurb', m.blurb));
+  // Where to watch it fold, from a copy online.
+  if (/^https?:$/.test(location.protocol)) about.append(el('p', 'po-from', `Watch each fold in 3D: ${location.host}${location.pathname}#${id}`));
+  head.append(pic, about);
+  const list = el('ol', 'po-steps');
+  b.steps.forEach((s, i) => {
+    const li = el('li');
+    const n = el('span', 'po-n', String(i + 1));
+    const drawing = el('span', 'po-pic');
+    drawing.innerHTML = diagram(s, marksOf(s), { front, ink });
+    const words = el('p');
+    words.append(el('b', '', s.name), ` ${s.say}`);
+    li.append(n, drawing, words);
+    if (m.steps[i].base) li.append(el('p', 'po-base', `${m.steps[i].base} · steps 1–${i + 1}`));
+    list.append(li);
+  });
+  $('printOut').replaceChildren(head, list);
+}
+// The paper's colour halfway to white.
+function paler(hex) {
+  const n = parseInt(hex.slice(1), 16);
+  const c = [n >> 16, (n >> 8) & 255, n & 255].map((v) => Math.round((v + 255) / 2));
+  return `#${((c[0] << 16) | (c[1] << 8) | c[2]).toString(16).padStart(6, '0')}`;
+}
+window.addEventListener('beforeprint', () => { if (!$('player').hidden && inPlayer) printOut(inPlayer); });
+$('printSteps').addEventListener('click', () => { if (inPlayer) printOut(inPlayer); window.print(); });
 
 // ---------- Drawing and the camera ----------
 

@@ -686,6 +686,31 @@ function mechMarks(step) {
   return out.length ? out : null;
 }
 
+// Points along a fold arrow's arc: a half circle standing on the fold, over the paper for a valley fold and under it for
+// a mountain fold, ending short of the target so the head sits on it. It leans sideways as well as up, so it reads as a
+// curve from above as well as from the side, and a printed step draws it as it looks from straight above (flat.js).
+export function arrowPath(ar) {
+  const from = ar.from, to = ar.to;
+  const c = [0, 1, 2].map((k) => from[k] + (to[k] - from[k]) * 0.5);
+  const u = [from[0] - c[0], from[1] - c[1]];
+  const r = Math.hypot(u[0], u[1]);
+  const ud = [u[0] / (r || 1), u[1] / (r || 1)];
+  // Lean the arc sideways as well as up.
+  const bow0 = [-ud[1] * 0.78, ud[0] * 0.78, (ar.over ? 1 : -1) * 0.62];
+  const bl = Math.hypot(...bow0) || 1;
+  const bow = bow0.map((k) => k / bl);
+  const total = Math.PI * Math.min(1, (ar.angle || 180) / 180);
+  const pts = [];
+  const N = 28;
+  const k = 0.82; // start and end a little inside the moving part
+  for (let i = 0; i <= N; i++) {
+    const phi = 0.1 + (total - 0.2) * (i / N);
+    const x = r * k * Math.cos(phi), y = r * k * Math.sin(phi) * 0.75;
+    pts.push([c[0] + ud[0] * x + bow[0] * y, c[1] + ud[1] * x + bow[1] * y, c[2] + bow[2] * y]);
+  }
+  return pts;
+}
+
 // The facet's corners on the paper and in 3D.
 export function corners(item) {
   if (item.pts) return item.pts;
